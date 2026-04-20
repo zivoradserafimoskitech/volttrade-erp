@@ -55,8 +55,9 @@ export default function BillingRuns() {
     for (const c of (contracts ?? [])) {
       const t = (tariffs ?? []).find((x: any) => x.id === c.tariff_id);
       if (!t) continue;
-      const energy = (t.components ?? []).find((x: any) => x.type === 'energy')?.value ?? 0;
-      const fixed = (t.components ?? []).find((x: any) => x.type === 'fixed_fee')?.value ?? 0;
+      const comps = (Array.isArray(t.components) ? t.components : []) as any[];
+      const energy = comps.find((x: any) => x.type === 'energy')?.value ?? 0;
+      const fixed = comps.find((x: any) => x.type === 'fixed_fee')?.value ?? 0;
       const mpIds = (links ?? []).filter((l: any) => l.contract_id === c.id).map((l: any) => l.metering_point_id);
       const kwh = (readings ?? []).filter((r: any) => mpIds.includes(r.metering_point_id)).reduce((s: number, r: any) => s + Number(r.import_kwh || 0), 0);
       const mwh = kwh / 1000;
