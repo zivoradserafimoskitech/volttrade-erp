@@ -14,7 +14,240 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clients: {
+        Row: {
+          company_name: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          contract_type: string
+          created_at: string
+          fixed_price_eur_mwh: number | null
+          id: string
+          margin_eur_mwh: number
+          status: string
+          tax_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_name: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contract_type?: string
+          created_at?: string
+          fixed_price_eur_mwh?: number | null
+          id?: string
+          margin_eur_mwh?: number
+          status?: string
+          tax_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_name?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contract_type?: string
+          created_at?: string
+          fixed_price_eur_mwh?: number | null
+          id?: string
+          margin_eur_mwh?: number
+          status?: string
+          tax_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      consumption_readings: {
+        Row: {
+          actual_mwh: number | null
+          created_at: string
+          forecast_mwh: number | null
+          id: string
+          metering_point_id: string
+          reading_at: string
+        }
+        Insert: {
+          actual_mwh?: number | null
+          created_at?: string
+          forecast_mwh?: number | null
+          id?: string
+          metering_point_id: string
+          reading_at: string
+        }
+        Update: {
+          actual_mwh?: number | null
+          created_at?: string
+          forecast_mwh?: number | null
+          id?: string
+          metering_point_id?: string
+          reading_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumption_readings_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          client_id: string
+          created_at: string
+          energy_amount_eur: number
+          id: string
+          invoice_number: string
+          margin_amount_eur: number
+          period_end: string
+          period_start: string
+          status: string
+          total_eur: number
+          total_mwh: number
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          energy_amount_eur?: number
+          id?: string
+          invoice_number: string
+          margin_amount_eur?: number
+          period_end: string
+          period_start: string
+          status?: string
+          total_eur?: number
+          total_mwh?: number
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          energy_amount_eur?: number
+          id?: string
+          invoice_number?: string
+          margin_amount_eur?: number
+          period_end?: string
+          period_start?: string
+          status?: string
+          total_eur?: number
+          total_mwh?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_prices: {
+        Row: {
+          created_at: string
+          delivery_at: string
+          id: string
+          price_eur_mwh: number
+        }
+        Insert: {
+          created_at?: string
+          delivery_at: string
+          id?: string
+          price_eur_mwh: number
+        }
+        Update: {
+          created_at?: string
+          delivery_at?: string
+          id?: string
+          price_eur_mwh?: number
+        }
+        Relationships: []
+      }
+      metering_points: {
+        Row: {
+          address: string | null
+          annual_consumption_mwh: number | null
+          client_id: string
+          created_at: string
+          edu_code: string
+          id: string
+          voltage_level: string | null
+        }
+        Insert: {
+          address?: string | null
+          annual_consumption_mwh?: number | null
+          client_id: string
+          created_at?: string
+          edu_code: string
+          id?: string
+          voltage_level?: string | null
+        }
+        Update: {
+          address?: string | null
+          annual_consumption_mwh?: number | null
+          client_id?: string
+          created_at?: string
+          edu_code?: string
+          id?: string
+          voltage_level?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metering_points_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nominations: {
+        Row: {
+          balancing_cost_eur: number
+          counterparty: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          price_eur_mwh: number
+          side: string
+          trade_date: string
+          user_id: string
+          volume_mwh: number
+        }
+        Insert: {
+          balancing_cost_eur?: number
+          counterparty?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price_eur_mwh: number
+          side: string
+          trade_date: string
+          user_id: string
+          volume_mwh: number
+        }
+        Update: {
+          balancing_cost_eur?: number
+          counterparty?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price_eur_mwh?: number
+          side?: string
+          trade_date?: string
+          user_id?: string
+          volume_mwh?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
