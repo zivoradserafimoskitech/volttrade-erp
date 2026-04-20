@@ -1,0 +1,4 @@
+project_id = "volttrade-erp"
+
+[functions.seed-demo-data]
+verify_jwt = true
