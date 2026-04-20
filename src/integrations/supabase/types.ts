@@ -14,53 +14,163 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          after_data: Json | null
+          before_data: Json | null
+          created_at: string
+          id: string
+          record_id: string | null
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          id?: string
+          record_id?: string | null
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          id?: string
+          record_id?: string | null
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      billing_runs: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_count: number
+          notes: string | null
+          period_end: string
+          period_start: string
+          scope: string
+          scope_id: string | null
+          status: string
+          total_eur: number
+          total_mwh: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_count?: number
+          notes?: string | null
+          period_end: string
+          period_start: string
+          scope?: string
+          scope_id?: string | null
+          status?: string
+          total_eur?: number
+          total_mwh?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_count?: number
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          scope?: string
+          scope_id?: string | null
+          status?: string
+          total_eur?: number
+          total_mwh?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
+          address: string | null
+          city: string | null
           company_name: string
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
           contract_type: string
+          country_code: string | null
           created_at: string
+          credit_limit_eur: number
+          customer_category: string
           fixed_price_eur_mwh: number | null
           id: string
           margin_eur_mwh: number
+          notes: string | null
+          payment_terms_days: number
           status: string
           tax_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          address?: string | null
+          city?: string | null
           company_name: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           contract_type?: string
+          country_code?: string | null
           created_at?: string
+          credit_limit_eur?: number
+          customer_category?: string
           fixed_price_eur_mwh?: number | null
           id?: string
           margin_eur_mwh?: number
+          notes?: string | null
+          payment_terms_days?: number
           status?: string
           tax_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          address?: string | null
+          city?: string | null
           company_name?: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           contract_type?: string
+          country_code?: string | null
           created_at?: string
+          credit_limit_eur?: number
+          customer_category?: string
           fixed_price_eur_mwh?: number | null
           id?: string
           margin_eur_mwh?: number
+          notes?: string | null
+          payment_terms_days?: number
           status?: string
           tax_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_country_code_fkey"
+            columns: ["country_code"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       consumption_readings: {
         Row: {
@@ -97,50 +207,105 @@ export type Database = {
           },
         ]
       }
+      countries: {
+        Row: {
+          code: string
+          created_at: string
+          currency: string
+          name: string
+          tso_code: string | null
+          vat_percent: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          currency?: string
+          name: string
+          tso_code?: string | null
+          vat_percent?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          currency?: string
+          name?: string
+          tso_code?: string | null
+          vat_percent?: number
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
+          billing_run_id: string | null
           client_id: string
+          components: Json
           created_at: string
+          currency: string
+          doc_type: string
+          due_date: string | null
           energy_amount_eur: number
           id: string
           invoice_number: string
           margin_amount_eur: number
+          paid_amount_eur: number
           period_end: string
           period_start: string
           status: string
+          tax_amount_eur: number
           total_eur: number
           total_mwh: number
           user_id: string
         }
         Insert: {
+          billing_run_id?: string | null
           client_id: string
+          components?: Json
           created_at?: string
+          currency?: string
+          doc_type?: string
+          due_date?: string | null
           energy_amount_eur?: number
           id?: string
           invoice_number: string
           margin_amount_eur?: number
+          paid_amount_eur?: number
           period_end: string
           period_start: string
           status?: string
+          tax_amount_eur?: number
           total_eur?: number
           total_mwh?: number
           user_id: string
         }
         Update: {
+          billing_run_id?: string | null
           client_id?: string
+          components?: Json
           created_at?: string
+          currency?: string
+          doc_type?: string
+          due_date?: string | null
           energy_amount_eur?: number
           id?: string
           invoice_number?: string
           margin_amount_eur?: number
+          paid_amount_eur?: number
           period_end?: string
           period_start?: string
           status?: string
+          tax_amount_eur?: number
           total_eur?: number
           total_mwh?: number
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "invoices_billing_run_id_fkey"
+            columns: ["billing_run_id"]
+            isOneToOne: false
+            referencedRelation: "billing_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoices_client_id_fkey"
             columns: ["client_id"]
@@ -171,32 +336,103 @@ export type Database = {
         }
         Relationships: []
       }
+      meter_readings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          export_kwh: number
+          id: string
+          import_kwh: number
+          metering_point_id: string
+          notes: string | null
+          reading_at: string
+          source: string
+          validated_at: string | null
+          validated_by: string | null
+          validation_status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          export_kwh?: number
+          id?: string
+          import_kwh?: number
+          metering_point_id: string
+          notes?: string | null
+          reading_at: string
+          source?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          export_kwh?: number
+          id?: string
+          import_kwh?: number
+          metering_point_id?: string
+          notes?: string | null
+          reading_at?: string
+          source?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meter_readings_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       metering_points: {
         Row: {
           address: string | null
           annual_consumption_mwh: number | null
+          capacity_kw: number | null
           client_id: string
+          connection_type: string | null
           created_at: string
+          dso_area: string | null
           edu_code: string
           id: string
+          meter_id: string | null
+          notes: string | null
+          status: string
           voltage_level: string | null
         }
         Insert: {
           address?: string | null
           annual_consumption_mwh?: number | null
+          capacity_kw?: number | null
           client_id: string
+          connection_type?: string | null
           created_at?: string
+          dso_area?: string | null
           edu_code: string
           id?: string
+          meter_id?: string | null
+          notes?: string | null
+          status?: string
           voltage_level?: string | null
         }
         Update: {
           address?: string | null
           annual_consumption_mwh?: number | null
+          capacity_kw?: number | null
           client_id?: string
+          connection_type?: string | null
           created_at?: string
+          dso_area?: string | null
           edu_code?: string
           id?: string
+          meter_id?: string | null
+          notes?: string | null
+          status?: string
           voltage_level?: string | null
         }
         Relationships: [
@@ -248,15 +484,297 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_allocations: {
+        Row: {
+          amount_eur: number
+          created_at: string
+          id: string
+          invoice_id: string
+          payment_id: string
+        }
+        Insert: {
+          amount_eur: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          payment_id: string
+        }
+        Update: {
+          amount_eur?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          payment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_allocations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount_eur: number
+          bank_reference: string | null
+          client_id: string
+          created_at: string
+          currency: string
+          id: string
+          method: string
+          notes: string | null
+          paid_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount_eur: number
+          bank_reference?: string | null
+          client_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          paid_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount_eur?: number
+          bank_reference?: string | null
+          client_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          paid_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supply_contract_points: {
+        Row: {
+          contract_id: string
+          metering_point_id: string
+        }
+        Insert: {
+          contract_id: string
+          metering_point_id: string
+        }
+        Update: {
+          contract_id?: string
+          metering_point_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supply_contract_points_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "supply_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supply_contract_points_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supply_contracts: {
+        Row: {
+          annual_volume_mwh: number | null
+          auto_renew: boolean
+          client_id: string
+          contract_number: string
+          created_at: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          payment_terms_days: number
+          start_date: string
+          status: string
+          tariff_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          annual_volume_mwh?: number | null
+          auto_renew?: boolean
+          client_id: string
+          contract_number: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_terms_days?: number
+          start_date: string
+          status?: string
+          tariff_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          annual_volume_mwh?: number | null
+          auto_renew?: boolean
+          client_id?: string
+          contract_number?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_terms_days?: number
+          start_date?: string
+          status?: string
+          tariff_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supply_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supply_contracts_tariff_id_fkey"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tariffs: {
+        Row: {
+          code: string
+          components: Json
+          created_at: string
+          currency: string
+          customer_segment: string | null
+          id: string
+          model: string
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          valid_from: string
+          valid_to: string | null
+          vat_included: boolean
+        }
+        Insert: {
+          code: string
+          components?: Json
+          created_at?: string
+          currency?: string
+          customer_segment?: string | null
+          id?: string
+          model?: string
+          name: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          valid_from: string
+          valid_to?: string | null
+          vat_included?: boolean
+        }
+        Update: {
+          code?: string
+          components?: Json
+          created_at?: string
+          currency?: string
+          customer_segment?: string | null
+          id?: string
+          model?: string
+          name?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valid_from?: string
+          valid_to?: string | null
+          vat_included?: boolean
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "admin"
+        | "management"
+        | "trader"
+        | "supply_manager"
+        | "billing_officer"
+        | "finance"
+        | "risk_officer"
+        | "operations"
+        | "auditor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -383,6 +901,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "admin",
+        "management",
+        "trader",
+        "supply_manager",
+        "billing_officer",
+        "finance",
+        "risk_officer",
+        "operations",
+        "auditor",
+      ],
+    },
   },
 } as const
