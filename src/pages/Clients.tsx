@@ -53,11 +53,11 @@ export default function Clients() {
   const addEdu = async (form: FormData, client_id: string) => {
     const { error } = await supabase.from("metering_points").insert({
       client_id,
-      edu_code: form.get("edu_code"),
+      edu_code: String(form.get("edu_code")),
       address: form.get("address") || null,
       voltage_level: form.get("voltage_level") || null,
       annual_consumption_mwh: form.get("annual_consumption_mwh") ? Number(form.get("annual_consumption_mwh")) : null,
-    });
+    } as any);
     if (error) return toast.error(error.message);
     toast.success("Metering point added"); setOpenEdu(null); load();
   };

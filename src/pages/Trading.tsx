@@ -28,14 +28,14 @@ export default function Trading() {
   const add = async (form: FormData) => {
     const { error } = await supabase.from("nominations").insert({
       user_id: user!.id,
-      trade_date: form.get("trade_date"),
-      side: form.get("side"),
+      trade_date: String(form.get("trade_date")),
+      side: String(form.get("side")) as "buy" | "sell",
       counterparty: form.get("counterparty") || null,
       volume_mwh: Number(form.get("volume_mwh")),
       price_eur_mwh: Number(form.get("price_eur_mwh")),
       balancing_cost_eur: Number(form.get("balancing_cost_eur") || 0),
       notes: form.get("notes") || null,
-    });
+    } as any);
     if (error) return toast.error(error.message);
     toast.success("Nomination saved"); load();
   };
