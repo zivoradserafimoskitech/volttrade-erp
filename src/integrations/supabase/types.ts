@@ -207,6 +207,74 @@ export type Database = {
           },
         ]
       }
+      counterparties: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          country_code: string | null
+          created_at: string
+          credit_limit_eur: number
+          eic_code: string | null
+          id: string
+          legal_name: string
+          notes: string | null
+          payment_terms_days: number
+          risk_status: string
+          short_name: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          vat_number: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country_code?: string | null
+          created_at?: string
+          credit_limit_eur?: number
+          eic_code?: string | null
+          id?: string
+          legal_name: string
+          notes?: string | null
+          payment_terms_days?: number
+          risk_status?: string
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          vat_number?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country_code?: string | null
+          created_at?: string
+          credit_limit_eur?: number
+          eic_code?: string | null
+          id?: string
+          legal_name?: string
+          notes?: string | null
+          payment_terms_days?: number
+          risk_status?: string
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counterparties_country_code_fkey"
+            columns: ["country_code"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       countries: {
         Row: {
           code: string
@@ -573,6 +641,99 @@ export type Database = {
           },
         ]
       }
+      schedule_lines: {
+        Row: {
+          created_at: string
+          direction: string
+          hour: number
+          id: string
+          schedule_id: string
+          trade_id: string | null
+          volume_mwh: number
+        }
+        Insert: {
+          created_at?: string
+          direction?: string
+          hour: number
+          id?: string
+          schedule_id: string
+          trade_id?: string | null
+          volume_mwh?: number
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          hour?: number
+          id?: string
+          schedule_id?: string
+          trade_id?: string | null
+          volume_mwh?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_lines_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_lines_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedules: {
+        Row: {
+          created_at: string
+          delivery_date: string
+          id: string
+          message_log: Json
+          notes: string | null
+          response_at: string | null
+          schedule_number: string
+          status: string
+          submitted_at: string | null
+          tso_area: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          delivery_date: string
+          id?: string
+          message_log?: Json
+          notes?: string | null
+          response_at?: string | null
+          schedule_number: string
+          status?: string
+          submitted_at?: string | null
+          tso_area: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          delivery_date?: string
+          id?: string
+          message_log?: Json
+          notes?: string | null
+          response_at?: string | null
+          schedule_number?: string
+          status?: string
+          submitted_at?: string | null
+          tso_area?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: []
+      }
       supply_contract_points: {
         Row: {
           contract_id: string
@@ -722,6 +883,140 @@ export type Database = {
           vat_included?: boolean
         }
         Relationships: []
+      }
+      trades: {
+        Row: {
+          counterparty_id: string | null
+          created_at: string
+          delivery_end: string
+          delivery_start: string
+          hub: string | null
+          id: string
+          market: string
+          notes: string | null
+          price_eur_mwh: number
+          side: string
+          status: string
+          total_value_eur: number | null
+          trade_number: string
+          trader: string | null
+          trading_contract_id: string | null
+          updated_at: string
+          user_id: string
+          volume_mwh: number
+        }
+        Insert: {
+          counterparty_id?: string | null
+          created_at?: string
+          delivery_end: string
+          delivery_start: string
+          hub?: string | null
+          id?: string
+          market?: string
+          notes?: string | null
+          price_eur_mwh: number
+          side: string
+          status?: string
+          total_value_eur?: number | null
+          trade_number: string
+          trader?: string | null
+          trading_contract_id?: string | null
+          updated_at?: string
+          user_id: string
+          volume_mwh: number
+        }
+        Update: {
+          counterparty_id?: string | null
+          created_at?: string
+          delivery_end?: string
+          delivery_start?: string
+          hub?: string | null
+          id?: string
+          market?: string
+          notes?: string | null
+          price_eur_mwh?: number
+          side?: string
+          status?: string
+          total_value_eur?: number | null
+          trade_number?: string
+          trader?: string | null
+          trading_contract_id?: string | null
+          updated_at?: string
+          user_id?: string
+          volume_mwh?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trades_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_trading_contract_id_fkey"
+            columns: ["trading_contract_id"]
+            isOneToOne: false
+            referencedRelation: "trading_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trading_contracts: {
+        Row: {
+          contract_number: string
+          contract_type: string
+          counterparty_id: string
+          created_at: string
+          currency: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          signed_date: string | null
+          start_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contract_number: string
+          contract_type?: string
+          counterparty_id: string
+          created_at?: string
+          currency?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          signed_date?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contract_number?: string
+          contract_type?: string
+          counterparty_id?: string
+          created_at?: string
+          currency?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          signed_date?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trading_contracts_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
