@@ -19,6 +19,9 @@ import BillingRuns from "./pages/BillingRuns";
 import Payments from "./pages/Payments";
 import UsersAdmin from "./pages/admin/UsersAdmin";
 import Settings from "./pages/admin/Settings";
+import Counterparties from "./pages/Counterparties";
+import TradingContracts from "./pages/TradingContracts";
+import Schedules from "./pages/Schedules";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +44,9 @@ const App = () => (
             <Route path="/payments" element={<Payments />} />
             <Route path="/market" element={<Market />} />
             <Route path="/trading" element={<Trading />} />
+            <Route path="/counterparties" element={<Counterparties />} />
+            <Route path="/trading-contracts" element={<TradingContracts />} />
+            <Route path="/schedules" element={<Schedules />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
