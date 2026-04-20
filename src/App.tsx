@@ -11,6 +11,14 @@ import Trading from "./pages/Trading";
 import Invoices from "./pages/Invoices";
 import AuthPage from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import SupplyPoints from "./pages/SupplyPoints";
+import Tariffs from "./pages/Tariffs";
+import SupplyContracts from "./pages/SupplyContracts";
+import MeterReadings from "./pages/MeterReadings";
+import BillingRuns from "./pages/BillingRuns";
+import Payments from "./pages/Payments";
+import UsersAdmin from "./pages/admin/UsersAdmin";
+import Settings from "./pages/admin/Settings";
 
 const queryClient = new QueryClient();
 
@@ -25,9 +33,17 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
+            <Route path="/supply-points" element={<SupplyPoints />} />
+            <Route path="/tariffs" element={<Tariffs />} />
+            <Route path="/contracts" element={<SupplyContracts />} />
+            <Route path="/readings" element={<MeterReadings />} />
+            <Route path="/billing" element={<BillingRuns />} />
+            <Route path="/payments" element={<Payments />} />
             <Route path="/market" element={<Market />} />
             <Route path="/trading" element={<Trading />} />
             <Route path="/invoices" element={<Invoices />} />
+            <Route path="/admin/users" element={<UsersAdmin />} />
+            <Route path="/admin/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
