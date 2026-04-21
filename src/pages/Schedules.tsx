@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { Plus, CalendarClock, Send, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { Plus, CalendarClock, Send, CheckCircle2, XCircle, Trash2, Wand2 } from "lucide-react";
 import { fmtNum } from "@/lib/format";
 
 type Sch = { id: string; schedule_number: string; tso_area: string; delivery_date: string; version: number; status: string; submitted_at: string|null; response_at: string|null };
@@ -83,6 +83,46 @@ export default function Schedules() {
     toast.success(`Status: ${status}`); load();
   };
 
+  const generateFromTrades = async (s: Sch) => {
+    // Aggregate confirmed/nominated trades that overlap the delivery date and match TSO area (hub)
+    const dayStart = new Date(`${s.delivery_date}T00:00:00`);
+    const dayEnd = new Date(`${s.delivery_date}T23:59:59`);
+    const { data: trades, error } = await supabase
+      .from("trades")
+      .select("side,volume_mwh,delivery_start,delivery_end,hub,status")
+      .in("status", ["confirmed", "nominated"])
+      .lte("delivery_start", dayEnd.toISOString())
+      .gte("delivery_end", dayStart.toISOString());
+    if (error) return toast.error(error.message);
+    const matching = (trades ?? []).filter(t => !t.hub || !s.tso_area || t.hub.toLowerCase().includes(s.tso_area.toLowerCase()) || s.tso_area.toLowerCase().includes((t.hub || "").toLowerCase()));
+    if (matching.length === 0) return toast.error("No confirmed/nominated trades match this day & TSO area");
+    // Spread each trade volume evenly across its delivery hours within the day
+    const hourly = Array(24).fill(0);
+    for (const t of matching) {
+      const start = new Date(Math.max(new Date(t.delivery_start).getTime(), dayStart.getTime()));
+      const end = new Date(Math.min(new Date(t.delivery_end).getTime(), dayEnd.getTime() + 1000));
+      const hours = Math.max(1, Math.round((end.getTime() - start.getTime()) / 3600_000));
+      const perHour = Number(t.volume_mwh) / hours;
+      const sign = t.side === "buy" ? 1 : -1;
+      for (let i = 0; i < hours; i++) {
+        const h = (start.getHours() + i) % 24;
+        hourly[h] += sign * perHour;
+      }
+    }
+    // Update existing lines with new volumes
+    const existing = lines[s.id] ?? (await (async () => { await loadLines(s.id); return lines[s.id] ?? []; })());
+    if (existing.length === 0) return toast.error("Open the schedule first to load lines");
+    await Promise.all(existing.map(l => supabase.from("schedule_lines").update({ volume_mwh: Number(hourly[l.hour].toFixed(3)) }).eq("id", l.id)));
+    toast.success(`Generated from ${matching.length} trade(s)`);
+    loadLines(s.id);
+  };
+
+  const fillAll = async (sid: string, value: number) => {
+    const ls = lines[sid] ?? [];
+    await Promise.all(ls.map(l => supabase.from("schedule_lines").update({ volume_mwh: value }).eq("id", l.id)));
+    loadLines(sid);
+  };
+
   const remove = async (id: string) => {
     if (!confirm("Delete schedule and all hourly lines?")) return;
     await supabase.from("schedules").delete().eq("id", id); load();
@@ -132,8 +172,8 @@ export default function Schedules() {
             </TableRow></TableHeader>
             <TableBody>
               {rows.map(r => (
-                <>
-                  <TableRow key={r.id} className="cursor-pointer" onClick={() => toggle(r.id)}>
+                <React.Fragment key={r.id}>
+                  <TableRow className="cursor-pointer" onClick={() => toggle(r.id)}>
                     <TableCell className="font-mono text-xs">{r.schedule_number}</TableCell>
                     <TableCell>{r.tso_area}</TableCell>
                     <TableCell>{r.delivery_date}</TableCell>
@@ -154,7 +194,18 @@ export default function Schedules() {
                   {expanded === r.id && (
                     <TableRow>
                       <TableCell colSpan={7} className="bg-muted/20 p-4">
-                        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Hourly lines (MWh)</div>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-xs uppercase tracking-wider text-muted-foreground">Hourly lines (MWh)</div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => generateFromTrades(r)}>
+                              <Wand2 className="h-3 w-3 mr-1" /> Generate from trades
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => {
+                              const v = Number(prompt("Set all 24 hours to (MWh):", "0") ?? "");
+                              if (!isNaN(v)) fillAll(r.id, v);
+                            }}>Fill all</Button>
+                          </div>
+                        </div>
                         <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
                           {(lines[r.id] ?? []).map(l => (
                             <div key={l.id} className="space-y-1">
@@ -164,13 +215,15 @@ export default function Schedules() {
                             </div>
                           ))}
                         </div>
-                        <div className="mt-3 text-xs text-muted-foreground">
-                          Total: <span className="text-foreground font-semibold">{fmtNum((lines[r.id] ?? []).reduce((s,l) => s + Number(l.volume_mwh), 0))} MWh</span>
+                        <div className="mt-3 flex gap-6 text-xs text-muted-foreground">
+                          <div>Total: <span className="text-foreground font-semibold">{fmtNum((lines[r.id] ?? []).reduce((s,l) => s + Number(l.volume_mwh), 0))} MWh</span></div>
+                          <div>Peak: <span className="text-foreground font-semibold">{fmtNum(Math.max(0, ...(lines[r.id] ?? []).map(l => Number(l.volume_mwh))))} MWh</span></div>
+                          <div>Avg: <span className="text-foreground font-semibold">{fmtNum(((lines[r.id] ?? []).reduce((s,l) => s + Number(l.volume_mwh), 0)) / Math.max(1, (lines[r.id] ?? []).length))} MWh</span></div>
                         </div>
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               ))}
               {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">No schedules yet.</TableCell></TableRow>}
             </TableBody>
