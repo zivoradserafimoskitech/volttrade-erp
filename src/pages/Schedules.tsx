@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -172,8 +172,8 @@ export default function Schedules() {
             </TableRow></TableHeader>
             <TableBody>
               {rows.map(r => (
-                <>
-                  <TableRow key={r.id} className="cursor-pointer" onClick={() => toggle(r.id)}>
+                <React.Fragment key={r.id}>
+                  <TableRow className="cursor-pointer" onClick={() => toggle(r.id)}>
                     <TableCell className="font-mono text-xs">{r.schedule_number}</TableCell>
                     <TableCell>{r.tso_area}</TableCell>
                     <TableCell>{r.delivery_date}</TableCell>
@@ -223,7 +223,7 @@ export default function Schedules() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               ))}
               {rows.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">No schedules yet.</TableCell></TableRow>}
             </TableBody>
