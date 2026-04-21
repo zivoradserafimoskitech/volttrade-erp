@@ -23,6 +23,9 @@ import Counterparties from "./pages/Counterparties";
 import TradingContracts from "./pages/TradingContracts";
 import Schedules from "./pages/Schedules";
 import Risk from "./pages/Risk";
+import CounterpartyDrill from "./pages/risk/CounterpartyDrill";
+import AgingDrill from "./pages/risk/AgingDrill";
+import NopDrill from "./pages/risk/NopDrill";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,9 @@ const App = () => (
             <Route path="/trading-contracts" element={<TradingContracts />} />
             <Route path="/schedules" element={<Schedules />} />
             <Route path="/risk" element={<Risk />} />
+            <Route path="/risk/counterparty/:id" element={<CounterpartyDrill />} />
+            <Route path="/risk/aging/:bucket" element={<AgingDrill />} />
+            <Route path="/risk/nop/:date" element={<NopDrill />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
