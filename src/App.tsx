@@ -22,6 +22,7 @@ import Settings from "./pages/admin/Settings";
 import Counterparties from "./pages/Counterparties";
 import TradingContracts from "./pages/TradingContracts";
 import Schedules from "./pages/Schedules";
+import Risk from "./pages/Risk";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/counterparties" element={<Counterparties />} />
             <Route path="/trading-contracts" element={<TradingContracts />} />
             <Route path="/schedules" element={<Schedules />} />
+            <Route path="/risk" element={<Risk />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
