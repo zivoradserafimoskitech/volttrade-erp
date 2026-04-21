@@ -108,7 +108,17 @@ export default function Trading() {
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />New trade</Button></DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader><DialogTitle>Book new trade</DialogTitle></DialogHeader>
-            <form onSubmit={e => { e.preventDefault(); add(new FormData(e.currentTarget)); }} className="grid grid-cols-2 gap-3">
+            <form
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  const t = e.target as HTMLElement;
+                  const isSubmit = t.tagName === "BUTTON" && (t as HTMLButtonElement).type === "submit";
+                  if (t.tagName !== "TEXTAREA" && !isSubmit) e.preventDefault();
+                }
+              }}
+              onSubmit={e => { e.preventDefault(); add(new FormData(e.currentTarget)); }}
+              className="grid grid-cols-2 gap-3"
+            >
               <div className="space-y-2"><Label>Trade number</Label><Input name="trade_number" required defaultValue={`TR-${Date.now().toString().slice(-8)}`} /></div>
               <div className="space-y-2">
                 <Label>Market</Label>

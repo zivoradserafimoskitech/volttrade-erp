@@ -69,7 +69,17 @@ export default function TradingContracts() {
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />New contract</Button></DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader><DialogTitle>New trading contract</DialogTitle></DialogHeader>
-            <form onSubmit={e => { e.preventDefault(); add(new FormData(e.currentTarget)); }} className="grid grid-cols-2 gap-3">
+            <form
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  const t = e.target as HTMLElement;
+                  const isSubmit = t.tagName === "BUTTON" && (t as HTMLButtonElement).type === "submit";
+                  if (t.tagName !== "TEXTAREA" && !isSubmit) e.preventDefault();
+                }
+              }}
+              onSubmit={e => { e.preventDefault(); add(new FormData(e.currentTarget)); }}
+              className="grid grid-cols-2 gap-3"
+            >
               <div className="space-y-2 col-span-2">
                 <Label>Counterparty</Label>
                 <Select name="counterparty_id" required>
