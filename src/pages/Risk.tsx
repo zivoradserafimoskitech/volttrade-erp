@@ -319,7 +319,7 @@ export default function Risk() {
           <div className="hidden md:flex items-center gap-2 border border-border rounded-md px-2 py-1">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} aria-label="Auto-refresh" />
             <span className="text-xs text-muted-foreground flex items-center gap-1">
-              {autoRefresh && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden />}
+              {autoRefresh && <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />}
               Auto
             </span>
             <Select value={interval} onValueChange={(v) => setIntervalKey(v as IntervalKey)}>
