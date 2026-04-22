@@ -12,7 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { fmtEur, fmtNum } from "@/lib/format";
-import { Plus, Trash2, ArrowDownCircle, ArrowUpCircle, Activity } from "lucide-react";
+import { Plus, Trash2, ArrowDownCircle, ArrowUpCircle, Activity, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { exportToExcel, exportToPdf, type ExportColumn } from "@/lib/exports";
 import { format } from "date-fns";
 
 type Trade = {
@@ -101,10 +103,59 @@ export default function Trading() {
   const cpName = (id: string|null) => id ? (cps.find(c => c.id === id)?.legal_name ?? "—") : "—";
   const filteredTcs = tcs.filter(t => !selectedCp || t.counterparty_id === selectedCp);
 
+  const exportBlotter = (kind: "xlsx" | "pdf") => {
+    const cols: ExportColumn[] = [
+      { key: "trade_number", label: "Trade #", format: "text" },
+      { key: "market", label: "Market", format: "text" },
+      { key: "side", label: "Side", format: "text" },
+      { key: "counterparty", label: "Counterparty", format: "text" },
+      { key: "delivery_start", label: "Delivery start", format: "text" },
+      { key: "delivery_end", label: "Delivery end", format: "text" },
+      { key: "hub", label: "Hub", format: "text" },
+      { key: "volume_mwh", label: "Volume (MWh)", format: "num" },
+      { key: "price_eur_mwh", label: "Price (€/MWh)", format: "num" },
+      { key: "total_value_eur", label: "Notional (€)", format: "eur" },
+      { key: "status", label: "Status", format: "text" },
+    ];
+    const rows = filtered.map(r => ({
+      ...r,
+      side: r.side.toUpperCase(),
+      counterparty: cpName(r.counterparty_id),
+      delivery_start: format(new Date(r.delivery_start), "yyyy-MM-dd HH:mm"),
+      delivery_end: format(new Date(r.delivery_end), "yyyy-MM-dd HH:mm"),
+      hub: r.hub ?? "—",
+      total_value_eur: r.total_value_eur ?? (Number(r.volume_mwh) * Number(r.price_eur_mwh)),
+    }));
+    const totals = { trade_number: "TOTAL", volume_mwh: buyVol + sellVol, total_value_eur: buyCost + sellRev };
+    const stamp = format(new Date(), "yyyy-MM-dd_HHmm");
+    if (kind === "xlsx") {
+      exportToExcel(`trade_blotter_${stamp}`, [{ name: "Trade Blotter", columns: cols, rows }]);
+    } else {
+      exportToPdf({
+        title: "Trade Blotter",
+        subtitle: `${filtered.length} trades · Net P&L ${fmtEur(pnl)}`,
+        filename: `trade_blotter_${stamp}`,
+        sections: [{ heading: "Trades", columns: cols, rows, totals }],
+      });
+    }
+  };
+
   return (
     <ErpLayout title="Trade Blotter" subtitle="All electricity trades across markets and counterparties"
       actions={
-        <Dialog open={open} onOpenChange={setOpen}>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" disabled={filtered.length === 0}>
+                <Download className="h-3 w-3 mr-1" /> Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportBlotter("xlsx")}><FileSpreadsheet className="h-4 w-4 mr-2" />Excel (.xlsx)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportBlotter("pdf")}><FileText className="h-4 w-4 mr-2" />PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />New trade</Button></DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader><DialogTitle>Book new trade</DialogTitle></DialogHeader>
@@ -162,6 +213,7 @@ export default function Trading() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       }>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat label="Buy volume" value={`${fmtNum(buyVol)} MWh`} icon={<ArrowDownCircle className="h-4 w-4 text-accent" />} />
