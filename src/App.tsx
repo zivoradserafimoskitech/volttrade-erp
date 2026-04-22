@@ -26,6 +26,7 @@ import Risk from "./pages/Risk";
 import CounterpartyDrill from "./pages/risk/CounterpartyDrill";
 import AgingDrill from "./pages/risk/AgingDrill";
 import NopDrill from "./pages/risk/NopDrill";
+import Forecasting from "./pages/Forecasting";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/risk/aging/:bucket" element={<AgingDrill />} />
             <Route path="/risk/nop/:date" element={<NopDrill />} />
             <Route path="/invoices" element={<Invoices />} />
+            <Route path="/forecasting" element={<Forecasting />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
