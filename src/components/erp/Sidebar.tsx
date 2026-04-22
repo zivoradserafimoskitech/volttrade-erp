@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
@@ -27,6 +27,9 @@ const groups: { title: string; items: Item[] }[] = [
   ]},
   { title: "Risk", items: [
     { to: "/risk", label: "Risk & Exposure", icon: AlertTriangle, roles: ['risk_officer','management','admin'] },
+  ]},
+  { title: "Planning", items: [
+    { to: "/forecasting", label: "Forecasting", icon: TrendingUp, roles: ['management','trader','supply_manager','admin'] },
   ]},
   { title: "Admin", items: [
     { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, roles: ['admin'] },

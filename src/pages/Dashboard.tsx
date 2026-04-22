@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { fmtMwh } from "@/lib/format";
-import { Activity, Users, Zap, Euro, Database } from "lucide-react";
+import { Activity, Users, Zap, Euro, Database, Gauge } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -67,6 +67,11 @@ export default function Dashboard() {
   const totalForecast = hourly.reduce((s, h) => s + h.forecast, 0);
   const totalActual = hourly.reduce((s, h) => s + h.actual, 0);
   const avgPrice = prices.length ? prices.reduce((s, p) => s + p.price, 0) / prices.length : 0;
+  // MAPE over hourly pairs where actual > 0
+  const mapePairs = hourly.filter(h => h.actual > 0);
+  const mape = mapePairs.length > 0
+    ? (mapePairs.reduce((s, h) => s + Math.abs((h.actual - h.forecast) / h.actual), 0) / mapePairs.length) * 100
+    : null;
 
   return (
     <ErpLayout
@@ -78,7 +83,13 @@ export default function Dashboard() {
         <StatCard label="Active clients" value={String(clientCount)} icon={Users} hint="Business contracts" />
         <StatCard label="Metering points" value={String(edusCount)} icon={Zap} accent="accent" hint="EDU codes under management" />
         <StatCard label="Avg HUPX (48h)" value={`${avgPrice.toFixed(2)} €/MWh`} icon={Activity} accent="warning" hint="Hourly day-ahead spot" />
-        <StatCard label="Portfolio actual (48h)" value={fmtMwh(totalActual)} icon={Euro} hint={`Forecast: ${fmtMwh(totalForecast)}`} />
+        <StatCard
+          label="Forecast accuracy (48h)"
+          value={mape != null ? `${mape.toFixed(1)}% MAPE` : "—"}
+          icon={Gauge}
+          accent={mape != null && mape < 15 ? "primary" : "warning"}
+          hint={`Actual ${fmtMwh(totalActual)} · Fcst ${fmtMwh(totalForecast)}`}
+        />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">

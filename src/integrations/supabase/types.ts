@@ -302,6 +302,48 @@ export type Database = {
         }
         Relationships: []
       }
+      forecasts: {
+        Row: {
+          budget_eur: number | null
+          budget_mwh: number | null
+          client_id: string
+          created_at: string
+          forecast_date: string
+          forecast_mwh: number
+          id: string
+          method: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_eur?: number | null
+          budget_mwh?: number | null
+          client_id: string
+          created_at?: string
+          forecast_date: string
+          forecast_mwh?: number
+          id?: string
+          method?: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_eur?: number | null
+          budget_mwh?: number | null
+          client_id?: string
+          created_at?: string
+          forecast_date?: string
+          forecast_mwh?: number
+          id?: string
+          method?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           billing_run_id: string | null
