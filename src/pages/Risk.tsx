@@ -318,7 +318,10 @@ export default function Risk() {
           </Button>
           <div className="hidden md:flex items-center gap-2 border border-border rounded-md px-2 py-1">
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} aria-label="Auto-refresh" />
-            <span className="text-xs text-muted-foreground">Auto</span>
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              {autoRefresh && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden />}
+              Auto
+            </span>
             <Select value={interval} onValueChange={(v) => setIntervalKey(v as IntervalKey)}>
               <SelectTrigger className="h-7 w-[70px] text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
