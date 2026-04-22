@@ -12,7 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { fmtEur, fmtNum } from "@/lib/format";
-import { Plus, Trash2, ArrowDownCircle, ArrowUpCircle, Activity } from "lucide-react";
+import { Plus, Trash2, ArrowDownCircle, ArrowUpCircle, Activity, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { exportToExcel, exportToPdf, type ExportColumn } from "@/lib/exports";
 import { format } from "date-fns";
 
 type Trade = {
