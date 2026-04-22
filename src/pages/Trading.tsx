@@ -213,6 +213,7 @@ export default function Trading() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       }>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Stat label="Buy volume" value={`${fmtNum(buyVol)} MWh`} icon={<ArrowDownCircle className="h-4 w-4 text-accent" />} />
