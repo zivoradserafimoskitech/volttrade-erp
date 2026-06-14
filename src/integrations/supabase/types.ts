@@ -308,8 +308,11 @@ export type Database = {
           budget_mwh: number | null
           client_id: string
           created_at: string
+          external_source: string | null
+          external_synced_at: string | null
           forecast_date: string
           forecast_mwh: number
+          forecast_mwh_external: number | null
           id: string
           method: string
           notes: string | null
@@ -321,8 +324,11 @@ export type Database = {
           budget_mwh?: number | null
           client_id: string
           created_at?: string
+          external_source?: string | null
+          external_synced_at?: string | null
           forecast_date: string
           forecast_mwh?: number
+          forecast_mwh_external?: number | null
           id?: string
           method?: string
           notes?: string | null
@@ -334,8 +340,11 @@ export type Database = {
           budget_mwh?: number | null
           client_id?: string
           created_at?: string
+          external_source?: string | null
+          external_synced_at?: string | null
           forecast_date?: string
           forecast_mwh?: number
+          forecast_mwh_external?: number | null
           id?: string
           method?: string
           notes?: string | null
