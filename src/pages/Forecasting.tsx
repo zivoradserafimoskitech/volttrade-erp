@@ -300,6 +300,9 @@ export default function Forecasting() {
           <Button size="sm" variant="outline" onClick={load} disabled={loading}>
             <RefreshCw className={`h-3 w-3 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
+          <Button size="sm" variant="outline" onClick={syncInflux} disabled={syncing}>
+            <Database className={`h-3 w-3 mr-1 ${syncing ? "animate-pulse" : ""}`} /> {syncing ? "Syncing…" : "Sync from InfluxDB"}
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" disabled={clients.length === 0}>
