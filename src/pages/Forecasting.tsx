@@ -15,12 +15,12 @@ import { useAuth } from "@/lib/auth";
 import { fmtEur, fmtMwh, fmtNum } from "@/lib/format";
 import { exportToExcel, exportToPdf, type ExportColumn } from "@/lib/exports";
 import { toast } from "sonner";
-import { TrendingUp, Target, AlertTriangle, Gauge, Download, FileSpreadsheet, FileText, Sparkles, RefreshCw } from "lucide-react";
+import { TrendingUp, Target, AlertTriangle, Gauge, Download, FileSpreadsheet, FileText, Sparkles, RefreshCw, Database } from "lucide-react";
 import { format, addDays, subDays, differenceInCalendarDays } from "date-fns";
 import { ResponsiveContainer, ComposedChart, Line, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
 type Client = { id: string; company_name: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number };
-type Forecast = { id?: string; client_id: string; forecast_date: string; forecast_mwh: number; budget_mwh: number | null; budget_eur: number | null; method: string };
+type Forecast = { id?: string; client_id: string; forecast_date: string; forecast_mwh: number; budget_mwh: number | null; budget_eur: number | null; method: string; forecast_mwh_external?: number | null; external_source?: string | null; external_synced_at?: string | null };
 type Reading = { metering_point_id: string; reading_at: string; actual_mwh: number | null };
 type Meter = { id: string; client_id: string };
 
@@ -51,6 +51,7 @@ export default function Forecasting() {
   const [editing, setEditing] = useState<Record<string, number>>({}); // key `${client_id}|${date}` -> draft mwh
   const [savingKey, setSavingKey] = useState<string>("");
   const [growth, setGrowth] = useState<number>(0);
+  const [syncing, setSyncing] = useState(false);
 
   const horizonDates = useMemo(() => daysArray(new Date(startDate), HORIZON_DAYS), [startDate]);
   const priorYearRange = useMemo(() => {
@@ -66,7 +67,7 @@ export default function Forecasting() {
     const [cRes, mRes, fRes, rRes] = await Promise.all([
       supabase.from("clients").select("id, company_name, fixed_price_eur_mwh, margin_eur_mwh").order("company_name"),
       supabase.from("metering_points").select("id, client_id"),
-      supabase.from("forecasts").select("id, client_id, forecast_date, forecast_mwh, budget_mwh, budget_eur, method").gte("forecast_date", priorYearRange.from).lte("forecast_date", rangeEnd),
+      supabase.from("forecasts").select("id, client_id, forecast_date, forecast_mwh, budget_mwh, budget_eur, method, forecast_mwh_external, external_source, external_synced_at").gte("forecast_date", priorYearRange.from).lte("forecast_date", rangeEnd),
       supabase.from("consumption_readings").select("metering_point_id, reading_at, actual_mwh").gte("reading_at", `${priorYearRange.from}T00:00:00`).lte("reading_at", `${rangeEnd}T23:59:59`).limit(10000),
     ]);
     setClients((cRes.data as any) ?? []);
@@ -170,7 +171,7 @@ export default function Forecasting() {
   const chartData = useMemo(() => {
     if (!selectedClientId) return [];
     const today = new Date();
-    const series: { date: string; actual: number | null; forecast: number | null; budget: number | null }[] = [];
+    const series: { date: string; actual: number | null; forecast: number | null; budget: number | null; external: number | null }[] = [];
     for (let i = -30; i < 60; i++) {
       const d = format(addDays(today, i), "yyyy-MM-dd");
       const f = forecastByKey.get(`${selectedClientId}|${d}`);
@@ -180,12 +181,31 @@ export default function Forecasting() {
         actual: i <= 0 && a != null ? +a.toFixed(3) : null,
         forecast: f ? +Number(f.forecast_mwh).toFixed(3) : null,
         budget: f && f.budget_mwh != null ? +Number(f.budget_mwh).toFixed(3) : null,
+        external: f && f.forecast_mwh_external != null ? +Number(f.forecast_mwh_external).toFixed(3) : null,
       });
     }
     return series;
   }, [selectedClientId, forecastByKey, actualByClientDate]);
 
   // ─── Actions ───
+  const syncInflux = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-influx-forecasts", { body: {} });
+      if (error) throw error;
+      if (!data?.ok) {
+        toast.error(data?.error ?? "Sync failed");
+      } else {
+        toast.success(`Synced ${data.synced ?? 0} forecast rows from InfluxDB (${data.meters ?? 0} meters)`);
+        await load();
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const saveCell = async (clientId: string, date: string, value: number, method: string = "manual") => {
     if (!user) return;
     const key = `${clientId}|${date}`;
