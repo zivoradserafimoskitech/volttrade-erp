@@ -390,6 +390,7 @@ export default function Forecasting() {
                     <Bar dataKey="actual" fill="hsl(var(--primary))" name="Actual (MWh)" />
                     <Line type="monotone" dataKey="forecast" stroke="hsl(var(--accent))" strokeWidth={2} dot={false} name="Forecast (MWh)" />
                     <Line type="monotone" dataKey="budget" stroke="hsl(var(--warning))" strokeDasharray="4 4" strokeWidth={2} dot={false} name="Budget (MWh)" />
+                    <Line type="monotone" dataKey="external" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} name="3rd-party (InfluxDB)" />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
