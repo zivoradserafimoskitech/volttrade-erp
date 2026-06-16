@@ -19,6 +19,7 @@ import BillingRuns from "./pages/BillingRuns";
 import Payments from "./pages/Payments";
 import UsersAdmin from "./pages/admin/UsersAdmin";
 import Settings from "./pages/admin/Settings";
+import AuditLog from "./pages/admin/AuditLog";
 import Counterparties from "./pages/Counterparties";
 import TradingContracts from "./pages/TradingContracts";
 import Schedules from "./pages/Schedules";
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/forecasting" element={<Forecasting />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
+            <Route path="/admin/audit" element={<AuditLog />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
