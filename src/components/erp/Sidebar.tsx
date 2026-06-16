@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
@@ -33,15 +33,16 @@ const groups: { title: string; items: Item[] }[] = [
   ]},
   { title: "Admin", items: [
     { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, roles: ['admin'] },
+    { to: "/admin/audit", label: "Audit Log", icon: History, roles: ['admin','auditor'] },
     { to: "/admin/settings", label: "Settings", icon: SettingsIcon, roles: ['admin'] },
   ]},
 ];
 
-export function Sidebar() {
+export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const { user, signOut, hasRole, roles } = useAuth();
   const navigate = useNavigate();
   return (
-    <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar overflow-y-auto">
+    <aside className={`${mobile ? "flex" : "hidden md:flex"} w-full md:w-64 flex-col border-r border-border bg-sidebar overflow-y-auto h-full`}>
       <div className="h-16 flex items-center gap-2 px-5 border-b border-sidebar-border">
         <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ background: "var(--gradient-primary)" }}>
           <Zap className="h-5 w-5 text-primary-foreground" />
