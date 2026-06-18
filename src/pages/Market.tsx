@@ -9,17 +9,35 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Price = { id: string; delivery_at: string; price_eur_mwh: number };
 
 export default function Market() {
   const [prices, setPrices] = useState<Price[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [zone, setZone] = useState("HU");
   const load = async () => {
     const { data } = await supabase.from("market_prices").select("*").order("delivery_at", { ascending: false }).limit(168);
     setPrices(((data as any) ?? []).reverse());
   };
   useEffect(() => { load(); }, []);
+
+  const syncEntsoe = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-entsoe-prices", { body: { zone, days: 2 } });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(`Synced ${(data as any)?.inserted ?? 0} prices from ENTSO-E (${zone})`);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const add = async (form: FormData) => {
     const dt = String(form.get("delivery_at"));
@@ -35,7 +53,29 @@ export default function Market() {
   const avg = chartData.length ? chartData.reduce((s,d)=>s+d.price,0)/chartData.length : 0;
 
   return (
-    <ErpLayout title="Market Prices" subtitle="HUPX-style hourly day-ahead prices (€/MWh)">
+    <ErpLayout
+      title="Market Prices"
+      subtitle="Hourly day-ahead prices (€/MWh) — ENTSO-E Transparency"
+      actions={
+        <div className="flex items-center gap-2">
+          <Select value={zone} onValueChange={setZone}>
+            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="HU">HU (MAVIR)</SelectItem>
+              <SelectItem value="MK">MK (MEPSO)</SelectItem>
+              <SelectItem value="DE_LU">DE-LU</SelectItem>
+              <SelectItem value="AT">AT (APG)</SelectItem>
+              <SelectItem value="RO">RO</SelectItem>
+              <SelectItem value="RS">RS</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={syncEntsoe} disabled={syncing} style={{ background: "var(--gradient-primary)" }}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing…" : "Sync now"}
+          </Button>
+        </div>
+      }
+    >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Records" value={String(chartData.length)} />
         <Stat label="Min" value={isFinite(min) ? `${fmtNum(min)} €` : "—"} />
