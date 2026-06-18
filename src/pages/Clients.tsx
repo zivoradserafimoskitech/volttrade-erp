@@ -139,7 +139,12 @@ export default function Clients() {
                     <TableCell className="text-right">{fmtNum(c.margin_eur_mwh)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 flex-wrap">
-                        {myEdus.map(e => <Badge key={e.id} variant="outline" className="font-mono text-[10px]"><Zap className="h-3 w-3 mr-1" />{e.edu_code}</Badge>)}
+                        {myEdus.map((e: any) => (
+                          <Badge key={e.id} variant="outline" className="font-mono text-[10px]" title={e.consumer_category === 'slp' ? `SLP: ${e.slp_profile_code ?? '—'}` : e.consumer_category}>
+                            <Zap className="h-3 w-3 mr-1" />{e.edu_code}
+                            <span className="ml-1 opacity-60">· {e.consumer_category === 'slp' ? 'SLP' : e.consumer_category === 'smart_daily' ? 'D' : 'H'}</span>
+                          </Badge>
+                        ))}
                         <Dialog open={openEdu === c.id} onOpenChange={(o) => { setOpenEdu(o ? c.id : null); if (!o) setEduCategory("smart_hourly"); }}>
                           <DialogTrigger asChild><Button size="sm" variant="ghost" className="h-6 px-2 text-xs">+ Add EDU</Button></DialogTrigger>
                           <DialogContent>
