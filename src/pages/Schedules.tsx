@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { Plus, CalendarClock, Send, CheckCircle2, XCircle, Trash2, Wand2 } from "lucide-react";
+import { Plus, CalendarClock, Send, CheckCircle2, XCircle, Trash2, Wand2, FileCode } from "lucide-react";
 import { fmtNum } from "@/lib/format";
+import { buildEssV4Xml, downloadXml } from "@/lib/essXml";
 
 type Sch = { id: string; schedule_number: string; tso_area: string; delivery_date: string; version: number; status: string; submitted_at: string|null; response_at: string|null };
 type Line = { id: string; schedule_id: string; hour: number; direction: string; volume_mwh: number };
@@ -128,6 +129,22 @@ export default function Schedules() {
     await supabase.from("schedules").delete().eq("id", id); load();
   };
 
+  const exportEss = async (s: Sch) => {
+    let ls = lines[s.id];
+    if (!ls) {
+      const { data } = await supabase.from("schedule_lines").select("*").eq("schedule_id", s.id).order("hour");
+      ls = (data as any) ?? [];
+      setLines(prev => ({ ...prev, [s.id]: ls! }));
+    }
+    if (!ls || ls.length === 0) return toast.error("No hourly lines to export");
+    const xml = buildEssV4Xml(
+      { schedule_number: s.schedule_number, tso_area: s.tso_area, delivery_date: s.delivery_date, version: s.version },
+      ls.map(l => ({ hour: l.hour, direction: l.direction, volume_mwh: Number(l.volume_mwh) }))
+    );
+    downloadXml(`${s.schedule_number}_v${s.version}_${s.delivery_date}.xml`, xml);
+    toast.success("ESS v4 XML downloaded");
+  };
+
   return (
     <ErpLayout title="Schedules & Nominations" subtitle="Hourly schedules per TSO area with submission tracking"
       actions={
@@ -187,6 +204,9 @@ export default function Schedules() {
                           <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "accepted")}><CheckCircle2 className="h-3 w-3 mr-1 text-accent" />Accept</Button>
                           <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "rejected")}><XCircle className="h-3 w-3 mr-1 text-destructive" />Reject</Button>
                         </>}
+                        <Button size="sm" variant="outline" onClick={() => exportEss(r)} title="Download ENTSO-E ESS v4 XML (MAVIR/MEPSO)">
+                          <FileCode className="h-3 w-3 mr-1" />XML
+                        </Button>
                         <Button size="icon" variant="ghost" onClick={() => remove(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </TableCell>
