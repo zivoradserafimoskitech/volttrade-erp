@@ -514,13 +514,16 @@ export type Database = {
           annual_consumption_mwh: number | null
           capacity_kw: number | null
           client_id: string
+          connected_power_kw: number | null
           connection_type: string | null
+          consumer_category: string
           created_at: string
           dso_area: string | null
           edu_code: string
           id: string
           meter_id: string | null
           notes: string | null
+          slp_profile_code: string | null
           status: string
           voltage_level: string | null
         }
@@ -529,13 +532,16 @@ export type Database = {
           annual_consumption_mwh?: number | null
           capacity_kw?: number | null
           client_id: string
+          connected_power_kw?: number | null
           connection_type?: string | null
+          consumer_category?: string
           created_at?: string
           dso_area?: string | null
           edu_code: string
           id?: string
           meter_id?: string | null
           notes?: string | null
+          slp_profile_code?: string | null
           status?: string
           voltage_level?: string | null
         }
@@ -544,13 +550,16 @@ export type Database = {
           annual_consumption_mwh?: number | null
           capacity_kw?: number | null
           client_id?: string
+          connected_power_kw?: number | null
           connection_type?: string | null
+          consumer_category?: string
           created_at?: string
           dso_area?: string | null
           edu_code?: string
           id?: string
           meter_id?: string | null
           notes?: string | null
+          slp_profile_code?: string | null
           status?: string
           voltage_level?: string | null
         }
@@ -561,6 +570,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metering_points_slp_profile_code_fkey"
+            columns: ["slp_profile_code"]
+            isOneToOne: false
+            referencedRelation: "slp_profiles"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -782,6 +798,59 @@ export type Database = {
           updated_at?: string
           user_id?: string
           version?: number
+        }
+        Relationships: []
+      }
+      slp_curve_points: {
+        Row: {
+          day_type: string
+          factor: number
+          hour: number
+          profile_code: string
+          season: string
+        }
+        Insert: {
+          day_type: string
+          factor: number
+          hour: number
+          profile_code: string
+          season: string
+        }
+        Update: {
+          day_type?: string
+          factor?: number
+          hour?: number
+          profile_code?: string
+          season?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slp_curve_points_profile_code_fkey"
+            columns: ["profile_code"]
+            isOneToOne: false
+            referencedRelation: "slp_profiles"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      slp_profiles: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          name?: string
         }
         Relationships: []
       }
