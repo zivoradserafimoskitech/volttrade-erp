@@ -16,11 +16,14 @@ import { fmtNum } from "@/lib/format";
 
 type Client = { id: string; company_name: string; tax_id: string | null; contact_name: string | null; contact_email: string | null; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; status: string };
 type Edu = { id: string; client_id: string; edu_code: string; address: string | null; voltage_level: string | null; annual_consumption_mwh: number | null };
+type SlpProfile = { code: string; name: string };
 
 export default function Clients() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [edus, setEdus] = useState<Edu[]>([]);
+  const [slpProfiles, setSlpProfiles] = useState<SlpProfile[]>([]);
+  const [eduCategory, setEduCategory] = useState<string>("smart_hourly");
   const [openClient, setOpenClient] = useState(false);
   const [openEdu, setOpenEdu] = useState<string | null>(null);
 
@@ -28,8 +31,10 @@ export default function Clients() {
     if (!user) return;
     const { data: cs } = await supabase.from("clients").select("*").order("company_name");
     const { data: es } = await supabase.from("metering_points").select("*").order("edu_code");
+    const { data: sp } = await supabase.from("slp_profiles").select("code,name").order("name");
     setClients((cs as any) ?? []);
     setEdus((es as any) ?? []);
+    setSlpProfiles((sp as any) ?? []);
   };
   useEffect(() => { load(); }, [user]);
 
@@ -51,15 +56,22 @@ export default function Clients() {
   };
 
   const addEdu = async (form: FormData, client_id: string) => {
+    const category = String(form.get("consumer_category") || "smart_hourly");
+    const power = form.get("connected_power_kw") ? Number(form.get("connected_power_kw")) : null;
+    const slpCode = form.get("slp_profile_code") ? String(form.get("slp_profile_code")) : null;
+    if (category === "slp" && !slpCode) return toast.error("Pick an SLP profile for category ≤ 40 kW");
     const { error } = await supabase.from("metering_points").insert({
       client_id,
       edu_code: String(form.get("edu_code")),
       address: form.get("address") || null,
       voltage_level: form.get("voltage_level") || null,
       annual_consumption_mwh: form.get("annual_consumption_mwh") ? Number(form.get("annual_consumption_mwh")) : null,
+      consumer_category: category,
+      connected_power_kw: power,
+      slp_profile_code: category === "slp" ? slpCode : null,
     } as any);
     if (error) return toast.error(error.message);
-    toast.success("Metering point added"); setOpenEdu(null); load();
+    toast.success("Metering point added"); setOpenEdu(null); setEduCategory("smart_hourly"); load();
   };
 
   const removeClient = async (id: string) => {
@@ -128,16 +140,39 @@ export default function Clients() {
                     <TableCell>
                       <div className="flex items-center gap-2 flex-wrap">
                         {myEdus.map(e => <Badge key={e.id} variant="outline" className="font-mono text-[10px]"><Zap className="h-3 w-3 mr-1" />{e.edu_code}</Badge>)}
-                        <Dialog open={openEdu === c.id} onOpenChange={(o) => setOpenEdu(o ? c.id : null)}>
+                        <Dialog open={openEdu === c.id} onOpenChange={(o) => { setOpenEdu(o ? c.id : null); if (!o) setEduCategory("smart_hourly"); }}>
                           <DialogTrigger asChild><Button size="sm" variant="ghost" className="h-6 px-2 text-xs">+ Add EDU</Button></DialogTrigger>
                           <DialogContent>
                             <DialogHeader><DialogTitle>New metering point</DialogTitle></DialogHeader>
-                            <form onSubmit={e => { e.preventDefault(); addEdu(new FormData(e.currentTarget), c.id); }} className="space-y-3">
+                            <form onSubmit={e => { e.preventDefault(); addEdu(new FormData(e.currentTarget), c.id); }} className="grid grid-cols-2 gap-3">
                               <Field name="edu_code" label="EDU code" required placeholder="HU000120F11-U-XXXXXX" />
-                              <Field name="address" label="Address" />
+                              <Field name="connected_power_kw" label="Connected power (kW)" type="number" step="0.1" />
+                              <Field name="address" label="Address" className="col-span-2" />
                               <Field name="voltage_level" label="Voltage level" placeholder="LV / MV / HV" />
                               <Field name="annual_consumption_mwh" label="Annual consumption (MWh)" type="number" step="0.01" />
-                              <DialogFooter><Button type="submit">Save</Button></DialogFooter>
+                              <div className="space-y-2 col-span-2">
+                                <Label>Consumer category</Label>
+                                <Select name="consumer_category" value={eduCategory} onValueChange={setEduCategory}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="slp">SLP profile (≤ 40 kW, direct meter)</SelectItem>
+                                    <SelectItem value="smart_daily">Smart meter — daily readings (&gt; 40 kW)</SelectItem>
+                                    <SelectItem value="smart_hourly">Smart meter — hourly readings</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {eduCategory === "slp" && (
+                                <div className="space-y-2 col-span-2">
+                                  <Label>Standard load profile</Label>
+                                  <Select name="slp_profile_code">
+                                    <SelectTrigger><SelectValue placeholder="Pick a profile…" /></SelectTrigger>
+                                    <SelectContent>
+                                      {slpProfiles.map(p => <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                              <DialogFooter className="col-span-2"><Button type="submit">Save</Button></DialogFooter>
                             </form>
                           </DialogContent>
                         </Dialog>
