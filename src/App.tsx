@@ -15,6 +15,7 @@ import SupplyPoints from "./pages/SupplyPoints";
 import Tariffs from "./pages/Tariffs";
 import SupplyContracts from "./pages/SupplyContracts";
 import MeterReadings from "./pages/MeterReadings";
+import Reconciliation from "./pages/Reconciliation";
 import BillingRuns from "./pages/BillingRuns";
 import Payments from "./pages/Payments";
 import UsersAdmin from "./pages/admin/UsersAdmin";
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/tariffs" element={<Tariffs />} />
             <Route path="/contracts" element={<SupplyContracts />} />
             <Route path="/readings" element={<MeterReadings />} />
+            <Route path="/reconciliation" element={<Reconciliation />} />
             <Route path="/billing" element={<BillingRuns />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/market" element={<Market />} />
