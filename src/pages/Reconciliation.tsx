@@ -11,7 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { allocateBySlp, hourlyRange, loadCurve, CurveLookup } from "@/lib/slp";
 import { fmtNum } from "@/lib/format";
-import { RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { RefreshCw, AlertTriangle, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { exportToExcel } from "@/lib/exports";
 import { toast } from "sonner";
 
 type Row = {
@@ -110,12 +111,87 @@ export default function Reconciliation() {
   const overallDev = totals.allocated > 0
     ? ((totals.actual - totals.allocated) / totals.allocated) * 100 : 0;
 
+  const exportXlsx = () => {
+    if (filtered.length === 0) { toast.error("Nothing to export"); return; }
+    const rowsOut = filtered.map(r => {
+      const delta = r.actual_kwh - r.allocated_kwh;
+      const dev = r.allocated_kwh > 0 ? (delta / r.allocated_kwh) * 100 : (r.actual_kwh > 0 ? 9999 : 0);
+      const bad = r.allocated_kwh > 0 ? Math.abs(dev) > tolerance : r.actual_kwh > 0;
+      const status = r.readings === 0 ? "no data" : bad ? "mismatch" : "ok";
+      return {
+        month: ym,
+        edu_code: r.edu_code,
+        category: r.category,
+        profile: r.profile ?? "",
+        annual_mwh: r.annual_mwh,
+        allocated_kwh: Number(r.allocated_kwh.toFixed(3)),
+        metered_kwh: Number(r.actual_kwh.toFixed(3)),
+        delta_kwh: Number(delta.toFixed(3)),
+        deviation_pct: Number(dev.toFixed(2)),
+        readings: r.readings,
+        tolerance_pct: tolerance,
+        status,
+      };
+    });
+    const summary = [{
+      month: ym,
+      edus: filtered.length,
+      flagged: flagged.length,
+      allocated_mwh: Number((totals.allocated / 1000).toFixed(3)),
+      metered_mwh: Number((totals.actual / 1000).toFixed(3)),
+      delta_mwh: Number(((totals.actual - totals.allocated) / 1000).toFixed(3)),
+      overall_deviation_pct: Number(overallDev.toFixed(2)),
+      tolerance_pct: tolerance,
+    }];
+    exportToExcel(`reconciliation_${ym}`, [
+      { name: "Summary", columns: [
+        { key: "month", label: "Month" },
+        { key: "edus", label: "EDUs", format: "num" },
+        { key: "flagged", label: "Flagged", format: "num" },
+        { key: "allocated_mwh", label: "Allocated (MWh)", format: "num" },
+        { key: "metered_mwh", label: "Metered (MWh)", format: "num" },
+        { key: "delta_mwh", label: "Δ (MWh)", format: "num" },
+        { key: "overall_deviation_pct", label: "Overall deviation %", format: "num" },
+        { key: "tolerance_pct", label: "Tolerance %", format: "num" },
+      ], rows: summary },
+      { name: "EDU detail", columns: [
+        { key: "month", label: "Month" },
+        { key: "edu_code", label: "EDU" },
+        { key: "category", label: "Category" },
+        { key: "profile", label: "SLP profile" },
+        { key: "annual_mwh", label: "Annual (MWh)", format: "num" },
+        { key: "allocated_kwh", label: "Allocated (kWh)", format: "num" },
+        { key: "metered_kwh", label: "Metered (kWh)", format: "num" },
+        { key: "delta_kwh", label: "Δ (kWh)", format: "num" },
+        { key: "deviation_pct", label: "Deviation %", format: "num" },
+        { key: "readings", label: "Readings", format: "num" },
+        { key: "tolerance_pct", label: "Tolerance %", format: "num" },
+        { key: "status", label: "Status" },
+      ], rows: rowsOut },
+      { name: "Mismatches", columns: [
+        { key: "edu_code", label: "EDU" },
+        { key: "category", label: "Category" },
+        { key: "allocated_kwh", label: "Allocated (kWh)", format: "num" },
+        { key: "metered_kwh", label: "Metered (kWh)", format: "num" },
+        { key: "delta_kwh", label: "Δ (kWh)", format: "num" },
+        { key: "deviation_pct", label: "Deviation %", format: "num" },
+        { key: "status", label: "Status" },
+      ], rows: rowsOut.filter(r => r.status !== "ok") },
+    ]);
+    toast.success("Exported reconciliation_" + ym + ".xlsx");
+  };
+
   return (
     <ErpLayout title="Reconciliation" subtitle="Meter totals vs curve-allocated volumes — flag mismatches per EDU and month"
       actions={
-        <Button onClick={run} disabled={loading} style={{ background: "var(--gradient-primary)" }}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Recalculate
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportXlsx} disabled={loading || filtered.length === 0}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />Export Excel
+          </Button>
+          <Button onClick={run} disabled={loading} style={{ background: "var(--gradient-primary)" }}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Recalculate
+          </Button>
+        </div>
       }>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="space-y-2"><Label>Month</Label><Input type="month" value={ym} onChange={e => setYm(e.target.value)} /></div>
