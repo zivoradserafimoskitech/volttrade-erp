@@ -31,11 +31,28 @@ export default function MeterReadings() {
   useEffect(() => { if (user) load(); }, [user]);
 
   const add = async (form: FormData) => {
+    const mpId = String(form.get("metering_point_id"));
+    const imp = Number(form.get("import_kwh") || 0);
+    const exp = Number(form.get("export_kwh") || 0);
+    const at = new Date(String(form.get("reading_at")));
+    if (Number.isNaN(at.getTime())) return toast.error("Invalid reading time");
+    if (at.getTime() > Date.now() + 60_000) return toast.error("Reading time cannot be in the future");
+    if (imp < 0 || exp < 0) return toast.error("Import/export must be non-negative");
+    if (imp > 10_000_000) return toast.error("Import value looks out of range (> 10 GWh)");
+    // SLP outlier warning vs expected monthly avg
+    const { data: mp } = await supabase.from("metering_points")
+      .select("annual_consumption_mwh,consumer_category").eq("id", mpId).maybeSingle();
+    if (mp?.annual_consumption_mwh) {
+      const monthlyAvgKwh = (Number(mp.annual_consumption_mwh) * 1000) / 12;
+      if (imp > monthlyAvgKwh * 5) {
+        toast.warning(`Reading ${imp.toFixed(0)} kWh is 5× higher than monthly average (${monthlyAvgKwh.toFixed(0)} kWh) — saved as pending`);
+      }
+    }
     const { error } = await supabase.from("meter_readings").insert({
-      metering_point_id: String(form.get("metering_point_id")),
-      reading_at: new Date(String(form.get("reading_at"))).toISOString(),
-      import_kwh: Number(form.get("import_kwh") || 0),
-      export_kwh: Number(form.get("export_kwh") || 0),
+      metering_point_id: mpId,
+      reading_at: at.toISOString(),
+      import_kwh: imp,
+      export_kwh: exp,
       source: String(form.get("source")),
       notes: form.get("notes") as string || null,
       created_by: user!.id,
