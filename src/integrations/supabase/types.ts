@@ -14,6 +14,240 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset_dispatch_schedules: {
+        Row: {
+          asset_id: string
+          created_at: string
+          id: string
+          mode: string
+          notes: string | null
+          schedule_id: string | null
+          setpoint_kw: number
+          status: string
+          ts_from: string
+          ts_to: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          id?: string
+          mode?: string
+          notes?: string | null
+          schedule_id?: string | null
+          setpoint_kw: number
+          status?: string
+          ts_from: string
+          ts_to: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          notes?: string | null
+          schedule_id?: string | null
+          setpoint_kw?: number
+          status?: string
+          ts_from?: string
+          ts_to?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_dispatch_schedules_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_dispatch_schedules_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_telemetry: {
+        Row: {
+          alarm_code: string | null
+          asset_id: string
+          created_at: string
+          energy_kwh: number | null
+          grid_kw: number | null
+          id: number
+          load_kw: number | null
+          power_kw: number | null
+          pv_generation_kwh: number | null
+          pv_irradiance_w_m2: number | null
+          soc_pct: number | null
+          source: string | null
+          status: string | null
+          ts: string
+          user_id: string
+        }
+        Insert: {
+          alarm_code?: string | null
+          asset_id: string
+          created_at?: string
+          energy_kwh?: number | null
+          grid_kw?: number | null
+          id?: number
+          load_kw?: number | null
+          power_kw?: number | null
+          pv_generation_kwh?: number | null
+          pv_irradiance_w_m2?: number | null
+          soc_pct?: number | null
+          source?: string | null
+          status?: string | null
+          ts: string
+          user_id: string
+        }
+        Update: {
+          alarm_code?: string | null
+          asset_id?: string
+          created_at?: string
+          energy_kwh?: number | null
+          grid_kw?: number | null
+          id?: number
+          load_kw?: number | null
+          power_kw?: number | null
+          pv_generation_kwh?: number | null
+          pv_irradiance_w_m2?: number | null
+          soc_pct?: number | null
+          source?: string | null
+          status?: string | null
+          ts?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_telemetry_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_telemetry_latest: {
+        Row: {
+          alarm_code: string | null
+          asset_id: string
+          grid_kw: number | null
+          load_kw: number | null
+          power_kw: number | null
+          pv_generation_kwh: number | null
+          soc_pct: number | null
+          status: string | null
+          ts: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alarm_code?: string | null
+          asset_id: string
+          grid_kw?: number | null
+          load_kw?: number | null
+          power_kw?: number | null
+          pv_generation_kwh?: number | null
+          soc_pct?: number | null
+          status?: string | null
+          ts: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alarm_code?: string | null
+          asset_id?: string
+          grid_kw?: number | null
+          load_kw?: number | null
+          power_kw?: number | null
+          pv_generation_kwh?: number | null
+          soc_pct?: number | null
+          status?: string | null
+          ts?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_telemetry_latest_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assets: {
+        Row: {
+          asset_code: string
+          asset_type: Database["public"]["Enums"]["asset_type"]
+          created_at: string
+          external_ref: string | null
+          id: string
+          install_date: string | null
+          model: string | null
+          nameplate_energy_kwh: number | null
+          nameplate_power_kw: number | null
+          pv_dc_kwp: number | null
+          site_id: string
+          status: string
+          updated_at: string
+          user_id: string
+          vendor: string | null
+        }
+        Insert: {
+          asset_code: string
+          asset_type: Database["public"]["Enums"]["asset_type"]
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          install_date?: string | null
+          model?: string | null
+          nameplate_energy_kwh?: number | null
+          nameplate_power_kw?: number | null
+          pv_dc_kwp?: number | null
+          site_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          vendor?: string | null
+        }
+        Update: {
+          asset_code?: string
+          asset_type?: Database["public"]["Enums"]["asset_type"]
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          install_date?: string | null
+          model?: string | null
+          nameplate_energy_kwh?: number | null
+          nameplate_power_kw?: number | null
+          pv_dc_kwp?: number | null
+          site_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -801,6 +1035,56 @@ export type Database = {
         }
         Relationships: []
       }
+      sites: {
+        Row: {
+          address: string | null
+          country: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          metering_point_id: string | null
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          metering_point_id?: string | null
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          metering_point_id?: string | null
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sites_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       slp_curve_points: {
         Row: {
           day_type: string
@@ -1190,6 +1474,7 @@ export type Database = {
         | "risk_officer"
         | "operations"
         | "auditor"
+      asset_type: "bess" | "pv" | "hybrid"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1328,6 +1613,7 @@ export const Constants = {
         "operations",
         "auditor",
       ],
+      asset_type: ["bess", "pv", "hybrid"],
     },
   },
 } as const
