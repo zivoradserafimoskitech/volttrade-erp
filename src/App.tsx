@@ -29,6 +29,8 @@ import CounterpartyDrill from "./pages/risk/CounterpartyDrill";
 import AgingDrill from "./pages/risk/AgingDrill";
 import NopDrill from "./pages/risk/NopDrill";
 import Forecasting from "./pages/Forecasting";
+import Assets from "./pages/Assets";
+import AssetMonitoring from "./pages/AssetMonitoring";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +63,8 @@ const App = () => (
             <Route path="/risk/nop/:date" element={<NopDrill />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/forecasting" element={<Forecasting />} />
+            <Route path="/assets" element={<Assets />} />
+            <Route path="/asset-monitoring" element={<AssetMonitoring />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin/audit" element={<AuditLog />} />
