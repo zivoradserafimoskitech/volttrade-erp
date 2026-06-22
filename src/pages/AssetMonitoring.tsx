@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -36,6 +37,7 @@ export default function AssetMonitoring() {
   const [syncing, setSyncing] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [dispatchForm, setDispatchForm] = useState<any>({ ts_from: format(new Date(), "yyyy-MM-dd'T'HH:00"), ts_to: format(new Date(Date.now() + 3600_000), "yyyy-MM-dd'T'HH:00"), setpoint_kw: 0, mode: "manual", notes: "" });
+  const [showForecast, setShowForecast] = useState(true);
 
   async function loadBase() {
     const [a, s, l] = await Promise.all([
@@ -121,11 +123,46 @@ export default function AssetMonitoring() {
     return { liveAssets, pvKw, charging, discharging, alarms };
   }, [latest]);
 
-  const chartData = telemetry.map(t => ({
-    t: format(new Date(t.ts), windowKey === "6h" || windowKey === "24h" ? "HH:mm" : "MM-dd HH:mm"),
-    power: t.power_kw ?? null, soc: t.soc_pct ?? null,
-    pv: t.pv_generation_kwh ?? null, grid: t.grid_kw ?? null, load: t.load_kw ?? null,
-  }));
+  // Simple clear-sky PV forecast: bell curve between sunrise/sunset scaled to nameplate kWp.
+  // Returns kWh produced within `intervalMinutes` centered on `date`.
+  function pvForecastKwh(date: Date, kWp: number, intervalMinutes: number, sunrise = 6, sunset = 20) {
+    if (!kWp || kWp <= 0) return 0;
+    const h = date.getHours() + date.getMinutes() / 60;
+    if (h <= sunrise || h >= sunset) return 0;
+    const x = (h - sunrise) / (sunset - sunrise); // 0..1
+    const shape = Math.sin(Math.PI * x); // 0..1..0
+    // Peak power ~ 80% of DC kWp under clear sky (rough heuristic)
+    const peakKw = kWp * 0.8;
+    const kW = peakKw * shape;
+    return kW * (intervalMinutes / 60);
+  }
+
+  const intervalMin = useMemo(() => {
+    if (telemetry.length < 2) return 1;
+    const a = new Date(telemetry[0].ts).getTime();
+    const b = new Date(telemetry[1].ts).getTime();
+    return Math.max(1, Math.round((b - a) / 60000));
+  }, [telemetry]);
+
+  const kWp = selected?.pv_dc_kwp ?? selected?.nameplate_power_kw ?? 0;
+
+  const chartData = telemetry.map(t => {
+    const d = new Date(t.ts);
+    return {
+      t: format(d, windowKey === "6h" || windowKey === "24h" ? "HH:mm" : "MM-dd HH:mm"),
+      power: t.power_kw ?? null, soc: t.soc_pct ?? null,
+      pv: t.pv_generation_kwh ?? null, grid: t.grid_kw ?? null, load: t.load_kw ?? null,
+      pv_forecast: kWp > 0 ? Number(pvForecastKwh(d, Number(kWp), intervalMin).toFixed(3)) : null,
+    };
+  });
+
+  const pvDeviation = useMemo(() => {
+    if (!showForecast || kWp <= 0) return null;
+    let act = 0, fc = 0;
+    for (const r of chartData) { act += Number(r.pv) || 0; fc += Number(r.pv_forecast) || 0; }
+    if (fc === 0) return null;
+    return { actual: act, forecast: fc, deltaPct: ((act - fc) / fc) * 100 };
+  }, [chartData, showForecast, kWp]);
 
   const typeIcon = (t?: string) => t === "pv" ? <Sun className="h-4 w-4" /> : t === "hybrid" ? <Zap className="h-4 w-4" /> : <Battery className="h-4 w-4" />;
 
@@ -203,7 +240,23 @@ export default function AssetMonitoring() {
 
             {(selected?.asset_type === "pv" || selected?.asset_type === "hybrid") && (
               <div>
-                <div className="text-sm font-medium mb-2">PV generation (kWh / interval)</div>
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <div className="text-sm font-medium">PV generation (kWh / interval)</div>
+                  <div className="flex items-center gap-3 text-xs">
+                    {pvDeviation && (
+                      <span className="text-muted-foreground">
+                        Σ actual {pvDeviation.actual.toFixed(1)} kWh · forecast {pvDeviation.forecast.toFixed(1)} kWh ·{" "}
+                        <span className={pvDeviation.deltaPct >= 0 ? "text-emerald-500" : "text-amber-500"}>
+                          {pvDeviation.deltaPct >= 0 ? "+" : ""}{pvDeviation.deltaPct.toFixed(1)}%
+                        </span>
+                      </span>
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Switch checked={showForecast} onCheckedChange={setShowForecast} />
+                      <span>Forecast overlay</span>
+                    </label>
+                  </div>
+                </div>
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
@@ -211,7 +264,11 @@ export default function AssetMonitoring() {
                       <XAxis dataKey="t" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Area type="monotone" dataKey="pv" stroke="#f59e0b" fill="#f59e0b33" />
+                      <Legend />
+                      <Area type="monotone" dataKey="pv" stroke="#f59e0b" fill="#f59e0b33" name="Actual" />
+                      {showForecast && (
+                        <Line type="monotone" dataKey="pv_forecast" stroke="hsl(var(--primary))" strokeDasharray="4 4" dot={false} name="Forecast (clear-sky)" />
+                      )}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
