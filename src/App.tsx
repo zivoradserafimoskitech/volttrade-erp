@@ -36,6 +36,14 @@ import ConsumerManager from "./pages/balancing/ConsumerManager";
 import SlpSynthesis from "./pages/balancing/SlpSynthesis";
 import Scheduling from "./pages/balancing/Scheduling";
 import Settlement from "./pages/balancing/Settlement";
+import Onboarding from "./pages/supply/Onboarding";
+import Switching from "./pages/supply/Switching";
+import PortalLinks from "./pages/admin/PortalLinks";
+import PortalOverview from "./pages/portal/Overview";
+import PortalEdus from "./pages/portal/Edus";
+import PortalInvoices from "./pages/portal/PortalInvoices";
+import PortalReadings from "./pages/portal/PortalReadings";
+import PortalProfile from "./pages/portal/Profile";
 
 const queryClient = new QueryClient();
 
@@ -75,9 +83,17 @@ const App = () => (
             <Route path="/balancing/slp" element={<SlpSynthesis />} />
             <Route path="/balancing/scheduling" element={<Scheduling />} />
             <Route path="/balancing/settlement" element={<Settlement />} />
+            <Route path="/supply/onboarding" element={<Onboarding />} />
+            <Route path="/supply/switching" element={<Switching />} />
+            <Route path="/portal" element={<PortalOverview />} />
+            <Route path="/portal/edus" element={<PortalEdus />} />
+            <Route path="/portal/invoices" element={<PortalInvoices />} />
+            <Route path="/portal/readings" element={<PortalReadings />} />
+            <Route path="/portal/profile" element={<PortalProfile />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin/audit" element={<AuditLog />} />
+            <Route path="/admin/portal-links" element={<PortalLinks />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
