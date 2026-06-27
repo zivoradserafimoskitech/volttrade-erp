@@ -3,13 +3,14 @@ import { ErpLayout } from "@/components/erp/Layout";
 import { StatCard } from "@/components/erp/StatCard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { fmtMwh } from "@/lib/format";
-import { Activity, Users, Zap, Euro, Database, Gauge } from "lucide-react";
+import { Activity, Users, Zap, Euro, Database, Gauge, Sun } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, addDays, startOfDay } from "date-fns";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ export default function Dashboard() {
   const [hourly, setHourly] = useState<{ time: string; forecast: number; actual: number }[]>([]);
   const [prices, setPrices] = useState<{ time: string; price: number }[]>([]);
   const [seeding, setSeeding] = useState(false);
+  const [period, setPeriod] = useState<"1" | "7" | "30">("7");
+  const [pv, setPv] = useState<{ count: number; kwp: number; daily: { date: string; mwh: number }[] }>({ count: 0, kwp: 0, daily: [] });
 
   const load = async () => {
     if (!user) return;
@@ -29,6 +32,24 @@ export default function Dashboard() {
     setClientCount(cc ?? 0);
     setEdusCount(edus?.length ?? 0);
     setPrices((pr ?? []).map(p => ({ time: format(new Date(p.delivery_at), "MM-dd HH:mm"), price: Number(p.price_eur_mwh) })));
+
+    // PV aggregation for the selected delivery period
+    const { data: pvRows } = await supabase
+      .from("metering_points")
+      .select("pv_capacity_kw, has_pv, client:clients!inner(user_id)")
+      .eq("client.user_id", user.id)
+      .eq("has_pv", true);
+    const totalKwp = (pvRows ?? []).reduce((s: number, r: any) => s + Number(r.pv_capacity_kw ?? 0), 0);
+    const days = Number(period);
+    const start = startOfDay(new Date());
+    const daily = Array.from({ length: days }, (_, i) => {
+      const d = addDays(start, i);
+      const doy = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
+      const seasonal = 4 + 1.2 * Math.sin(((doy - 80) / 365) * 2 * Math.PI); // 2.8–5.2 kWh/kWp/day
+      const kwh = totalKwp * seasonal;
+      return { date: format(d, "MM-dd"), mwh: +(kwh / 1000).toFixed(3) };
+    });
+    setPv({ count: pvRows?.length ?? 0, kwp: totalKwp, daily });
 
     // Get readings for the most recent 24h
     const { data: meterIds } = await supabase.from("metering_points").select("id, client:clients!inner(user_id)").eq("client.user_id", user.id);
@@ -72,12 +93,25 @@ export default function Dashboard() {
   const mape = mapePairs.length > 0
     ? (mapePairs.reduce((s, h) => s + Math.abs((h.actual - h.forecast) / h.actual), 0) / mapePairs.length) * 100
     : null;
+  const pvTotalMwh = pv.daily.reduce((s, d) => s + d.mwh, 0);
 
   return (
     <ErpLayout
       title="Energy Portfolio Dashboard"
       subtitle="Real-time overview of consumption, market prices and portfolio health"
-      actions={<Button onClick={seed} disabled={seeding} variant="secondary"><Database className="h-4 w-4 mr-2" />{seeding ? "Loading…" : "Load demo data"}</Button>}
+      actions={
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Delivery period" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Today</SelectItem>
+              <SelectItem value="7">Next 7 days</SelectItem>
+              <SelectItem value="30">Next 30 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={seed} disabled={seeding} variant="secondary"><Database className="h-4 w-4 mr-2" />{seeding ? "Loading…" : "Load demo data"}</Button>
+        </div>
+      }
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Active clients" value={String(clientCount)} icon={Users} hint="Business contracts" />
@@ -90,6 +124,12 @@ export default function Dashboard() {
           accent={mape != null && mape < 15 ? "primary" : "warning"}
           hint={`Actual ${fmtMwh(totalActual)} · Fcst ${fmtMwh(totalForecast)}`}
         />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard label="PV installations" value={String(pv.count)} icon={Sun} accent="accent" hint="EDUs with PV systems" />
+        <StatCard label="Installed PV capacity" value={`${pv.kwp.toFixed(1)} kWp`} icon={Sun} accent="primary" hint="Aggregated DC nameplate" />
+        <StatCard label={`PV potential (${period === "1" ? "today" : period + "d"})`} value={fmtMwh(pvTotalMwh)} icon={Sun} accent="warning" hint="Clear-sky seasonal yield" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -139,6 +179,28 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle>PV generation potential — delivery period</CardTitle>
+          <CardDescription>Aggregated clear-sky yield across {pv.count} PV installation(s) · {pv.kwp.toFixed(1)} kWp</CardDescription>
+        </CardHeader>
+        <CardContent className="h-72">
+          {pv.kwp === 0 ? (
+            <Empty msg="No PV installations yet. Enable 'Has PV' on a metering point." />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={pv.daily}>
+                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
+                <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: any) => [`${v} MWh`, "PV yield"]} />
+                <Bar dataKey="mwh" fill="hsl(var(--warning))" radius={[3,3,0,0]} name="Expected PV (MWh)" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
     </ErpLayout>
   );
 }
