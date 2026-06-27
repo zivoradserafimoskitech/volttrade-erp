@@ -146,9 +146,10 @@ export default function Clients() {
                     <TableCell>
                       <div className="flex items-center gap-2 flex-wrap">
                         {myEdus.map((e: any) => (
-                          <Badge key={e.id} variant="outline" className="font-mono text-[10px]" title={e.consumer_category === 'slp' ? `SLP: ${e.slp_profile_code ?? '—'}` : e.consumer_category}>
+                          <Badge key={e.id} variant="outline" className="font-mono text-[10px]" title={`${e.consumer_category === 'slp' ? `SLP: ${e.slp_profile_code ?? '—'}` : e.consumer_category}${e.has_pv ? ` · PV ${e.pv_capacity_kw ?? '?'} kW` : ''}`}>
                             <Zap className="h-3 w-3 mr-1" />{e.edu_code}
                             <span className="ml-1 opacity-60">· {e.consumer_category === 'slp' ? 'SLP' : e.consumer_category === 'smart_daily' ? 'D' : 'H'}</span>
+                            {e.has_pv && <Sun className="h-3 w-3 ml-1 text-amber-500" />}
                           </Badge>
                         ))}
                         <Dialog open={openEdu === c.id} onOpenChange={(o) => { setOpenEdu(o ? c.id : null); if (!o) { setEduCategory("smart_hourly"); setEduHasPv(false); } }}>
