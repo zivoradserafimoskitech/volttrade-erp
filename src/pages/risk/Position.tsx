@@ -101,10 +101,10 @@ export default function Position() {
     <ErpLayout title="Hourly Position" subtitle="See for each hour how much electricity you have over (long) or are missing (short)"
       actions={
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => exportToExcel(`position_${date}`, hourly, cols, { sheetName: "Position" })}>
+          <Button variant="outline" size="sm" onClick={() => exportToExcel(`position_${date}`, [{ name: "Position", columns: cols, rows: hourly }])}>
             <FileDown className="h-4 w-4 mr-1" />Excel
           </Button>
-          <Button variant="outline" size="sm" onClick={() => exportToPdf(`position_${date}`, `Hourly position — ${date}`, hourly, cols)}>
+          <Button variant="outline" size="sm" onClick={() => exportToPdf({ filename: `position_${date}`, title: "Hourly position", subtitle: date, sections: [{ heading: "Per-hour breakdown", columns: cols, rows: hourly }] })}>
             <FileText className="h-4 w-4 mr-1" />PDF
           </Button>
         </div>
