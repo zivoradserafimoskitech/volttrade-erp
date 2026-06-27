@@ -8,14 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Plus, Trash2, Zap } from "lucide-react";
+import { Plus, Trash2, Zap, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
 
 type Client = { id: string; company_name: string; tax_id: string | null; contact_name: string | null; contact_email: string | null; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; status: string };
-type Edu = { id: string; client_id: string; edu_code: string; address: string | null; voltage_level: string | null; annual_consumption_mwh: number | null };
+type Edu = { id: string; client_id: string; edu_code: string; address: string | null; voltage_level: string | null; annual_consumption_mwh: number | null; has_pv?: boolean; pv_capacity_kw?: number | null };
 type SlpProfile = { code: string; name: string };
 
 export default function Clients() {
@@ -24,6 +25,7 @@ export default function Clients() {
   const [edus, setEdus] = useState<Edu[]>([]);
   const [slpProfiles, setSlpProfiles] = useState<SlpProfile[]>([]);
   const [eduCategory, setEduCategory] = useState<string>("smart_hourly");
+  const [eduHasPv, setEduHasPv] = useState<boolean>(false);
   const [openClient, setOpenClient] = useState(false);
   const [openEdu, setOpenEdu] = useState<string | null>(null);
 
@@ -60,6 +62,8 @@ export default function Clients() {
     const power = form.get("connected_power_kw") ? Number(form.get("connected_power_kw")) : null;
     const slpCode = form.get("slp_profile_code") ? String(form.get("slp_profile_code")) : null;
     if (category === "slp" && !slpCode) return toast.error("Pick an SLP profile for category ≤ 40 kW");
+    const hasPv = eduHasPv;
+    const pvCapacity = hasPv && form.get("pv_capacity_kw") ? Number(form.get("pv_capacity_kw")) : null;
     const { error } = await supabase.from("metering_points").insert({
       client_id,
       edu_code: String(form.get("edu_code")),
@@ -69,9 +73,11 @@ export default function Clients() {
       consumer_category: category,
       connected_power_kw: power,
       slp_profile_code: category === "slp" ? slpCode : null,
+      has_pv: hasPv,
+      pv_capacity_kw: pvCapacity,
     } as any);
     if (error) return toast.error(error.message);
-    toast.success("Metering point added"); setOpenEdu(null); setEduCategory("smart_hourly"); load();
+    toast.success("Metering point added"); setOpenEdu(null); setEduCategory("smart_hourly"); setEduHasPv(false); load();
   };
 
   const removeClient = async (id: string) => {
@@ -140,12 +146,13 @@ export default function Clients() {
                     <TableCell>
                       <div className="flex items-center gap-2 flex-wrap">
                         {myEdus.map((e: any) => (
-                          <Badge key={e.id} variant="outline" className="font-mono text-[10px]" title={e.consumer_category === 'slp' ? `SLP: ${e.slp_profile_code ?? '—'}` : e.consumer_category}>
+                          <Badge key={e.id} variant="outline" className="font-mono text-[10px]" title={`${e.consumer_category === 'slp' ? `SLP: ${e.slp_profile_code ?? '—'}` : e.consumer_category}${e.has_pv ? ` · PV ${e.pv_capacity_kw ?? '?'} kW` : ''}`}>
                             <Zap className="h-3 w-3 mr-1" />{e.edu_code}
                             <span className="ml-1 opacity-60">· {e.consumer_category === 'slp' ? 'SLP' : e.consumer_category === 'smart_daily' ? 'D' : 'H'}</span>
+                            {e.has_pv && <Sun className="h-3 w-3 ml-1 text-amber-500" />}
                           </Badge>
                         ))}
-                        <Dialog open={openEdu === c.id} onOpenChange={(o) => { setOpenEdu(o ? c.id : null); if (!o) setEduCategory("smart_hourly"); }}>
+                        <Dialog open={openEdu === c.id} onOpenChange={(o) => { setOpenEdu(o ? c.id : null); if (!o) { setEduCategory("smart_hourly"); setEduHasPv(false); } }}>
                           <DialogTrigger asChild><Button size="sm" variant="ghost" className="h-6 px-2 text-xs">+ Add EDU</Button></DialogTrigger>
                           <DialogContent>
                             <DialogHeader><DialogTitle>New metering point</DialogTitle></DialogHeader>
@@ -174,7 +181,17 @@ export default function Clients() {
                                     <SelectContent>
                                       {slpProfiles.map(p => <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>)}
                                     </SelectContent>
-                                  </Select>
+                              </Select>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 col-span-2">
+                                <Label className="text-xs">Has PV (photovoltaic)</Label>
+                                <Switch checked={eduHasPv} onCheckedChange={v => setEduHasPv(v)} />
+                              </div>
+                              {eduHasPv && (
+                                <div className="space-y-2 col-span-2">
+                                  <Label htmlFor="pv_capacity_kw">PV capacity (kW)</Label>
+                                  <Input id="pv_capacity_kw" name="pv_capacity_kw" type="number" step="0.1" placeholder="e.g. 10.5" />
                                 </div>
                               )}
                               <DialogFooter className="col-span-2"><Button type="submit">Save</Button></DialogFooter>

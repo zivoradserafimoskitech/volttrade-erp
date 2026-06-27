@@ -1116,9 +1116,11 @@ export type Database = {
           created_at: string
           dso_area: string | null
           edu_code: string
+          has_pv: boolean
           id: string
           meter_id: string | null
           notes: string | null
+          pv_capacity_kw: number | null
           slp_profile_code: string | null
           status: string
           voltage_level: string | null
@@ -1134,9 +1136,11 @@ export type Database = {
           created_at?: string
           dso_area?: string | null
           edu_code: string
+          has_pv?: boolean
           id?: string
           meter_id?: string | null
           notes?: string | null
+          pv_capacity_kw?: number | null
           slp_profile_code?: string | null
           status?: string
           voltage_level?: string | null
@@ -1152,9 +1156,11 @@ export type Database = {
           created_at?: string
           dso_area?: string | null
           edu_code?: string
+          has_pv?: boolean
           id?: string
           meter_id?: string | null
           notes?: string | null
+          pv_capacity_kw?: number | null
           slp_profile_code?: string | null
           status?: string
           voltage_level?: string | null
