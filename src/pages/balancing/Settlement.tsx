@@ -13,6 +13,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Scale, TrendingDown, Save } from "lucide-react";
+import { FileDown, FileText } from "lucide-react";
+import { exportToExcel, exportToPdf, type ExportColumn } from "@/lib/exports";
 
 type Seg = "PROFILED" | "MEASURED" | "PV";
 
@@ -58,9 +60,62 @@ export default function Settlement() {
     toast({ title: `Settlement ${status}`, description: `${enriched.length} segments saved` });
   }
 
+  const exportCols: ExportColumn[] = [
+    { key: "segment", label: "Segment" },
+    { key: "scheduled", label: "Scheduled MWh", format: "num" },
+    { key: "actual", label: "Actual MWh", format: "num" },
+    { key: "imbalance", label: "Imbalance MWh", format: "num" },
+    { key: "price", label: "Price €/MWh", format: "eur" },
+    { key: "cost", label: "Cost €", format: "eur" },
+  ];
+  const fileBase = `settlement_${period}${bg ? "_" + (groups.find(g => g.id === bg)?.name ?? "bg").replace(/\s+/g, "_") : ""}`;
+  function handleExcel() {
+    exportToExcel(fileBase, [
+      { name: "Segments", columns: exportCols, rows: enriched },
+      { name: "Summary", columns: [
+        { key: "k", label: "Metric" }, { key: "v", label: "Value" },
+      ], rows: [
+        { k: "Period", v: period },
+        { k: "Balance group", v: groups.find(g => g.id === bg)?.name ?? "—" },
+        { k: "Pricing", v: dual ? `Dual (up ${upPrice} / down ${downPrice})` : `Single ${singlePrice}` },
+        { k: "Scheduled MWh", v: totals.scheduled.toFixed(2) },
+        { k: "Actual MWh", v: totals.actual.toFixed(2) },
+        { k: "Imbalance MWh", v: totals.imbalance.toFixed(2) },
+        { k: "Imbalance cost €", v: totals.cost.toFixed(2) },
+      ] },
+    ]);
+  }
+  function handlePdf() {
+    exportToPdf({
+      title: `Settlement summary · ${period}`,
+      subtitle: groups.find(g => g.id === bg)?.name ?? undefined,
+      filename: fileBase,
+      sections: [
+        {
+          heading: "Per-segment settlement",
+          columns: exportCols,
+          rows: enriched,
+          totals: { segment: "TOTAL", scheduled: totals.scheduled, actual: totals.actual, imbalance: totals.imbalance, cost: totals.cost },
+        },
+        {
+          heading: "Pricing parameters",
+          columns: [{ key: "k", label: "Parameter" }, { key: "v", label: "Value" }],
+          rows: [
+            { k: "Pricing mode", v: dual ? "Dual" : "Single" },
+            { k: "Single price €/MWh", v: dual ? "—" : singlePrice },
+            { k: "Up regulation €/MWh", v: dual ? upPrice : "—" },
+            { k: "Down regulation €/MWh", v: dual ? downPrice : "—" },
+          ],
+        },
+      ],
+    });
+  }
+
   return (
     <ErpLayout title="Imbalance Settlement" subtitle="Scheduled vs actual per segment · cost allocation to cost-to-serve"
       actions={<>
+        <Button size="sm" variant="outline" onClick={handleExcel}><FileDown className="h-4 w-4 mr-1" />Excel</Button>
+        <Button size="sm" variant="outline" onClick={handlePdf}><FileText className="h-4 w-4 mr-1" />PDF</Button>
         <Button size="sm" variant="outline" onClick={() => persist("PROVISIONAL")}><Save className="h-4 w-4 mr-1" />Save provisional</Button>
         <Button size="sm" onClick={() => persist("FINAL")}><Save className="h-4 w-4 mr-1" />Mark final</Button>
       </>}>
