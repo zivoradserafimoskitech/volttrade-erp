@@ -51,7 +51,7 @@ export default function BillingRuns() {
     const { data: links } = await supabase.from("supply_contract_points").select("*");
     const { data: readings } = await supabase.from("meter_readings").select("*").eq("validation_status", "validated").gte("reading_at", run.period_start).lte("reading_at", run.period_end + "T23:59:59");
 
-    let invoiceCount = 0, totalEur = 0, totalMwh = 0;
+    let invoiceCount = 0, totalEur = 0, totalMwh = 0, skipped = 0;
     for (const c of (contracts ?? [])) {
       const t = (tariffs ?? []).find((x: any) => x.id === c.tariff_id);
       if (!t) continue;
@@ -60,6 +60,7 @@ export default function BillingRuns() {
       const fixed = comps.find((x: any) => x.type === 'fixed_fee')?.value ?? 0;
       const mpIds = (links ?? []).filter((l: any) => l.contract_id === c.id).map((l: any) => l.metering_point_id);
       const kwh = (readings ?? []).filter((r: any) => mpIds.includes(r.metering_point_id)).reduce((s: number, r: any) => s + Number(r.import_kwh || 0), 0);
+      if (kwh <= 0 && Number(fixed) <= 0) { skipped++; continue; }
       const mwh = kwh / 1000;
       const energy_amount = mwh * Number(energy);
       const subtotal = energy_amount + Number(fixed);
@@ -85,7 +86,7 @@ export default function BillingRuns() {
       if (!error) { invoiceCount++; totalEur += total; totalMwh += mwh; }
     }
     await supabase.from("billing_runs").update({ status: 'preview', invoice_count: invoiceCount, total_eur: totalEur, total_mwh: totalMwh }).eq("id", run.id);
-    toast.success(`Generated ${invoiceCount} draft invoices`);
+    toast.success(`Generated ${invoiceCount} draft invoices${skipped ? ` (skipped ${skipped} contracts with no consumption)` : ''}`);
     load();
   };
 
@@ -96,7 +97,7 @@ export default function BillingRuns() {
   };
 
   return (
-    <ErpLayout title="Billing Runs" subtitle="Generate monthly invoices from validated meter readings"
+    <ErpLayout title="Supply Billing Runs" subtitle="Generate invoices for activated supply contracts — drafts appear in the customer portal automatically"
       actions={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />New billing run</Button></DialogTrigger>

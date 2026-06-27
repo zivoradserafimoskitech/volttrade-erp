@@ -20,7 +20,10 @@ export default function PortalOverview() {
     if (!cl) return;
     const { data: c } = await supabase.from("supply_contracts").select("*").eq("client_id", cl.id).eq("status", "active").limit(1).maybeSingle();
     setContract(c);
-    const { data: inv } = await supabase.from("invoices").select("*").eq("client_id", cl.id).order("due_date", { ascending: true }).limit(1).maybeSingle();
+    const { data: inv } = await supabase.from("invoices")
+      .select("*").eq("client_id", cl.id)
+      .in("status", ["draft", "issued", "overdue"])
+      .order("due_date", { ascending: true }).limit(1).maybeSingle();
     setInvoice(inv);
     const { data: mps } = await supabase.from("metering_points").select("id").eq("client_id", cl.id);
     const ids = (mps ?? []).map(m => m.id);

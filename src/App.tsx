@@ -28,6 +28,7 @@ import Risk from "./pages/Risk";
 import CounterpartyDrill from "./pages/risk/CounterpartyDrill";
 import AgingDrill from "./pages/risk/AgingDrill";
 import NopDrill from "./pages/risk/NopDrill";
+import Position from "./pages/risk/Position";
 import Forecasting from "./pages/Forecasting";
 import Assets from "./pages/Assets";
 import AssetMonitoring from "./pages/AssetMonitoring";
@@ -74,6 +75,7 @@ const App = () => (
             <Route path="/risk/counterparty/:id" element={<CounterpartyDrill />} />
             <Route path="/risk/aging/:bucket" element={<AgingDrill />} />
             <Route path="/risk/nop/:date" element={<NopDrill />} />
+            <Route path="/risk/position" element={<Position />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/forecasting" element={<Forecasting />} />
             <Route path="/assets" element={<Assets />} />
