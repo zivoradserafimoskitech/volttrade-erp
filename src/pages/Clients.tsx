@@ -180,7 +180,17 @@ export default function Clients() {
                                     <SelectContent>
                                       {slpProfiles.map(p => <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>)}
                                     </SelectContent>
-                                  </Select>
+                              </Select>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 col-span-2">
+                                <Label className="text-xs">Has PV (photovoltaic)</Label>
+                                <Switch checked={eduHasPv} onCheckedChange={v => setEduHasPv(v)} />
+                              </div>
+                              {eduHasPv && (
+                                <div className="space-y-2 col-span-2">
+                                  <Label htmlFor="pv_capacity_kw">PV capacity (kW)</Label>
+                                  <Input id="pv_capacity_kw" name="pv_capacity_kw" type="number" step="0.1" placeholder="e.g. 10.5" />
                                 </div>
                               )}
                               <DialogFooter className="col-span-2"><Button type="submit">Save</Button></DialogFooter>
