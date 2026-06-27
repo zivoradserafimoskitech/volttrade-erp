@@ -25,6 +25,7 @@ export default function Clients() {
   const [edus, setEdus] = useState<Edu[]>([]);
   const [slpProfiles, setSlpProfiles] = useState<SlpProfile[]>([]);
   const [eduCategory, setEduCategory] = useState<string>("smart_hourly");
+  const [eduHasPv, setEduHasPv] = useState<boolean>(false);
   const [openClient, setOpenClient] = useState(false);
   const [openEdu, setOpenEdu] = useState<string | null>(null);
 
