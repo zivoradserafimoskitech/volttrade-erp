@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Plus, Trash2, Zap } from "lucide-react";
+import { Plus, Trash2, Zap, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
 
