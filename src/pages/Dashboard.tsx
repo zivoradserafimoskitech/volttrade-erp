@@ -1,13 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
 import { StatCard } from "@/components/erp/StatCard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { fmtMwh } from "@/lib/format";
-import { Activity, Users, Zap, Euro, Database, Gauge, Sun } from "lucide-react";
+import { Activity, Users, Zap, Euro, Database, Gauge, Sun, Bell, AlertTriangle } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ComposedChart } from "recharts";
 import { toast } from "sonner";
 import { format, addDays, startOfDay, subDays } from "date-fns";
@@ -21,6 +26,14 @@ export default function Dashboard() {
   const [seeding, setSeeding] = useState(false);
   const [period, setPeriod] = useState<"1" | "7" | "30">("7");
   const [pv, setPv] = useState<{ count: number; kwp: number; daily: { date: string; potential: number; actual: number | null }[] }>({ count: 0, kwp: 0, daily: [] });
+  const [prAlert, setPrAlert] = useState<{ enabled: boolean; threshold: number }>(() => {
+    try {
+      const raw = localStorage.getItem("pv.pr.alert");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return { enabled: true, threshold: 80 };
+  });
+  const lastNotifiedRef = useRef<string | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -102,6 +115,10 @@ export default function Dashboard() {
 
   useEffect(() => { load(); }, [user, period]);
 
+  useEffect(() => {
+    try { localStorage.setItem("pv.pr.alert", JSON.stringify(prAlert)); } catch {}
+  }, [prAlert]);
+
   const seed = async () => {
     setSeeding(true);
     const { error } = await supabase.functions.invoke("seed-demo-data");
@@ -124,6 +141,18 @@ export default function Dashboard() {
     ? (pvActualDays.reduce((s, d) => s + (d.actual ?? 0), 0) /
        Math.max(0.0001, pvActualDays.reduce((s, d) => s + d.potential, 0))) * 100
     : null;
+  const prBreached = prAlert.enabled && performanceRatio != null && performanceRatio < prAlert.threshold;
+
+  useEffect(() => {
+    if (!prBreached || performanceRatio == null) return;
+    const key = `${period}|${prAlert.threshold}|${performanceRatio.toFixed(1)}`;
+    if (lastNotifiedRef.current === key) return;
+    lastNotifiedRef.current = key;
+    toast.warning(`PV Performance Ratio ${performanceRatio.toFixed(1)}% is below ${prAlert.threshold}% threshold`, {
+      description: `Window: ${period === "1" ? "today" : `last ${period} days`} · Actual ${fmtMwh(pvActualMwh)} vs potential ${fmtMwh(pvPotentialMwh)}`,
+      duration: 8000,
+    });
+  }, [prBreached, performanceRatio, prAlert.threshold, period, pvActualMwh, pvPotentialMwh]);
 
   return (
     <ErpLayout
@@ -131,6 +160,37 @@ export default function Dashboard() {
       subtitle="Real-time overview of consumption, market prices and portfolio health"
       actions={
         <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Bell className={`h-4 w-4 ${prBreached ? "text-amber-500" : ""}`} />
+                PR alert {prAlert.enabled ? `< ${prAlert.threshold}%` : "off"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="pr-alert-enabled" className="text-sm">Enable PR alert</Label>
+                <Switch
+                  id="pr-alert-enabled"
+                  checked={prAlert.enabled}
+                  onCheckedChange={(v) => setPrAlert(s => ({ ...s, enabled: v }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pr-threshold" className="text-xs text-muted-foreground">Notify when PR drops below (%)</Label>
+                <Input
+                  id="pr-threshold"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={prAlert.threshold}
+                  onChange={(e) => setPrAlert(s => ({ ...s, threshold: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Evaluated against the currently selected period.</p>
+            </PopoverContent>
+          </Popover>
           <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="Delivery period" /></SelectTrigger>
             <SelectContent>
@@ -168,6 +228,17 @@ export default function Dashboard() {
           hint={performanceRatio != null ? `Actual ${fmtMwh(pvActualMwh)} vs potential` : "No telemetry in window"}
         />
       </div>
+
+      {prBreached && performanceRatio != null && (
+        <Alert variant="destructive" className="border-amber-500/50 text-amber-600 dark:text-amber-400 [&>svg]:text-amber-500">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>PV Performance Ratio below threshold</AlertTitle>
+          <AlertDescription>
+            Current PR is <strong>{performanceRatio.toFixed(1)}%</strong> (threshold {prAlert.threshold}%) for the {period === "1" ? "selected day" : `last ${period} days`}.
+            Actual {fmtMwh(pvActualMwh)} vs potential {fmtMwh(pvPotentialMwh)}.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-2 border-border/60">
