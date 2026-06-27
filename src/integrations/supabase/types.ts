@@ -427,6 +427,7 @@ export type Database = {
           margin_eur_mwh: number
           notes: string | null
           payment_terms_days: number
+          portal_user_id: string | null
           status: string
           tax_id: string | null
           updated_at: string
@@ -449,6 +450,7 @@ export type Database = {
           margin_eur_mwh?: number
           notes?: string | null
           payment_terms_days?: number
+          portal_user_id?: string | null
           status?: string
           tax_id?: string | null
           updated_at?: string
@@ -471,6 +473,7 @@ export type Database = {
           margin_eur_mwh?: number
           notes?: string | null
           payment_terms_days?: number
+          portal_user_id?: string | null
           status?: string
           tax_id?: string | null
           updated_at?: string
@@ -843,6 +846,184 @@ export type Database = {
           {
             foreignKeyName: "invoices_client_id_fkey"
             columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kyc_documents: {
+        Row: {
+          created_at: string
+          doc_type: string
+          file_name: string | null
+          file_path: string
+          id: string
+          lead_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_note: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          doc_type: string
+          file_name?: string | null
+          file_path: string
+          id?: string
+          lead_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          doc_type?: string
+          file_name?: string | null
+          file_path?: string
+          id?: string
+          lead_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kyc_documents_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_quotes: {
+        Row: {
+          annual_cost_eur: number | null
+          annual_volume_mwh: number | null
+          base_price_eur_mwh: number | null
+          created_at: string
+          id: string
+          lead_id: string
+          margin_eur_mwh: number | null
+          pdf_url: string | null
+          status: string
+          tariff_id: string | null
+          term_months: number | null
+          updated_at: string
+        }
+        Insert: {
+          annual_cost_eur?: number | null
+          annual_volume_mwh?: number | null
+          base_price_eur_mwh?: number | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          margin_eur_mwh?: number | null
+          pdf_url?: string | null
+          status?: string
+          tariff_id?: string | null
+          term_months?: number | null
+          updated_at?: string
+        }
+        Update: {
+          annual_cost_eur?: number | null
+          annual_volume_mwh?: number | null
+          base_price_eur_mwh?: number | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          margin_eur_mwh?: number | null
+          pdf_url?: string | null
+          status?: string
+          tariff_id?: string | null
+          term_months?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_quotes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_quotes_tariff_id_fkey"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          company_name: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          converted_client_id: string | null
+          country: string | null
+          created_at: string
+          est_annual_mwh: number | null
+          est_value_eur: number | null
+          id: string
+          lost_reason: string | null
+          notes: string | null
+          owner: string | null
+          source: string | null
+          stage: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_name: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          converted_client_id?: string | null
+          country?: string | null
+          created_at?: string
+          est_annual_mwh?: number | null
+          est_value_eur?: number | null
+          id?: string
+          lost_reason?: string | null
+          notes?: string | null
+          owner?: string | null
+          source?: string | null
+          stage?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_name?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          converted_client_id?: string | null
+          country?: string | null
+          created_at?: string
+          est_annual_mwh?: number | null
+          est_value_eur?: number | null
+          id?: string
+          lost_reason?: string | null
+          notes?: string | null
+          owner?: string | null
+          source?: string | null
+          stage?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_converted_client_id_fkey"
+            columns: ["converted_client_id"]
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
@@ -1510,6 +1691,77 @@ export type Database = {
           },
         ]
       }
+      switch_requests: {
+        Row: {
+          client_id: string | null
+          confirmed_date: string | null
+          created_at: string
+          current_supplier: string | null
+          direction: string
+          dso_status: string
+          edu_code: string
+          id: string
+          lost_reason: string | null
+          message_envelope: string | null
+          new_supplier: string | null
+          notes: string | null
+          requested_date: string | null
+          updated_at: string
+          user_id: string
+          volume_estimate_mwh: number | null
+          win_back_discount_eur_mwh: number | null
+          win_back_offered: boolean | null
+        }
+        Insert: {
+          client_id?: string | null
+          confirmed_date?: string | null
+          created_at?: string
+          current_supplier?: string | null
+          direction: string
+          dso_status?: string
+          edu_code: string
+          id?: string
+          lost_reason?: string | null
+          message_envelope?: string | null
+          new_supplier?: string | null
+          notes?: string | null
+          requested_date?: string | null
+          updated_at?: string
+          user_id: string
+          volume_estimate_mwh?: number | null
+          win_back_discount_eur_mwh?: number | null
+          win_back_offered?: boolean | null
+        }
+        Update: {
+          client_id?: string | null
+          confirmed_date?: string | null
+          created_at?: string
+          current_supplier?: string | null
+          direction?: string
+          dso_status?: string
+          edu_code?: string
+          id?: string
+          lost_reason?: string | null
+          message_envelope?: string | null
+          new_supplier?: string | null
+          notes?: string | null
+          requested_date?: string | null
+          updated_at?: string
+          user_id?: string
+          volume_estimate_mwh?: number | null
+          win_back_discount_eur_mwh?: number | null
+          win_back_offered?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "switch_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tariffs: {
         Row: {
           code: string
@@ -1724,6 +1976,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_portal_client_id: { Args: never; Returns: string }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -1750,6 +2003,7 @@ export type Database = {
         | "risk_officer"
         | "operations"
         | "auditor"
+        | "customer"
       asset_type: "bess" | "pv" | "hybrid"
       consumer_type: "Residential" | "SOHO" | "SME" | "Industrial" | "Public"
       day_type_t: "WD" | "SA" | "SU"
@@ -1910,6 +2164,7 @@ export const Constants = {
         "risk_officer",
         "operations",
         "auditor",
+        "customer",
       ],
       asset_type: ["bess", "pv", "hybrid"],
       consumer_type: ["Residential", "SOHO", "SME", "Industrial", "Public"],
