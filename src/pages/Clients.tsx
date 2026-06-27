@@ -62,6 +62,8 @@ export default function Clients() {
     const power = form.get("connected_power_kw") ? Number(form.get("connected_power_kw")) : null;
     const slpCode = form.get("slp_profile_code") ? String(form.get("slp_profile_code")) : null;
     if (category === "slp" && !slpCode) return toast.error("Pick an SLP profile for category ≤ 40 kW");
+    const hasPv = eduHasPv;
+    const pvCapacity = hasPv && form.get("pv_capacity_kw") ? Number(form.get("pv_capacity_kw")) : null;
     const { error } = await supabase.from("metering_points").insert({
       client_id,
       edu_code: String(form.get("edu_code")),
@@ -71,9 +73,11 @@ export default function Clients() {
       consumer_category: category,
       connected_power_kw: power,
       slp_profile_code: category === "slp" ? slpCode : null,
+      has_pv: hasPv,
+      pv_capacity_kw: pvCapacity,
     } as any);
     if (error) return toast.error(error.message);
-    toast.success("Metering point added"); setOpenEdu(null); setEduCategory("smart_hourly"); load();
+    toast.success("Metering point added"); setOpenEdu(null); setEduCategory("smart_hourly"); setEduHasPv(false); load();
   };
 
   const removeClient = async (id: string) => {
