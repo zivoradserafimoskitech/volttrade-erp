@@ -32,6 +32,10 @@ import Forecasting from "./pages/Forecasting";
 import Assets from "./pages/Assets";
 import AssetMonitoring from "./pages/AssetMonitoring";
 import SmartMeter from "./pages/SmartMeter";
+import ConsumerManager from "./pages/balancing/ConsumerManager";
+import SlpSynthesis from "./pages/balancing/SlpSynthesis";
+import Scheduling from "./pages/balancing/Scheduling";
+import Settlement from "./pages/balancing/Settlement";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +71,10 @@ const App = () => (
             <Route path="/assets" element={<Assets />} />
             <Route path="/asset-monitoring" element={<AssetMonitoring />} />
             <Route path="/smart-meter" element={<SmartMeter />} />
+            <Route path="/balancing/consumers" element={<ConsumerManager />} />
+            <Route path="/balancing/slp" element={<SlpSynthesis />} />
+            <Route path="/balancing/scheduling" element={<Scheduling />} />
+            <Route path="/balancing/settlement" element={<Settlement />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin/audit" element={<AuditLog />} />
