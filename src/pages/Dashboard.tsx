@@ -8,9 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { fmtMwh } from "@/lib/format";
 import { Activity, Users, Zap, Euro, Database, Gauge, Sun } from "lucide-react";
-import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ComposedChart } from "recharts";
 import { toast } from "sonner";
-import { format, addDays, startOfDay } from "date-fns";
+import { format, addDays, startOfDay, subDays } from "date-fns";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [prices, setPrices] = useState<{ time: string; price: number }[]>([]);
   const [seeding, setSeeding] = useState(false);
   const [period, setPeriod] = useState<"1" | "7" | "30">("7");
-  const [pv, setPv] = useState<{ count: number; kwp: number; daily: { date: string; mwh: number }[] }>({ count: 0, kwp: 0, daily: [] });
+  const [pv, setPv] = useState<{ count: number; kwp: number; daily: { date: string; potential: number; actual: number | null }[] }>({ count: 0, kwp: 0, daily: [] });
 
   const load = async () => {
     if (!user) return;
@@ -33,7 +33,7 @@ export default function Dashboard() {
     setEdusCount(edus?.length ?? 0);
     setPrices((pr ?? []).map(p => ({ time: format(new Date(p.delivery_at), "MM-dd HH:mm"), price: Number(p.price_eur_mwh) })));
 
-    // PV aggregation for the selected delivery period
+    // PV aggregation for the selected delivery period (rolling window ending today)
     const { data: pvRows } = await supabase
       .from("metering_points")
       .select("pv_capacity_kw, has_pv, client:clients!inner(user_id)")
@@ -41,13 +41,37 @@ export default function Dashboard() {
       .eq("has_pv", true);
     const totalKwp = (pvRows ?? []).reduce((s: number, r: any) => s + Number(r.pv_capacity_kw ?? 0), 0);
     const days = Number(period);
-    const start = startOfDay(new Date());
+    const today = startOfDay(new Date());
+    const windowStart = subDays(today, days - 1);
+
+    // Pull actual PV telemetry for the window (pv / hybrid assets)
+    const { data: pvAssets } = await supabase
+      .from("assets")
+      .select("id, asset_type")
+      .in("asset_type", ["pv", "hybrid"]);
+    const pvAssetIds = (pvAssets ?? []).map((a: any) => a.id);
+    const actualByDay = new Map<string, number>();
+    if (pvAssetIds.length) {
+      const { data: tel } = await supabase
+        .from("asset_telemetry")
+        .select("ts, pv_generation_kwh, asset_id")
+        .in("asset_id", pvAssetIds)
+        .gte("ts", windowStart.toISOString())
+        .lte("ts", addDays(today, 1).toISOString());
+      (tel ?? []).forEach((r: any) => {
+        const k = format(new Date(r.ts), "MM-dd");
+        actualByDay.set(k, (actualByDay.get(k) ?? 0) + Number(r.pv_generation_kwh ?? 0));
+      });
+    }
+
     const daily = Array.from({ length: days }, (_, i) => {
-      const d = addDays(start, i);
+      const d = addDays(windowStart, i);
+      const key = format(d, "MM-dd");
       const doy = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
-      const seasonal = 4 + 1.2 * Math.sin(((doy - 80) / 365) * 2 * Math.PI); // 2.8–5.2 kWh/kWp/day
-      const kwh = totalKwp * seasonal;
-      return { date: format(d, "MM-dd"), mwh: +(kwh / 1000).toFixed(3) };
+      const seasonal = 4 + 1.2 * Math.sin(((doy - 80) / 365) * 2 * Math.PI);
+      const potentialMwh = +((totalKwp * seasonal) / 1000).toFixed(3);
+      const actualMwh = actualByDay.has(key) ? +(actualByDay.get(key)! / 1000).toFixed(3) : null;
+      return { date: key, potential: potentialMwh, actual: actualMwh };
     });
     setPv({ count: pvRows?.length ?? 0, kwp: totalKwp, daily });
 
@@ -93,7 +117,13 @@ export default function Dashboard() {
   const mape = mapePairs.length > 0
     ? (mapePairs.reduce((s, h) => s + Math.abs((h.actual - h.forecast) / h.actual), 0) / mapePairs.length) * 100
     : null;
-  const pvTotalMwh = pv.daily.reduce((s, d) => s + d.mwh, 0);
+  const pvPotentialMwh = pv.daily.reduce((s, d) => s + d.potential, 0);
+  const pvActualMwh = pv.daily.reduce((s, d) => s + (d.actual ?? 0), 0);
+  const pvActualDays = pv.daily.filter(d => d.actual != null);
+  const performanceRatio = pvActualDays.length > 0
+    ? (pvActualDays.reduce((s, d) => s + (d.actual ?? 0), 0) /
+       Math.max(0.0001, pvActualDays.reduce((s, d) => s + d.potential, 0))) * 100
+    : null;
 
   return (
     <ErpLayout
@@ -105,8 +135,8 @@ export default function Dashboard() {
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="Delivery period" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="1">Today</SelectItem>
-              <SelectItem value="7">Next 7 days</SelectItem>
-              <SelectItem value="30">Next 30 days</SelectItem>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={seed} disabled={seeding} variant="secondary"><Database className="h-4 w-4 mr-2" />{seeding ? "Loading…" : "Load demo data"}</Button>
@@ -126,10 +156,17 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="PV installations" value={String(pv.count)} icon={Sun} accent="accent" hint="EDUs with PV systems" />
         <StatCard label="Installed PV capacity" value={`${pv.kwp.toFixed(1)} kWp`} icon={Sun} accent="primary" hint="Aggregated DC nameplate" />
-        <StatCard label={`PV potential (${period === "1" ? "today" : period + "d"})`} value={fmtMwh(pvTotalMwh)} icon={Sun} accent="warning" hint="Clear-sky seasonal yield" />
+        <StatCard label={`PV potential (${period === "1" ? "today" : period + "d"})`} value={fmtMwh(pvPotentialMwh)} icon={Sun} accent="warning" hint="Clear-sky seasonal yield" />
+        <StatCard
+          label="Performance ratio"
+          value={performanceRatio != null ? `${performanceRatio.toFixed(1)}%` : "—"}
+          icon={Gauge}
+          accent={performanceRatio != null && performanceRatio >= 80 ? "primary" : "warning"}
+          hint={performanceRatio != null ? `Actual ${fmtMwh(pvActualMwh)} vs potential` : "No telemetry in window"}
+        />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -182,21 +219,28 @@ export default function Dashboard() {
 
       <Card className="border-border/60">
         <CardHeader>
-          <CardTitle>PV generation potential — delivery period</CardTitle>
-          <CardDescription>Aggregated clear-sky yield across {pv.count} PV installation(s) · {pv.kwp.toFixed(1)} kWp</CardDescription>
+          <CardTitle>PV potential vs actual generation</CardTitle>
+          <CardDescription>
+            Aggregated across {pv.count} PV installation(s) · {pv.kwp.toFixed(1)} kWp
+            {performanceRatio != null && (
+              <> · PR <span className={performanceRatio >= 80 ? "text-emerald-500" : "text-amber-500"}>{performanceRatio.toFixed(1)}%</span></>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent className="h-72">
           {pv.kwp === 0 ? (
             <Empty msg="No PV installations yet. Enable 'Has PV' on a metering point." />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pv.daily}>
+              <ComposedChart data={pv.daily}>
                 <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
                 <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
                 <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: any) => [`${v} MWh`, "PV yield"]} />
-                <Bar dataKey="mwh" fill="hsl(var(--warning))" radius={[3,3,0,0]} name="Expected PV (MWh)" />
-              </BarChart>
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: any) => v == null ? ["—", ""] : [`${v} MWh`, ""]} />
+                <Legend />
+                <Bar dataKey="potential" fill="hsl(var(--warning))" radius={[3,3,0,0]} name="Potential (clear-sky)" />
+                <Bar dataKey="actual" fill="hsl(var(--primary))" radius={[3,3,0,0]} name="Actual telemetry" />
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </CardContent>
