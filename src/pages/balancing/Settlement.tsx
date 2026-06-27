@@ -78,8 +78,8 @@ export default function Settlement() {
       const v = (r as any)[c.key];
       return typeof v === "number" ? v : `"${String(v ?? "").replace(/"/g, '""')}"`;
     }).join(","));
-    const totals = ["TOTAL", totals_.scheduled, totals_.actual, totals_.imbalance, "", totals_.cost].join(",");
-    const csv = [header, ...lines, totals].join("\n");
+    const totalLine = ["TOTAL", totals.scheduled, totals.actual, totals.imbalance, "", totals.cost].join(",");
+    const csv = [header, ...lines, totalLine].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `${fileBase}.csv`; a.click();
