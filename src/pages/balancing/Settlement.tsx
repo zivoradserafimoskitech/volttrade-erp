@@ -17,6 +17,7 @@ import { FileDown, FileText } from "lucide-react";
 import { exportToExcel, exportToPdf, type ExportColumn } from "@/lib/exports";
 
 type Seg = "PROFILED" | "MEASURED" | "PV";
+const ALL_SEGS: Seg[] = ["PROFILED", "MEASURED", "PV"];
 
 export default function Settlement() {
   const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
@@ -31,14 +32,15 @@ export default function Settlement() {
     { segment: "MEASURED", scheduled: 360, actual: 384 },
     { segment: "PV", scheduled: 110, actual: 96 },
   ]);
+  const [activeSegs, setActiveSegs] = useState<Set<Seg>>(new Set(ALL_SEGS));
 
   useEffect(() => { supabase.from("balance_groups").select("id,name").then(({ data }) => { setGroups(data ?? []); if (data?.[0]) setBg(data[0].id); }); }, []);
 
-  const enriched = useMemo(() => rows.map(r => {
+  const enriched = useMemo(() => rows.filter(r => activeSegs.has(r.segment)).map(r => {
     const imb = r.actual - r.scheduled;
     const price = dual ? (imb >= 0 ? downPrice : upPrice) : singlePrice;
     return { ...r, imbalance: imb, price, cost: imb * price };
-  }), [rows, dual, singlePrice, upPrice, downPrice]);
+  }), [rows, dual, singlePrice, upPrice, downPrice, activeSegs]);
 
   const totals = enriched.reduce((s, r) => ({
     scheduled: s.scheduled + r.scheduled, actual: s.actual + r.actual,
@@ -68,7 +70,21 @@ export default function Settlement() {
     { key: "price", label: "Price €/MWh", format: "eur" },
     { key: "cost", label: "Cost €", format: "eur" },
   ];
-  const fileBase = `settlement_${period}${bg ? "_" + (groups.find(g => g.id === bg)?.name ?? "bg").replace(/\s+/g, "_") : ""}`;
+  const segTag = activeSegs.size === ALL_SEGS.length ? "ALL" : Array.from(activeSegs).join("-");
+  const fileBase = `settlement_${period}_${segTag}${bg ? "_" + (groups.find(g => g.id === bg)?.name ?? "bg").replace(/\s+/g, "_") : ""}`;
+  function handleCsv() {
+    const header = exportCols.map(c => c.label).join(",");
+    const lines = enriched.map(r => exportCols.map(c => {
+      const v = (r as any)[c.key];
+      return typeof v === "number" ? v : `"${String(v ?? "").replace(/"/g, '""')}"`;
+    }).join(","));
+    const totals = ["TOTAL", totals_.scheduled, totals_.actual, totals_.imbalance, "", totals_.cost].join(",");
+    const csv = [header, ...lines, totals].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${fileBase}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
   function handleExcel() {
     exportToExcel(fileBase, [
       { name: "Segments", columns: exportCols, rows: enriched },
