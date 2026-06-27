@@ -85,26 +85,151 @@ export default function Invoices() {
     } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
   };
 
-  const exportPdf = (inv: Invoice) => {
+  const exportPdf = async (inv: Invoice) => {
     const client = clients.find(c => c.id === inv.client_id);
-    const doc = new jsPDF();
-    doc.setFontSize(20); doc.text("VoltTrade ERP", 14, 20);
-    doc.setFontSize(10); doc.setTextColor(120); doc.text("Electricity Trading & Supply", 14, 26);
-    doc.setTextColor(0); doc.setFontSize(14); doc.text(`Invoice ${inv.invoice_number}`, 14, 40);
-    doc.setFontSize(10);
-    doc.text(`Client: ${client?.company_name ?? "—"}`, 14, 48);
-    doc.text(`Period: ${inv.period_start} → ${inv.period_end}`, 14, 54);
-    doc.text(`Status: ${inv.status.toUpperCase()}`, 14, 60);
+    // Fetch meter detail for the period
+    const { data: meters } = await supabase.from("metering_points").select("id, edu_code, address").eq("client_id", inv.client_id);
+    const meterIds = (meters ?? []).map((m: any) => m.id);
+    const startISO = new Date(inv.period_start).toISOString();
+        const endISO = new Date(new Date(inv.period_end).getTime() + 24*3600*1000 - 1).toISOString();
+    const { data: readings } = meterIds.length
+      ? await supabase.from("consumption_readings").select("reading_at, actual_mwh, metering_point_id")
+          .in("metering_point_id", meterIds).gte("reading_at", startISO).lte("reading_at", endISO)
+      : { data: [] as any[] };
+
+    const energy = Number(inv.energy_amount_eur ?? 0);
+    const margin = Number(inv.margin_amount_eur ?? 0);
+    const net = energy + margin;
+    const vatRate = 0.18;
+    const vat = net * vatRate;
+    const gross = net + vat;
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+
+    // ── Top banner ──────────────────────────────────────────
+    doc.setFillColor(15, 56, 102); doc.rect(0, 0, W, 70, "F");
+    doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+    doc.text("VoltTrade", 40, 38);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text("Electricity Supply & Distribution", 40, 54);
+    doc.setFontSize(8); doc.setTextColor(200, 220, 240);
+    doc.text("VAT: HU 1234567890   |   IBAN: HU93 1177 3016 1111 1018 0000 0000", W - 40, 38, { align: "right" });
+    doc.text("info@volttrade.example   |   www.volttrade.example", W - 40, 52, { align: "right" });
+
+    // ── Customer block ──────────────────────────────────────
+    let y = 100;
+    doc.setTextColor(60); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+    doc.text("CUSTOMER", 40, y);
+    doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text(client?.company_name ?? "—", 40, y + 14);
+    doc.setFontSize(9); doc.setTextColor(80);
+    doc.text("Customer no.: " + (client?.id?.slice(0, 8).toUpperCase() ?? "—"), 40, y + 28);
+
+    // Invoice meta block (right)
+    const metaX = W - 260;
+    doc.setFillColor(245, 247, 250); doc.rect(metaX, y - 12, 220, 70, "F");
+    doc.setTextColor(15, 56, 102); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    doc.text("INVOICE", metaX + 12, y + 4);
+    doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text(`No.    ${inv.invoice_number}`, metaX + 12, y + 20);
+    doc.text(`Issued ${format(new Date(), "dd.MM.yyyy")}`, metaX + 12, y + 34);
+    doc.text(`Period ${format(new Date(inv.period_start), "dd.MM.yyyy")} – ${format(new Date(inv.period_end), "dd.MM.yyyy")}`, metaX + 12, y + 48);
+
+    y += 60;
+
+    // ── Charges summary ────────────────────────────────────
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(15, 56, 102);
+    doc.text(`Invoice for period ${format(new Date(inv.period_start), "dd.MM.yyyy")} – ${format(new Date(inv.period_end), "dd.MM.yyyy")}`, 40, y);
+    y += 8;
+
     autoTable(doc, {
-      startY: 70,
-      head: [["Description", "Qty (MWh)", "Rate", "Amount (€)"]],
+      startY: y + 4,
+      head: [["Description", "Amount (EUR)"]],
       body: [
-        ["Energy supply", fmtNum(inv.total_mwh, 3), client?.contract_type === "fixed" ? `${fmtNum(Number(client.fixed_price_eur_mwh ?? 0))} €/MWh` : "Hourly HUPX", fmtNum(inv.energy_amount_eur)],
-        ["Trading margin", fmtNum(inv.total_mwh, 3), `${fmtNum(Number(client?.margin_eur_mwh ?? 0))} €/MWh`, fmtNum(inv.margin_amount_eur)],
-        [{ content: "Total", colSpan: 3, styles: { halign: "right", fontStyle: "bold" } }, { content: `${fmtNum(inv.total_eur)} €`, styles: { fontStyle: "bold" } }],
+        ["Energy supply", energy.toFixed(2)],
+        ["Trading margin / access fee", margin.toFixed(2)],
+        [`VAT ${(vatRate * 100).toFixed(0)}%`, vat.toFixed(2)],
       ],
-      styles: { fontSize: 10 }, headStyles: { fillColor: [21, 128, 95] },
+      foot: [
+        [{ content: "Amount payable by due date", styles: { fontStyle: "bold" } }, { content: gross.toFixed(2), styles: { fontStyle: "bold" } }],
+        [{ content: "Outstanding balance", styles: { textColor: [120,120,120] } }, { content: "0.00", styles: { textColor: [120,120,120] } }],
+        [{ content: "TOTAL TO PAY", styles: { fontStyle: "bold", fillColor: [15,56,102], textColor: 255 } },
+         { content: gross.toFixed(2), styles: { fontStyle: "bold", fillColor: [15,56,102], textColor: 255 } }],
+      ],
+      styles: { fontSize: 10, cellPadding: 6 },
+      headStyles: { fillColor: [230, 236, 245], textColor: [15,56,102], fontStyle: "bold" },
+      columnStyles: { 1: { halign: "right" } },
+      margin: { left: 40, right: 40 },
     });
+    y = (doc as any).lastAutoTable.finalY + 20;
+
+    // ── Payment band ───────────────────────────────────────
+    doc.setFillColor(245, 247, 250); doc.rect(40, y, W - 80, 60, "F");
+    doc.setTextColor(15, 56, 102); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+    doc.text("Payment instructions", 52, y + 18);
+    doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text("• Pay via online banking or at any branch.", 52, y + 34);
+    doc.text(`• Reference: ${inv.invoice_number}`, 52, y + 48);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(15, 56, 102);
+    doc.text(`Due: ${format(new Date(new Date(inv.period_end).getTime() + 20*86400*1000), "dd.MM.yyyy")}`, W - 52, y + 18, { align: "right" });
+    doc.setFontSize(14); doc.text(`${gross.toFixed(2)} EUR`, W - 52, y + 40, { align: "right" });
+    y += 80;
+
+    doc.setFontSize(7); doc.setTextColor(120);
+    doc.text("VoltTrade Ltd. · Registered office: Budapest, Energy Plaza 1 · Status: " + inv.status.toUpperCase(), 40, H - 30);
+
+    // ── Page 2: detail ─────────────────────────────────────
+    doc.addPage();
+    doc.setFillColor(15, 56, 102); doc.rect(0, 0, W, 40, "F");
+    doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+    doc.text(`Invoice ${inv.invoice_number} — Detailed information`, 40, 26);
+
+    let y2 = 70;
+    doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text(`Customer: ${client?.company_name ?? "—"}`, 40, y2);
+    doc.text(`Contract type: ${client?.contract_type ?? "—"}`, 40, y2 + 14);
+    doc.text(`Metering points: ${meterIds.length}`, 40, y2 + 28);
+    y2 += 44;
+
+    // Group readings by meter
+    const byMeter: Record<string, any[]> = {};
+    (readings ?? []).forEach((r: any) => { (byMeter[r.metering_point_id] ||= []).push(r); });
+
+    (meters ?? []).forEach((m: any) => {
+      const rs = byMeter[m.id] ?? [];
+      const total = rs.reduce((s: number, r: any) => s + Number(r.actual_mwh ?? 0), 0);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(15, 56, 102);
+      doc.text(`EDU ${m.edu_code}`, 40, y2);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(80);
+      doc.text(m.address ?? "", 40, y2 + 12);
+      y2 += 18;
+      autoTable(doc, {
+        startY: y2,
+        head: [["Meter / tariff", "Period", "Quantity (MWh)", "Unit price €/MWh", "Amount EUR"]],
+        body: [[
+          m.edu_code, `${format(new Date(inv.period_start), "dd.MM.yyyy")} – ${format(new Date(inv.period_end), "dd.MM.yyyy")}`,
+          total.toFixed(3),
+          client?.contract_type === "fixed" ? Number(client.fixed_price_eur_mwh ?? 0).toFixed(2) : "Hourly (HUPX)",
+          (total * (client?.contract_type === "fixed" ? Number(client.fixed_price_eur_mwh ?? 0) : (energy / Math.max(inv.total_mwh, 1e-9)))).toFixed(2),
+        ]],
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [230, 236, 245], textColor: [15,56,102] },
+        columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+        margin: { left: 40, right: 40 },
+      });
+      y2 = (doc as any).lastAutoTable.finalY + 16;
+      if (y2 > H - 80) { doc.addPage(); y2 = 60; }
+    });
+
+    // Footer page numbers
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120);
+      doc.text(`Page ${i} of ${pages}`, W / 2, H - 20, { align: "center" });
+    }
+
     doc.save(`${inv.invoice_number}.pdf`);
   };
 

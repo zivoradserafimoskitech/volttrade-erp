@@ -17,6 +17,7 @@ import { FileDown, FileText } from "lucide-react";
 import { exportToExcel, exportToPdf, type ExportColumn } from "@/lib/exports";
 
 type Seg = "PROFILED" | "MEASURED" | "PV";
+const ALL_SEGS: Seg[] = ["PROFILED", "MEASURED", "PV"];
 
 export default function Settlement() {
   const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
@@ -31,14 +32,15 @@ export default function Settlement() {
     { segment: "MEASURED", scheduled: 360, actual: 384 },
     { segment: "PV", scheduled: 110, actual: 96 },
   ]);
+  const [activeSegs, setActiveSegs] = useState<Set<Seg>>(new Set(ALL_SEGS));
 
   useEffect(() => { supabase.from("balance_groups").select("id,name").then(({ data }) => { setGroups(data ?? []); if (data?.[0]) setBg(data[0].id); }); }, []);
 
-  const enriched = useMemo(() => rows.map(r => {
+  const enriched = useMemo(() => rows.filter(r => activeSegs.has(r.segment)).map(r => {
     const imb = r.actual - r.scheduled;
     const price = dual ? (imb >= 0 ? downPrice : upPrice) : singlePrice;
     return { ...r, imbalance: imb, price, cost: imb * price };
-  }), [rows, dual, singlePrice, upPrice, downPrice]);
+  }), [rows, dual, singlePrice, upPrice, downPrice, activeSegs]);
 
   const totals = enriched.reduce((s, r) => ({
     scheduled: s.scheduled + r.scheduled, actual: s.actual + r.actual,
@@ -68,7 +70,21 @@ export default function Settlement() {
     { key: "price", label: "Price €/MWh", format: "eur" },
     { key: "cost", label: "Cost €", format: "eur" },
   ];
-  const fileBase = `settlement_${period}${bg ? "_" + (groups.find(g => g.id === bg)?.name ?? "bg").replace(/\s+/g, "_") : ""}`;
+  const segTag = activeSegs.size === ALL_SEGS.length ? "ALL" : Array.from(activeSegs).join("-");
+  const fileBase = `settlement_${period}_${segTag}${bg ? "_" + (groups.find(g => g.id === bg)?.name ?? "bg").replace(/\s+/g, "_") : ""}`;
+  function handleCsv() {
+    const header = exportCols.map(c => c.label).join(",");
+    const lines = enriched.map(r => exportCols.map(c => {
+      const v = (r as any)[c.key];
+      return typeof v === "number" ? v : `"${String(v ?? "").replace(/"/g, '""')}"`;
+    }).join(","));
+    const totalLine = ["TOTAL", totals.scheduled, totals.actual, totals.imbalance, "", totals.cost].join(",");
+    const csv = [header, ...lines, totalLine].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${fileBase}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
   function handleExcel() {
     exportToExcel(fileBase, [
       { name: "Segments", columns: exportCols, rows: enriched },
@@ -114,11 +130,26 @@ export default function Settlement() {
   return (
     <ErpLayout title="Imbalance Settlement" subtitle="Scheduled vs actual per segment · cost allocation to cost-to-serve"
       actions={<>
+        <Button size="sm" variant="outline" onClick={handleCsv}><FileDown className="h-4 w-4 mr-1" />CSV</Button>
         <Button size="sm" variant="outline" onClick={handleExcel}><FileDown className="h-4 w-4 mr-1" />Excel</Button>
         <Button size="sm" variant="outline" onClick={handlePdf}><FileText className="h-4 w-4 mr-1" />PDF</Button>
         <Button size="sm" variant="outline" onClick={() => persist("PROVISIONAL")}><Save className="h-4 w-4 mr-1" />Save provisional</Button>
         <Button size="sm" onClick={() => persist("FINAL")}><Save className="h-4 w-4 mr-1" />Mark final</Button>
       </>}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Segments:</span>
+        {ALL_SEGS.map(s => {
+          const on = activeSegs.has(s);
+          return (
+            <Badge key={s} variant={on ? "default" : "outline"} className="cursor-pointer select-none"
+              onClick={() => setActiveSegs(prev => {
+                const next = new Set(prev); next.has(s) ? next.delete(s) : next.add(s);
+                return next.size ? next : prev;
+              })}>{s}</Badge>
+          );
+        })}
+        <span className="text-xs text-muted-foreground ml-2">Exports respect this filter ({enriched.length}/{rows.length})</span>
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Scheduled" value={`${totals.scheduled.toFixed(1)} MWh`} icon={Scale} />
         <StatCard label="Actual" value={`${totals.actual.toFixed(1)} MWh`} icon={Scale} accent="accent" />
