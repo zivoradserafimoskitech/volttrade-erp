@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge } from "lucide-react";
+import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
@@ -43,9 +43,14 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/balancing/scheduling", label: "Scheduling", icon: CalendarClock },
     { to: "/balancing/settlement", label: "Imbalance Settlement", icon: GitMerge },
   ]},
+  { title: "Supply Operations", items: [
+    { to: "/supply/onboarding", label: "Onboarding / KYC", icon: UserPlus, roles: ['admin','management','supply_manager'] },
+    { to: "/supply/switching", label: "Switching", icon: Repeat, roles: ['admin','management','supply_manager'] },
+  ]},
   { title: "Admin", items: [
     { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, roles: ['admin'] },
     { to: "/admin/audit", label: "Audit Log", icon: History, roles: ['admin','auditor'] },
+    { to: "/admin/portal-links", label: "Portal Access", icon: KeyRound, roles: ['admin','supply_manager'] },
     { to: "/admin/settings", label: "Settings", icon: SettingsIcon, roles: ['admin'] },
   ]},
 ];
