@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { renderInvoicePdf } from "@/lib/invoiceTemplates";
 
 type Client = { id: string; company_name: string; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number };
 type Invoice = { id: string; invoice_number: string; period_start: string; period_end: string; total_mwh: number; energy_amount_eur: number; margin_amount_eur: number; total_eur: number; status: string; client_id: string };
