@@ -281,6 +281,86 @@ export type Database = {
         }
         Relationships: []
       }
+      balance_groups: {
+        Row: {
+          brp_party: string | null
+          code: string
+          country: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          brp_party?: string | null
+          code: string
+          country?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brp_party?: string | null
+          code?: string
+          country?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      balance_schedules: {
+        Row: {
+          balance_group_id: string
+          created_at: string
+          date: string
+          gate_closure_ts: string | null
+          id: string
+          leg: Database["public"]["Enums"]["schedule_leg"]
+          mtu: number
+          scheduled_mwh: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          balance_group_id: string
+          created_at?: string
+          date: string
+          gate_closure_ts?: string | null
+          id?: string
+          leg: Database["public"]["Enums"]["schedule_leg"]
+          mtu: number
+          scheduled_mwh?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          balance_group_id?: string
+          created_at?: string
+          date?: string
+          gate_closure_ts?: string | null
+          id?: string
+          leg?: Database["public"]["Enums"]["schedule_leg"]
+          mtu?: number
+          scheduled_mwh?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_schedules_balance_group_id_fkey"
+            columns: ["balance_group_id"]
+            isOneToOne: false
+            referencedRelation: "balance_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_runs: {
         Row: {
           created_at: string
@@ -406,30 +486,131 @@ export type Database = {
           },
         ]
       }
+      connection_points: {
+        Row: {
+          balance_group_id: string | null
+          connection_power_kw: number | null
+          consumer_type: Database["public"]["Enums"]["consumer_type"]
+          created_at: string
+          customer_id: string | null
+          dso_meter_id: string | null
+          eic_metering_id: string | null
+          has_private_meter: boolean
+          id: string
+          is_prosumer: boolean
+          metering_category: Database["public"]["Enums"]["metering_category"]
+          metering_point_id: string | null
+          prosumer_scheme: Database["public"]["Enums"]["prosumer_scheme"] | null
+          pv_capacity_kwp: number | null
+          slp_category: Database["public"]["Enums"]["slp_category"] | null
+          status: string
+          tariff_type: string | null
+          updated_at: string
+          voltage_level: string | null
+        }
+        Insert: {
+          balance_group_id?: string | null
+          connection_power_kw?: number | null
+          consumer_type?: Database["public"]["Enums"]["consumer_type"]
+          created_at?: string
+          customer_id?: string | null
+          dso_meter_id?: string | null
+          eic_metering_id?: string | null
+          has_private_meter?: boolean
+          id?: string
+          is_prosumer?: boolean
+          metering_category: Database["public"]["Enums"]["metering_category"]
+          metering_point_id?: string | null
+          prosumer_scheme?:
+            | Database["public"]["Enums"]["prosumer_scheme"]
+            | null
+          pv_capacity_kwp?: number | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
+          status?: string
+          tariff_type?: string | null
+          updated_at?: string
+          voltage_level?: string | null
+        }
+        Update: {
+          balance_group_id?: string | null
+          connection_power_kw?: number | null
+          consumer_type?: Database["public"]["Enums"]["consumer_type"]
+          created_at?: string
+          customer_id?: string | null
+          dso_meter_id?: string | null
+          eic_metering_id?: string | null
+          has_private_meter?: boolean
+          id?: string
+          is_prosumer?: boolean
+          metering_category?: Database["public"]["Enums"]["metering_category"]
+          metering_point_id?: string | null
+          prosumer_scheme?:
+            | Database["public"]["Enums"]["prosumer_scheme"]
+            | null
+          pv_capacity_kwp?: number | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
+          status?: string
+          tariff_type?: string | null
+          updated_at?: string
+          voltage_level?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connection_points_balance_group_id_fkey"
+            columns: ["balance_group_id"]
+            isOneToOne: false
+            referencedRelation: "balance_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "connection_points_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "connection_points_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consumption_readings: {
         Row: {
           actual_mwh: number | null
           created_at: string
           forecast_mwh: number | null
           id: string
+          is_estimated: boolean
           metering_point_id: string
           reading_at: string
+          settlement_relevant: boolean
+          source: Database["public"]["Enums"]["reading_source"]
         }
         Insert: {
           actual_mwh?: number | null
           created_at?: string
           forecast_mwh?: number | null
           id?: string
+          is_estimated?: boolean
           metering_point_id: string
           reading_at: string
+          settlement_relevant?: boolean
+          source?: Database["public"]["Enums"]["reading_source"]
         }
         Update: {
           actual_mwh?: number | null
           created_at?: string
           forecast_mwh?: number | null
           id?: string
+          is_estimated?: boolean
           metering_point_id?: string
           reading_at?: string
+          settlement_relevant?: boolean
+          source?: Database["public"]["Enums"]["reading_source"]
         }
         Relationships: [
           {
@@ -1035,6 +1216,74 @@ export type Database = {
         }
         Relationships: []
       }
+      settlements: {
+        Row: {
+          actual_mwh: number
+          balance_group_id: string | null
+          created_at: string
+          grid_loss_factor: number | null
+          id: string
+          imbalance_cost: number
+          imbalance_mwh: number
+          imbalance_price: number
+          imbalance_price_down: number | null
+          imbalance_price_up: number | null
+          notes: string | null
+          period_end: string
+          period_start: string
+          scheduled_mwh: number
+          segment: Database["public"]["Enums"]["schedule_leg"]
+          status: Database["public"]["Enums"]["settlement_status"]
+          updated_at: string
+        }
+        Insert: {
+          actual_mwh?: number
+          balance_group_id?: string | null
+          created_at?: string
+          grid_loss_factor?: number | null
+          id?: string
+          imbalance_cost?: number
+          imbalance_mwh?: number
+          imbalance_price?: number
+          imbalance_price_down?: number | null
+          imbalance_price_up?: number | null
+          notes?: string | null
+          period_end: string
+          period_start: string
+          scheduled_mwh?: number
+          segment: Database["public"]["Enums"]["schedule_leg"]
+          status?: Database["public"]["Enums"]["settlement_status"]
+          updated_at?: string
+        }
+        Update: {
+          actual_mwh?: number
+          balance_group_id?: string | null
+          created_at?: string
+          grid_loss_factor?: number | null
+          id?: string
+          imbalance_cost?: number
+          imbalance_mwh?: number
+          imbalance_price?: number
+          imbalance_price_down?: number | null
+          imbalance_price_up?: number | null
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          scheduled_mwh?: number
+          segment?: Database["public"]["Enums"]["schedule_leg"]
+          status?: Database["public"]["Enums"]["settlement_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlements_balance_group_id_fkey"
+            columns: ["balance_group_id"]
+            isOneToOne: false
+            referencedRelation: "balance_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sites: {
         Row: {
           address: string | null
@@ -1084,6 +1333,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      slp_coefficients: {
+        Row: {
+          coefficient: number
+          day_type: Database["public"]["Enums"]["day_type_t"]
+          hour: number
+          id: number
+          season: Database["public"]["Enums"]["season_t"]
+          slp_category: Database["public"]["Enums"]["slp_category"]
+        }
+        Insert: {
+          coefficient: number
+          day_type: Database["public"]["Enums"]["day_type_t"]
+          hour: number
+          id?: number
+          season: Database["public"]["Enums"]["season_t"]
+          slp_category: Database["public"]["Enums"]["slp_category"]
+        }
+        Update: {
+          coefficient?: number
+          day_type?: Database["public"]["Enums"]["day_type_t"]
+          hour?: number
+          id?: number
+          season?: Database["public"]["Enums"]["season_t"]
+          slp_category?: Database["public"]["Enums"]["slp_category"]
+        }
+        Relationships: []
       }
       slp_curve_points: {
         Row: {
@@ -1475,6 +1751,28 @@ export type Database = {
         | "operations"
         | "auditor"
       asset_type: "bess" | "pv" | "hybrid"
+      consumer_type: "Residential" | "SOHO" | "SME" | "Industrial" | "Public"
+      day_type_t: "WD" | "SA" | "SU"
+      metering_category: "PROFILED" | "MEASURED"
+      prosumer_scheme: "NET_METERING" | "NET_BILLING"
+      reading_source:
+        | "DSO_MONTHLY"
+        | "DSO_INTERVAL"
+        | "PRIVATE_SMART"
+        | "SIMULATED"
+      schedule_leg: "PROFILED" | "MEASURED" | "PV"
+      season_t: "Spring" | "Summer" | "Autumn" | "Winter"
+      settlement_status: "PROVISIONAL" | "FINAL"
+      slp_category:
+        | "Office"
+        | "Cafe_Restaurant"
+        | "Market_Shop"
+        | "Bakery"
+        | "Street_Lighting"
+        | "Base_Station"
+        | "Fuel_Station"
+        | "Household"
+        | "Household_Electric_Heating"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1614,6 +1912,30 @@ export const Constants = {
         "auditor",
       ],
       asset_type: ["bess", "pv", "hybrid"],
+      consumer_type: ["Residential", "SOHO", "SME", "Industrial", "Public"],
+      day_type_t: ["WD", "SA", "SU"],
+      metering_category: ["PROFILED", "MEASURED"],
+      prosumer_scheme: ["NET_METERING", "NET_BILLING"],
+      reading_source: [
+        "DSO_MONTHLY",
+        "DSO_INTERVAL",
+        "PRIVATE_SMART",
+        "SIMULATED",
+      ],
+      schedule_leg: ["PROFILED", "MEASURED", "PV"],
+      season_t: ["Spring", "Summer", "Autumn", "Winter"],
+      settlement_status: ["PROVISIONAL", "FINAL"],
+      slp_category: [
+        "Office",
+        "Cafe_Restaurant",
+        "Market_Shop",
+        "Bakery",
+        "Street_Lighting",
+        "Base_Station",
+        "Fuel_Station",
+        "Household",
+        "Household_Electric_Heating",
+      ],
     },
   },
 } as const

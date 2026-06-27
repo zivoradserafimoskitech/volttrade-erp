@@ -2,3 +2,9 @@ project_id = "volttrade-erp"
 
 [functions.seed-demo-data]
 verify_jwt = true
+
+[functions.submit-schedule]
+verify_jwt = true
+
+[functions.import-dso-reads]
+verify_jwt = false
