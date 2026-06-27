@@ -151,7 +151,7 @@ export default function Clients() {
                             <span className="ml-1 opacity-60">· {e.consumer_category === 'slp' ? 'SLP' : e.consumer_category === 'smart_daily' ? 'D' : 'H'}</span>
                           </Badge>
                         ))}
-                        <Dialog open={openEdu === c.id} onOpenChange={(o) => { setOpenEdu(o ? c.id : null); if (!o) setEduCategory("smart_hourly"); }}>
+                        <Dialog open={openEdu === c.id} onOpenChange={(o) => { setOpenEdu(o ? c.id : null); if (!o) { setEduCategory("smart_hourly"); setEduHasPv(false); } }}>
                           <DialogTrigger asChild><Button size="sm" variant="ghost" className="h-6 px-2 text-xs">+ Add EDU</Button></DialogTrigger>
                           <DialogContent>
                             <DialogHeader><DialogTitle>New metering point</DialogTitle></DialogHeader>
