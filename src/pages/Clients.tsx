@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
 
 type Client = { id: string; company_name: string; tax_id: string | null; contact_name: string | null; contact_email: string | null; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; status: string };
-type Edu = { id: string; client_id: string; edu_code: string; address: string | null; voltage_level: string | null; annual_consumption_mwh: number | null };
+type Edu = { id: string; client_id: string; edu_code: string; address: string | null; voltage_level: string | null; annual_consumption_mwh: number | null; has_pv?: boolean; pv_capacity_kw?: number | null };
 type SlpProfile = { code: string; name: string };
 
 export default function Clients() {
