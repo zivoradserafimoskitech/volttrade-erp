@@ -55,7 +55,7 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [user, period]);
 
   const seed = async () => {
     setSeeding(true);
