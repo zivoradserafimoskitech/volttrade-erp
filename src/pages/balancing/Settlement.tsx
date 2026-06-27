@@ -130,11 +130,26 @@ export default function Settlement() {
   return (
     <ErpLayout title="Imbalance Settlement" subtitle="Scheduled vs actual per segment · cost allocation to cost-to-serve"
       actions={<>
+        <Button size="sm" variant="outline" onClick={handleCsv}><FileDown className="h-4 w-4 mr-1" />CSV</Button>
         <Button size="sm" variant="outline" onClick={handleExcel}><FileDown className="h-4 w-4 mr-1" />Excel</Button>
         <Button size="sm" variant="outline" onClick={handlePdf}><FileText className="h-4 w-4 mr-1" />PDF</Button>
         <Button size="sm" variant="outline" onClick={() => persist("PROVISIONAL")}><Save className="h-4 w-4 mr-1" />Save provisional</Button>
         <Button size="sm" onClick={() => persist("FINAL")}><Save className="h-4 w-4 mr-1" />Mark final</Button>
       </>}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Segments:</span>
+        {ALL_SEGS.map(s => {
+          const on = activeSegs.has(s);
+          return (
+            <Badge key={s} variant={on ? "default" : "outline"} className="cursor-pointer select-none"
+              onClick={() => setActiveSegs(prev => {
+                const next = new Set(prev); next.has(s) ? next.delete(s) : next.add(s);
+                return next.size ? next : prev;
+              })}>{s}</Badge>
+          );
+        })}
+        <span className="text-xs text-muted-foreground ml-2">Exports respect this filter ({enriched.length}/{rows.length})</span>
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Scheduled" value={`${totals.scheduled.toFixed(1)} MWh`} icon={Scale} />
         <StatCard label="Actual" value={`${totals.actual.toFixed(1)} MWh`} icon={Scale} accent="accent" />
