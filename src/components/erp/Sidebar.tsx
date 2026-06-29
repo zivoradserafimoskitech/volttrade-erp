@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass } from "lucide-react";
+import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass, Handshake } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +13,7 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/supply-points", label: "Supply Points", icon: MapPin },
     { to: "/tariffs", label: "Tariffs", icon: Tags },
     { to: "/contracts", label: "Supply Contracts", icon: FileText },
+    { to: "/ppa", label: "PPA Agreements", icon: Handshake },
     { to: "/readings", label: "Meter Readings", icon: Gauge },
     { to: "/reconciliation", label: "Reconciliation", icon: Scale },
     { to: "/billing", label: "Billing Runs", icon: Calculator },
