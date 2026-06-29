@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import SupplyPoints from "./pages/SupplyPoints";
 import Tariffs from "./pages/Tariffs";
 import SupplyContracts from "./pages/SupplyContracts";
+import Ppa from "./pages/Ppa";
 import MeterReadings from "./pages/MeterReadings";
 import Reconciliation from "./pages/Reconciliation";
 import BillingRuns from "./pages/BillingRuns";
@@ -44,6 +45,7 @@ import PortalOverview from "./pages/portal/Overview";
 import PortalEdus from "./pages/portal/Edus";
 import PortalInvoices from "./pages/portal/PortalInvoices";
 import PortalReadings from "./pages/portal/PortalReadings";
+import PortalPpa from "./pages/portal/PortalPpa";
 import PortalProfile from "./pages/portal/Profile";
 
 const queryClient = new QueryClient();
@@ -62,6 +64,7 @@ const App = () => (
             <Route path="/supply-points" element={<SupplyPoints />} />
             <Route path="/tariffs" element={<Tariffs />} />
             <Route path="/contracts" element={<SupplyContracts />} />
+            <Route path="/ppa" element={<Ppa />} />
             <Route path="/readings" element={<MeterReadings />} />
             <Route path="/reconciliation" element={<Reconciliation />} />
             <Route path="/billing" element={<BillingRuns />} />
@@ -91,6 +94,7 @@ const App = () => (
             <Route path="/portal/edus" element={<PortalEdus />} />
             <Route path="/portal/invoices" element={<PortalInvoices />} />
             <Route path="/portal/readings" element={<PortalReadings />} />
+            <Route path="/portal/ppa" element={<PortalPpa />} />
             <Route path="/portal/profile" element={<PortalProfile />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
