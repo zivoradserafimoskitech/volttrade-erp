@@ -1310,6 +1310,163 @@ export type Database = {
           },
         ]
       }
+      ppa_agreements: {
+        Row: {
+          asset_id: string | null
+          buyback_price_eur_mwh: number | null
+          ceiling_price_eur_mwh: number | null
+          client_id: string
+          contracted_volume_mwh: number | null
+          created_at: string
+          currency: string
+          end_date: string
+          fixed_price_eur_mwh: number
+          floor_price_eur_mwh: number | null
+          id: string
+          metering_point_id: string | null
+          notes: string | null
+          ppa_code: string
+          ppa_type: string
+          start_date: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          buyback_price_eur_mwh?: number | null
+          ceiling_price_eur_mwh?: number | null
+          client_id: string
+          contracted_volume_mwh?: number | null
+          created_at?: string
+          currency?: string
+          end_date: string
+          fixed_price_eur_mwh: number
+          floor_price_eur_mwh?: number | null
+          id?: string
+          metering_point_id?: string | null
+          notes?: string | null
+          ppa_code: string
+          ppa_type: string
+          start_date: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          buyback_price_eur_mwh?: number | null
+          ceiling_price_eur_mwh?: number | null
+          client_id?: string
+          contracted_volume_mwh?: number | null
+          created_at?: string
+          currency?: string
+          end_date?: string
+          fixed_price_eur_mwh?: number
+          floor_price_eur_mwh?: number | null
+          id?: string
+          metering_point_id?: string | null
+          notes?: string | null
+          ppa_code?: string
+          ppa_type?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppa_agreements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ppa_agreements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ppa_agreements_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ppa_settlements: {
+        Row: {
+          applied_price_eur_mwh: number
+          buyback_credit_eur: number
+          created_at: string
+          delivered_mwh: number
+          energy_cost_eur: number
+          id: string
+          invoice_id: string | null
+          net_amount_eur: number
+          period_month: string
+          ppa_id: string
+          produced_mwh: number
+          spot_avg_eur_mwh: number | null
+          status: string
+          surplus_export_mwh: number
+          updated_at: string
+        }
+        Insert: {
+          applied_price_eur_mwh: number
+          buyback_credit_eur?: number
+          created_at?: string
+          delivered_mwh?: number
+          energy_cost_eur?: number
+          id?: string
+          invoice_id?: string | null
+          net_amount_eur?: number
+          period_month: string
+          ppa_id: string
+          produced_mwh?: number
+          spot_avg_eur_mwh?: number | null
+          status?: string
+          surplus_export_mwh?: number
+          updated_at?: string
+        }
+        Update: {
+          applied_price_eur_mwh?: number
+          buyback_credit_eur?: number
+          created_at?: string
+          delivered_mwh?: number
+          energy_cost_eur?: number
+          id?: string
+          invoice_id?: string | null
+          net_amount_eur?: number
+          period_month?: string
+          ppa_id?: string
+          produced_mwh?: number
+          spot_avg_eur_mwh?: number | null
+          status?: string
+          surplus_export_mwh?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppa_settlements_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ppa_settlements_ppa_id_fkey"
+            columns: ["ppa_id"]
+            isOneToOne: false
+            referencedRelation: "ppa_agreements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_lines: {
         Row: {
           created_at: string
