@@ -2,11 +2,12 @@ import { ReactNode } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Flame, LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft } from "lucide-react";
+import { Flame, LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity } from "lucide-react";
 
 const items = [
   { to: "/portal", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/portal/edus", label: "My supply points", icon: MapPin },
+  { to: "/portal/hourly", label: "Hourly readings", icon: Activity },
   { to: "/portal/invoices", label: "Invoices", icon: Receipt },
   { to: "/portal/ppa", label: "My PPAs", icon: Handshake },
   { to: "/portal/readings", label: "Submit reading", icon: Gauge },
