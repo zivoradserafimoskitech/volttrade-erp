@@ -47,6 +47,7 @@ import PortalOverview from "./pages/portal/Overview";
 import PortalEdus from "./pages/portal/Edus";
 import PortalInvoices from "./pages/portal/PortalInvoices";
 import PortalReadings from "./pages/portal/PortalReadings";
+import PortalHourly from "./pages/portal/PortalHourly";
 import PortalPpa from "./pages/portal/PortalPpa";
 import PortalProfile from "./pages/portal/Profile";
 
@@ -97,6 +98,7 @@ const App = () => (
             <Route path="/portal/edus" element={<PortalEdus />} />
             <Route path="/portal/invoices" element={<PortalInvoices />} />
             <Route path="/portal/readings" element={<PortalReadings />} />
+            <Route path="/portal/hourly" element={<PortalHourly />} />
             <Route path="/portal/ppa" element={<PortalPpa />} />
             <Route path="/portal/profile" element={<PortalProfile />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
