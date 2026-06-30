@@ -84,6 +84,7 @@ const App = () => (
             <Route path="/forecasting" element={<Forecasting />} />
             <Route path="/assets" element={<Assets />} />
             <Route path="/asset-monitoring" element={<AssetMonitoring />} />
+            <Route path="/pv-monitoring" element={<PvMonitoring />} />
             <Route path="/smart-meter" element={<SmartMeter />} />
             <Route path="/balancing/consumers" element={<ConsumerManager />} />
             <Route path="/balancing/slp" element={<SlpSynthesis />} />
