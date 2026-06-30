@@ -12,21 +12,28 @@ import {
 } from "recharts";
 import { Zap, TrendingDown, Clock, Check, ArrowRight, Sparkles, Sun, Car, ShieldCheck } from "lucide-react";
 import { syntheticPrices } from "@/lib/evOptimiser";
+import { convert, currencyForCountry, formatMoney, type Currency } from "@/lib/fx";
 
 const EMBER = "#FF6B2C";
 
-type Plan = { code: string; name: string; tag: string; unit: string; standing: string; perks: string[]; icon: any; recommended?: boolean };
-const PLANS: (Plan & { unitEurKwh: number | ((avgWholesaleEurMwh: number) => number); standingEurDay: number; nightShare?: number; nightEurKwh?: number })[] = [
-  { code: "fixed_12", name: "Vatra Fixed 12", tag: "Stability", unit: "€0.142 / kWh", standing: "€0.18 / day",
+type Plan = { code: string; name: string; tag: string; perks: string[]; icon: any; recommended?: boolean };
+type FullPlan = Plan & {
+  unitEurKwh: number | ((avgWholesaleEurMwh: number) => number);
+  standingEurDay: number;
+  nightShare?: number;
+  nightEurKwh?: number;
+};
+const PLANS: FullPlan[] = [
+  { code: "fixed_12", name: "Vatra Fixed 12", tag: "Stability",
     perks: ["Locked rate for 12 months", "No surprises", "Switch any time"], icon: ShieldCheck,
     unitEurKwh: 0.142, standingEurDay: 0.18 },
-  { code: "tracker",  name: "Vatra Tracker",  tag: "Wholesale-linked", unit: "Daily wholesale + €0.025", standing: "€0.18 / day",
+  { code: "tracker",  name: "Vatra Tracker",  tag: "Wholesale-linked",
     perks: ["Follows the wholesale market", "Updated every day", "Typically cheaper than fixed"], icon: TrendingDown, recommended: true,
     unitEurKwh: (w) => w / 1000 + 0.025, standingEurDay: 0.18 },
-  { code: "agile",    name: "Vatra Agile",    tag: "Half-hourly", unit: "Updates every 30 minutes", standing: "€0.20 / day",
+  { code: "agile",    name: "Vatra Agile",    tag: "Half-hourly",
     perks: ["Cheapest at night and midday", "Great with smart appliances", "See tomorrow's prices at 4pm"], icon: Sparkles,
     unitEurKwh: (w) => w / 1000 + 0.018, standingEurDay: 0.20 },
-  { code: "go_ev",    name: "Vatra Go (EV)",  tag: "EV drivers", unit: "€0.075 / kWh 00:30–05:30", standing: "€0.20 / day",
+  { code: "go_ev",    name: "Vatra Go (EV)",  tag: "EV drivers",
     perks: ["Ultra-cheap overnight slot", "Smart-charge friendly", "Standard rate the rest of the day"], icon: Car,
     unitEurKwh: 0.155, standingEurDay: 0.20, nightShare: 0.21, nightEurKwh: 0.075 },
 ];
@@ -42,6 +49,7 @@ function colorFor(price: number, min: number, max: number) {
 export default function PortalTariffs() {
   const { user } = useAuth();
   const [clientId, setClientId] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<Currency>("EUR");
   const [currentTariff, setCurrentTariff] = useState<string | null>(null);
   const [prices, setPrices] = useState<{ ts: string; price: number; label: string }[]>([]);
   const [trend, setTrend] = useState<{ day: string; price: number }[]>([]);
@@ -52,9 +60,10 @@ export default function PortalTariffs() {
 
   useEffect(() => { (async () => {
     if (!user) return;
-    const { data: cl } = await supabase.from("clients").select("id").eq("portal_user_id", user.id).maybeSingle();
+    const { data: cl } = await supabase.from("clients").select("id, country_code").eq("portal_user_id", user.id).maybeSingle();
     if (!cl) return;
     setClientId(cl.id);
+    setCurrency(currencyForCountry((cl as any).country_code));
     const { data: sc } = await supabase.from("supply_contracts").select("tariff_id, tariffs(code,name)").eq("client_id", cl.id).eq("status","active").limit(1).maybeSingle();
     setCurrentTariff((sc as any)?.tariffs?.name ?? null);
     const { data: psw } = await supabase.from("tariff_switch_requests").select("target_tariff_code").eq("client_id", cl.id).eq("status","pending").maybeSingle();
@@ -111,7 +120,18 @@ export default function PortalTariffs() {
     return { current, cheapest3, min, max };
   }, [prices]);
 
-  const costFor = (p: (typeof PLANS)[number], kwh: number) => {
+  // Plan unit/standing text, localised to the client's currency
+  const planUnitLabel = (p: FullPlan): string => {
+    if (p.code === "tracker") return `Daily wholesale + ${formatMoney(convert(0.025, "EUR", currency), currency, { digits: currency === "EUR" ? 3 : 2 })} / kWh`;
+    if (p.code === "agile")   return "Updates every 30 minutes";
+    if (p.code === "go_ev")   return `${formatMoney(convert(0.075, "EUR", currency), currency, { perUnit: "kWh", digits: currency === "EUR" ? 3 : 2 })} 00:30–05:30`;
+    const unit = p.unitEurKwh as number;
+    return formatMoney(convert(unit, "EUR", currency), currency, { perUnit: "kWh", digits: currency === "EUR" ? 3 : 2 });
+  };
+  const planStandingLabel = (p: FullPlan): string =>
+    formatMoney(convert(p.standingEurDay, "EUR", currency), currency, { perUnit: "day", digits: currency === "EUR" ? 2 : 0 });
+
+  const costFor = (p: FullPlan, kwh: number) => {
     const days = 30;
     const standing = p.standingEurDay * days;
     let energy = 0;
@@ -122,7 +142,7 @@ export default function PortalTariffs() {
     } else {
       energy = (p.unitEurKwh as number) * kwh;
     }
-    return +(standing + energy).toFixed(2);
+    return +convert(standing + energy, "EUR", currency).toFixed(2);
   };
 
   const currentPlanObj = useMemo(() => {
@@ -228,8 +248,8 @@ export default function PortalTariffs() {
                     </div>
                   </div>
                   <div className="text-sm">
-                    <div><span className="text-muted-foreground">Unit:</span> {p.unit}</div>
-                    <div><span className="text-muted-foreground">Standing charge:</span> {p.standing}</div>
+                    <div><span className="text-muted-foreground">Unit:</span> {planUnitLabel(p)}</div>
+                    <div><span className="text-muted-foreground">Standing charge:</span> {planStandingLabel(p)}</div>
                   </div>
                   <ul className="space-y-1 text-sm">
                     {p.perks.map(perk => (
@@ -256,7 +276,7 @@ export default function PortalTariffs() {
               Switch to {confirmPlan?.name}?
             </DialogTitle>
             <DialogDescription>
-              Estimate based on your last 30 days of usage ({monthlyKwh.toLocaleString()} kWh) and an average wholesale price of €{avgWholesale.toFixed(0)}/MWh.
+              Estimate based on your last 30 days of usage ({monthlyKwh.toLocaleString()} kWh) and an average wholesale price of €{avgWholesale.toFixed(0)}/MWh. Shown in {currency}.
             </DialogDescription>
           </DialogHeader>
 
@@ -273,7 +293,7 @@ export default function PortalTariffs() {
                     <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Current plan</div>
                     <div className="text-sm font-medium mt-1">{currentPlanObj?.name ?? currentTariff ?? "No active plan"}</div>
                     <div className="text-2xl font-semibold mt-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                      {cur != null ? `€${cur.toFixed(2)}` : "—"}
+                      {cur != null ? formatMoney(cur, currency) : "—"}
                     </div>
                     <div className="text-[11px] text-muted-foreground">est. / month</div>
                   </div>
@@ -281,7 +301,7 @@ export default function PortalTariffs() {
                     <div className="text-[11px] uppercase tracking-widest" style={{ color: EMBER }}>New plan</div>
                     <div className="text-sm font-medium mt-1">{confirmPlan.name}</div>
                     <div className="text-2xl font-semibold mt-1" style={{ fontFamily: "'Space Grotesk', sans-serif", color: EMBER }}>
-                      €{newCost.toFixed(2)}
+                      {formatMoney(newCost, currency)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">est. / month</div>
                   </div>
@@ -293,14 +313,14 @@ export default function PortalTariffs() {
                                 color: cheaper ? "#22c55e" : "#ef4444" }}>
                     <span>{cheaper ? "You could save" : "You could pay more"}</span>
                     <span className="font-semibold">
-                      €{Math.abs(delta).toFixed(2)} / month · €{Math.abs(annual!).toLocaleString()} / year
+                      {formatMoney(Math.abs(delta), currency)} / month · {formatMoney(Math.abs(annual!), currency, { digits: 0 })} / year
                     </span>
                   </div>
                 )}
 
                 <div className="text-xs text-muted-foreground space-y-1 border-t border-border pt-3">
-                  <div><span className="text-foreground">Unit rate:</span> {confirmPlan.unit}</div>
-                  <div><span className="text-foreground">Standing charge:</span> {confirmPlan.standing}</div>
+                  <div><span className="text-foreground">Unit rate:</span> {planUnitLabel(confirmPlan as FullPlan)}</div>
+                  <div><span className="text-foreground">Standing charge:</span> {planStandingLabel(confirmPlan as FullPlan)}</div>
                   <div>Estimates are indicative. Your actual bill depends on real usage, daily wholesale prices, and when you use power.</div>
                 </div>
               </div>
