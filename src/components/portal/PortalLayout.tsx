@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Flame, LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car } from "lucide-react";
+import { Flame, LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell } from "lucide-react";
 
 const items = [
   { to: "/portal", label: "Overview", icon: LayoutDashboard, end: true },
@@ -15,6 +15,7 @@ const items = [
   { to: "/portal/invoices", label: "Invoices", icon: Receipt },
   { to: "/portal/ppa", label: "My PPAs", icon: Handshake },
   { to: "/portal/readings", label: "Submit reading", icon: Gauge },
+  { to: "/portal/notifications", label: "Notifications", icon: Bell },
   { to: "/portal/profile", label: "Profile", icon: User },
 ];
 

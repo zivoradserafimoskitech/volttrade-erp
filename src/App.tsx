@@ -54,6 +54,7 @@ import PortalRefer from "./pages/portal/PortalRefer";
 import PortalEv from "./pages/portal/PortalEv";
 import PortalPpa from "./pages/portal/PortalPpa";
 import PortalProfile from "./pages/portal/Profile";
+import PortalNotifications from "./pages/portal/PortalNotifications";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +110,7 @@ const App = () => (
             <Route path="/portal/ev" element={<PortalEv />} />
             <Route path="/portal/ppa" element={<PortalPpa />} />
             <Route path="/portal/profile" element={<PortalProfile />} />
+            <Route path="/portal/notifications" element={<PortalNotifications />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin/audit" element={<AuditLog />} />
