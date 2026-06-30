@@ -3,6 +3,7 @@ import { PortalLayout } from "@/components/portal/PortalLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -15,15 +16,19 @@ import { syntheticPrices } from "@/lib/evOptimiser";
 const EMBER = "#FF6B2C";
 
 type Plan = { code: string; name: string; tag: string; unit: string; standing: string; perks: string[]; icon: any; recommended?: boolean };
-const PLANS: Plan[] = [
+const PLANS: (Plan & { unitEurKwh: number | ((avgWholesaleEurMwh: number) => number); standingEurDay: number; nightShare?: number; nightEurKwh?: number })[] = [
   { code: "fixed_12", name: "Vatra Fixed 12", tag: "Stability", unit: "€0.142 / kWh", standing: "€0.18 / day",
-    perks: ["Locked rate for 12 months", "No surprises", "Switch any time"], icon: ShieldCheck },
+    perks: ["Locked rate for 12 months", "No surprises", "Switch any time"], icon: ShieldCheck,
+    unitEurKwh: 0.142, standingEurDay: 0.18 },
   { code: "tracker",  name: "Vatra Tracker",  tag: "Wholesale-linked", unit: "Daily wholesale + €0.025", standing: "€0.18 / day",
-    perks: ["Follows the wholesale market", "Updated every day", "Typically cheaper than fixed"], icon: TrendingDown, recommended: true },
+    perks: ["Follows the wholesale market", "Updated every day", "Typically cheaper than fixed"], icon: TrendingDown, recommended: true,
+    unitEurKwh: (w) => w / 1000 + 0.025, standingEurDay: 0.18 },
   { code: "agile",    name: "Vatra Agile",    tag: "Half-hourly", unit: "Updates every 30 minutes", standing: "€0.20 / day",
-    perks: ["Cheapest at night and midday", "Great with smart appliances", "See tomorrow's prices at 4pm"], icon: Sparkles },
+    perks: ["Cheapest at night and midday", "Great with smart appliances", "See tomorrow's prices at 4pm"], icon: Sparkles,
+    unitEurKwh: (w) => w / 1000 + 0.018, standingEurDay: 0.20 },
   { code: "go_ev",    name: "Vatra Go (EV)",  tag: "EV drivers", unit: "€0.075 / kWh 00:30–05:30", standing: "€0.20 / day",
-    perks: ["Ultra-cheap overnight slot", "Smart-charge friendly", "Standard rate the rest of the day"], icon: Car },
+    perks: ["Ultra-cheap overnight slot", "Smart-charge friendly", "Standard rate the rest of the day"], icon: Car,
+    unitEurKwh: 0.155, standingEurDay: 0.20, nightShare: 0.21, nightEurKwh: 0.075 },
 ];
 
 function colorFor(price: number, min: number, max: number) {
@@ -41,6 +46,9 @@ export default function PortalTariffs() {
   const [prices, setPrices] = useState<{ ts: string; price: number; label: string }[]>([]);
   const [trend, setTrend] = useState<{ day: string; price: number }[]>([]);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
+  const [monthlyKwh, setMonthlyKwh] = useState<number>(0);
+  const [avgWholesale, setAvgWholesale] = useState<number>(0);
+  const [confirmPlan, setConfirmPlan] = useState<Plan | null>(null);
 
   useEffect(() => { (async () => {
     if (!user) return;
@@ -51,6 +59,16 @@ export default function PortalTariffs() {
     setCurrentTariff((sc as any)?.tariffs?.name ?? null);
     const { data: psw } = await supabase.from("tariff_switch_requests").select("target_tariff_code").eq("client_id", cl.id).eq("status","pending").maybeSingle();
     setPendingCode(psw?.target_tariff_code ?? null);
+
+    // Estimate monthly kWh from last 30 days of meter readings
+    const since = new Date(Date.now() - 30 * 86400e3).toISOString();
+    const { data: mrs } = await supabase
+      .from("meter_readings")
+      .select("kwh, metering_points!inner(client_id)")
+      .gte("ts", since)
+      .eq("metering_points.client_id", cl.id);
+    const total = (mrs ?? []).reduce((s: number, r: any) => s + Number(r.kwh || 0), 0);
+    setMonthlyKwh(total > 0 ? Math.round(total) : 320);
 
     // Half-hourly forward curve for the next 48h
     const now = new Date(); now.setMinutes(0,0,0);
@@ -67,6 +85,8 @@ export default function PortalTariffs() {
       const d = new Date(c.ts);
       return { ts: c.ts, price: c.price, label: d.toLocaleString(undefined, { weekday: "short", hour: "2-digit" }) };
     }));
+    const avg = curve.length ? curve.reduce((s, x) => s + x.price, 0) / curve.length : 70;
+    setAvgWholesale(avg);
 
     // 30-day trend (avg daily wholesale)
     const monthAgo = new Date(Date.now() - 30 * 86400e3).toISOString();
@@ -91,6 +111,27 @@ export default function PortalTariffs() {
     return { current, cheapest3, min, max };
   }, [prices]);
 
+  const costFor = (p: (typeof PLANS)[number], kwh: number) => {
+    const days = 30;
+    const standing = p.standingEurDay * days;
+    let energy = 0;
+    if (typeof p.unitEurKwh === "function") {
+      energy = p.unitEurKwh(avgWholesale) * kwh;
+    } else if (p.nightShare && p.nightEurKwh != null) {
+      energy = (p.unitEurKwh as number) * kwh * (1 - p.nightShare) + p.nightEurKwh * kwh * p.nightShare;
+    } else {
+      energy = (p.unitEurKwh as number) * kwh;
+    }
+    return +(standing + energy).toFixed(2);
+  };
+
+  const currentPlanObj = useMemo(() => {
+    if (!currentTariff) return null;
+    return PLANS.find(p => p.name === currentTariff) ?? null;
+  }, [currentTariff]);
+
+  const currentMonthlyCost = useMemo(() => currentPlanObj ? costFor(currentPlanObj, monthlyKwh) : null, [currentPlanObj, monthlyKwh, avgWholesale]);
+
   const switchTo = async (plan: Plan) => {
     if (!clientId) return toast.error("Account not linked");
     const { error } = await supabase.from("tariff_switch_requests").insert({
@@ -98,6 +139,7 @@ export default function PortalTariffs() {
     } as any);
     if (error) return toast.error(error.message);
     setPendingCode(plan.code);
+    setConfirmPlan(null);
     toast.success(`Switch to ${plan.name} requested — we'll process it within 2 working days.`);
   };
 
@@ -194,10 +236,10 @@ export default function PortalTariffs() {
                       <li key={perk} className="flex items-center gap-2"><Check className="h-3.5 w-3.5" style={{ color: EMBER }} /> {perk}</li>
                     ))}
                   </ul>
-                  <Button onClick={() => switchTo(p)} disabled={isPending} className="w-full"
+                  <Button onClick={() => setConfirmPlan(p)} disabled={isPending} className="w-full"
                           style={isPending ? {} : { background: EMBER, color: "#1A140F" }}
                           variant={isPending ? "outline" : "default"}>
-                    {isPending ? "Switch pending…" : (<>Switch to {p.name} <ArrowRight className="h-4 w-4 ml-2" /></>)}
+                    {isPending ? "Switch pending…" : (<>Compare & switch <ArrowRight className="h-4 w-4 ml-2" /></>)}
                   </Button>
                 </CardContent>
               </Card>
@@ -205,6 +247,75 @@ export default function PortalTariffs() {
           })}
         </div>
       </div>
+
+      {/* Confirm switch with monthly cost comparison */}
+      <Dialog open={!!confirmPlan} onOpenChange={(o) => !o && setConfirmPlan(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Switch to {confirmPlan?.name}?
+            </DialogTitle>
+            <DialogDescription>
+              Estimate based on your last 30 days of usage ({monthlyKwh.toLocaleString()} kWh) and an average wholesale price of €{avgWholesale.toFixed(0)}/MWh.
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmPlan && (() => {
+            const newCost = costFor(confirmPlan as any, monthlyKwh);
+            const cur = currentMonthlyCost;
+            const delta = cur != null ? +(newCost - cur).toFixed(2) : null;
+            const annual = delta != null ? +(delta * 12).toFixed(0) : null;
+            const cheaper = delta != null && delta < 0;
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Current plan</div>
+                    <div className="text-sm font-medium mt-1">{currentPlanObj?.name ?? currentTariff ?? "No active plan"}</div>
+                    <div className="text-2xl font-semibold mt-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {cur != null ? `€${cur.toFixed(2)}` : "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">est. / month</div>
+                  </div>
+                  <div className="rounded-lg border p-3" style={{ borderColor: EMBER, background: "rgba(255,107,44,0.06)" }}>
+                    <div className="text-[11px] uppercase tracking-widest" style={{ color: EMBER }}>New plan</div>
+                    <div className="text-sm font-medium mt-1">{confirmPlan.name}</div>
+                    <div className="text-2xl font-semibold mt-1" style={{ fontFamily: "'Space Grotesk', sans-serif", color: EMBER }}>
+                      €{newCost.toFixed(2)}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">est. / month</div>
+                  </div>
+                </div>
+
+                {delta != null && (
+                  <div className="rounded-lg p-3 text-sm flex items-center justify-between"
+                       style={{ background: cheaper ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)",
+                                color: cheaper ? "#22c55e" : "#ef4444" }}>
+                    <span>{cheaper ? "You could save" : "You could pay more"}</span>
+                    <span className="font-semibold">
+                      €{Math.abs(delta).toFixed(2)} / month · €{Math.abs(annual!).toLocaleString()} / year
+                    </span>
+                  </div>
+                )}
+
+                <div className="text-xs text-muted-foreground space-y-1 border-t border-border pt-3">
+                  <div><span className="text-foreground">Unit rate:</span> {confirmPlan.unit}</div>
+                  <div><span className="text-foreground">Standing charge:</span> {confirmPlan.standing}</div>
+                  <div>Estimates are indicative. Your actual bill depends on real usage, daily wholesale prices, and when you use power.</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmPlan(null)}>Cancel</Button>
+            <Button onClick={() => confirmPlan && switchTo(confirmPlan)}
+                    style={{ background: EMBER, color: "#1A140F" }}>
+              Confirm switch <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PortalLayout>
   );
 }
