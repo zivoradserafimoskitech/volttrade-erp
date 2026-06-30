@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
+import { SUPPORTED_CURRENCIES, formatMoney } from "@/lib/fx";
 
 type Tariff = any;
 const MODELS = [
@@ -68,15 +69,22 @@ export default function Tariffs() {
                   <SelectContent>{MODELS.map(m => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <F name="currency" label="Currency" defaultValue="EUR" />
+              <div className="space-y-2"><Label>Currency</Label>
+                <Select name="currency" defaultValue="EUR">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <F name="valid_from" label="Valid from" type="date" required />
               <F name="valid_to" label="Valid to (optional)" type="date" />
               <F name="customer_segment" label="Segment" placeholder="industrial / commercial / household" />
               <div className="space-y-2"><Label>VAT</Label>
                 <label className="flex items-center gap-2 text-sm h-10"><input type="checkbox" name="vat_included" /> Prices include VAT</label>
               </div>
-              <F name="energy_price" label="Energy price (€/MWh)" type="number" step="0.01" required />
-              <F name="fixed_fee" label="Monthly fixed fee (€)" type="number" step="0.01" defaultValue="0" />
+              <F name="energy_price" label="Energy price (/MWh, in chosen currency)" type="number" step="0.01" required />
+              <F name="fixed_fee" label="Monthly fixed fee (in chosen currency)" type="number" step="0.01" defaultValue="0" />
               <DialogFooter className="col-span-2"><Button type="submit" style={{ background: "var(--gradient-primary)" }}>Save tariff</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -86,7 +94,7 @@ export default function Tariffs() {
         <CardContent className="p-0">
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Model</TableHead><TableHead>Segment</TableHead><TableHead>Validity</TableHead><TableHead className="text-right">Energy €/MWh</TableHead><TableHead className="text-right">Fixed €/mo</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+              <TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Model</TableHead><TableHead>Currency</TableHead><TableHead>Segment</TableHead><TableHead>Validity</TableHead><TableHead className="text-right">Energy /MWh</TableHead><TableHead className="text-right">Fixed /mo</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {rows.map(t => {
@@ -97,16 +105,17 @@ export default function Tariffs() {
                     <TableCell className="font-mono text-xs">{t.code}</TableCell>
                     <TableCell>{t.name}</TableCell>
                     <TableCell><Badge variant="outline">{t.model}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary">{t.currency ?? 'EUR'}</Badge></TableCell>
                     <TableCell className="text-sm text-muted-foreground">{t.customer_segment ?? '—'}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{t.valid_from} → {t.valid_to ?? '∞'}</TableCell>
-                    <TableCell className="text-right">{energy != null ? fmtNum(energy) : '—'}</TableCell>
-                    <TableCell className="text-right">{fixed != null ? fmtNum(fixed) : '—'}</TableCell>
+                    <TableCell className="text-right">{energy != null ? formatMoney(Number(energy), t.currency ?? 'EUR') : '—'}</TableCell>
+                    <TableCell className="text-right">{fixed != null ? formatMoney(Number(fixed), t.currency ?? 'EUR') : '—'}</TableCell>
                     <TableCell><Badge variant={t.status==='active'?'default':'secondary'}>{t.status}</Badge></TableCell>
                     <TableCell className="text-right"><Button size="icon" variant="ghost" onClick={() => del(t.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                   </TableRow>
                 );
               })}
-              {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">No tariffs yet.</TableCell></TableRow>}
+              {rows.length === 0 && <TableRow><TableCell colSpan={10} className="text-center py-10 text-sm text-muted-foreground">No tariffs yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
