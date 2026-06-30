@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass, Handshake } from "lucide-react";
+import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass, Handshake, Eye } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
@@ -95,6 +95,17 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
       <div className="p-3 border-t border-sidebar-border space-y-2">
         <div className="text-xs text-muted-foreground px-2 truncate">{user?.email}</div>
         {roles.length > 0 && <div className="text-[10px] text-muted-foreground/70 px-2 truncate">{roles.join(' · ')}</div>}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start"
+          onClick={() => {
+            try { sessionStorage.setItem('viewAsCustomer', '1'); } catch {}
+            window.open('/portal', '_blank', 'noopener');
+          }}
+        >
+          <Eye className="h-4 w-4 mr-2" /> View as customer
+        </Button>
         <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground" onClick={async () => { await signOut(); navigate("/auth"); }}>
           <LogOut className="h-4 w-4 mr-2" /> Sign out
         </Button>
