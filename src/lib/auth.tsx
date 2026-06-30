@@ -14,15 +14,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadRoles = async (uid: string | undefined) => {
     if (!uid) { setRoles([]); return; }
     const { data } = await supabase.from('user_roles').select('role').eq('user_id', uid);
-    let rs = (data ?? []).map((r: any) => r.role as AppRole);
-    // Bootstrap: if no admins exist anywhere, make this user admin
-    if (rs.length === 0) {
-      const { count } = await supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'admin');
-      if ((count ?? 0) === 0) {
-        const { error } = await supabase.from('user_roles').insert({ user_id: uid, role: 'admin' });
-        if (!error) rs = ['admin'];
-      }
-    }
+    const rs = (data ?? []).map((r: any) => r.role as AppRole);
     setRoles(rs);
   };
 
