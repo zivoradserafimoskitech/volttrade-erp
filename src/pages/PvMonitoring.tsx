@@ -128,10 +128,10 @@ export default function PvMonitoring() {
     }>
       <div className="space-y-4">
         <div className="grid gap-4 md:grid-cols-4">
-          <StatCard title="Plants online" value={`${totals.onl}/${rows.length}`} icon={CheckCircle2} />
-          <StatCard title="Active alerts" value={String(totals.alarms)} icon={Bell} />
-          <StatCard title="Live output" value={`${totals.kwSum.toFixed(1)} kW`} icon={Sun} />
-          <StatCard title="Installed (DC)" value={`${totals.kwpSum.toFixed(0)} kWp`} icon={Sun} />
+          <StatCard label="Plants online" value={`${totals.onl}/${rows.length}`} icon={CheckCircle2} />
+          <StatCard label="Active alerts" value={String(totals.alarms)} icon={Bell} />
+          <StatCard label="Live output" value={`${totals.kwSum.toFixed(1)} kW`} icon={Sun} />
+          <StatCard label="Installed (DC)" value={`${totals.kwpSum.toFixed(0)} kWp`} icon={Sun} />
         </div>
 
         <Card>
