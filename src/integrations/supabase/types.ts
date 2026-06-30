@@ -720,6 +720,39 @@ export type Database = {
         }
         Relationships: []
       }
+      device_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          last_seen: string
+          platform: string
+          token: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_seen?: string
+          platform?: string
+          token: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_seen?: string
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ev_charge_plans: {
         Row: {
           avg_price_eur_mwh: number | null
@@ -1325,6 +1358,81 @@ export type Database = {
           trade_date?: string
           user_id?: string
           volume_mwh?: number
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          alerts: boolean
+          billing: boolean
+          cheapest_slot: boolean
+          created_at: string
+          ev: boolean
+          outage: boolean
+          savings: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alerts?: boolean
+          billing?: boolean
+          cheapest_slot?: boolean
+          created_at?: string
+          ev?: boolean
+          outage?: boolean
+          savings?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alerts?: boolean
+          billing?: boolean
+          cheapest_slot?: boolean
+          created_at?: string
+          ev?: boolean
+          outage?: boolean
+          savings?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          data: Json | null
+          delivered: boolean
+          id: string
+          read_at: string | null
+          title: string
+          topic: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          data?: Json | null
+          delivered?: boolean
+          id?: string
+          read_at?: string | null
+          title: string
+          topic: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          data?: Json | null
+          delivered?: boolean
+          id?: string
+          read_at?: string | null
+          title?: string
+          topic?: string
+          url?: string | null
+          user_id?: string
         }
         Relationships: []
       }
