@@ -16,9 +16,9 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { renderInvoicePdf } from "@/lib/invoiceTemplates";
+import { renderInvoicePdf, detectInvoiceLang, type InvoiceLang } from "@/lib/invoiceTemplates";
 
-type Client = { id: string; company_name: string; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number };
+type Client = { id: string; company_name: string; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; country_code: string | null };
 type Invoice = { id: string; invoice_number: string; period_start: string; period_end: string; total_mwh: number; energy_amount_eur: number; margin_amount_eur: number; total_eur: number; status: string; client_id: string };
 
 export default function Invoices() {
@@ -26,9 +26,10 @@ export default function Invoices() {
   const [clients, setClients] = useState<Client[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [busy, setBusy] = useState(false);
+  const [lang, setLang] = useState<InvoiceLang | "auto">("auto");
 
   const load = async () => {
-    const { data: cs } = await supabase.from("clients").select("id, company_name, contract_type, fixed_price_eur_mwh, margin_eur_mwh");
+    const { data: cs } = await supabase.from("clients").select("id, company_name, contract_type, fixed_price_eur_mwh, margin_eur_mwh, country_code");
     const { data: inv } = await supabase.from("invoices").select("*").order("created_at", { ascending: false });
     setClients((cs as any) ?? []); setInvoices((inv as any) ?? []);
   };
@@ -101,6 +102,7 @@ export default function Invoices() {
       inv, client,
       meters: (meters ?? []) as any,
       readings: (readings ?? []) as any,
+      lang: lang === "auto" ? detectInvoiceLang(client.country_code) : lang,
     });
   };
 
@@ -118,7 +120,20 @@ export default function Invoices() {
 
   return (
     <ErpLayout title="Billing & Invoicing" subtitle="Generate hourly-priced invoices and export reports"
-      actions={<Button variant="secondary" onClick={exportExcel}><FileSpreadsheet className="h-4 w-4 mr-2" />Export Excel report</Button>}>
+      actions={
+        <div className="flex items-center gap-2">
+          <Select value={lang} onValueChange={(v) => setLang(v as any)}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Invoice language" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Auto (by country)</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="mk">Македонски</SelectItem>
+              <SelectItem value="sq">Shqip</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="secondary" onClick={exportExcel}><FileSpreadsheet className="h-4 w-4 mr-2" />Export Excel report</Button>
+        </div>
+      }>
       <Card className="border-border/60">
         <CardHeader><CardTitle>Generate invoice</CardTitle><CardDescription>Calculates Σ(actual MWh × hourly price) + margin</CardDescription></CardHeader>
         <CardContent>
