@@ -37,6 +37,7 @@ const groups: { title: string; items: Item[] }[] = [
   { title: "Assets", items: [
     { to: "/assets", label: "Sites & Assets", icon: Battery },
     { to: "/asset-monitoring", label: "Monitoring", icon: Sun },
+    { to: "/pv-monitoring", label: "PV Plants", icon: Sun },
     { to: "/smart-meter", label: "Smart Meter", icon: Radio },
   ]},
   { title: "Balancing & Settlement", items: [
