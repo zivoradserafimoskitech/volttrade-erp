@@ -42,9 +42,13 @@ export default function PortalOverview() {
     setContract(c); setInvoice(inv); setEdus(mps ?? []); setPpaCount((ppas ?? []).length);
     const ids = (mps ?? []).map((m: any) => m.id);
     if (ids.length) {
-      const { data: rd } = await supabase.from("meter_readings").select("reading_date, kwh_used").in("metering_point_id", ids);
+      const { data: rd } = await supabase.from("meter_readings").select("reading_at, import_kwh, export_kwh").in("metering_point_id", ids);
       const map: Record<string, number> = {};
-      (rd ?? []).forEach((r: any) => { const m = r.reading_date?.slice(0, 7); if (!m) return; map[m] = (map[m] ?? 0) + Number(r.kwh_used || 0); });
+      (rd ?? []).forEach((r: any) => {
+        const m = (r.reading_at as string | null)?.slice(0, 7);
+        if (!m) return;
+        map[m] = (map[m] ?? 0) + Number(r.import_kwh || 0) - Number(r.export_kwh || 0);
+      });
       setSeries(Object.entries(map).sort().slice(-12).map(([month, kwh]) => ({ month: month.slice(5), kwh: Math.round(kwh) })));
     }
   })(); }, [user]);
