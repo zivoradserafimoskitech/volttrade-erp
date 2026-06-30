@@ -20,7 +20,30 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
   if (!user) return <Navigate to="/auth" replace />;
   const previewMode = (() => { try { return sessionStorage.getItem('viewAsCustomer') === '1'; } catch { return false; } })();
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div
+      className="vatra-portal min-h-screen flex flex-col bg-background"
+      style={{
+        // Ember palette scoped to the portal — overrides shadcn semantic tokens
+        // so all child cards, charts and accents inherit the Vatra identity.
+        ["--background" as any]: "24 18% 8%",
+        ["--foreground" as any]: "30 25% 92%",
+        ["--card" as any]: "24 18% 11%",
+        ["--card-foreground" as any]: "30 25% 92%",
+        ["--popover" as any]: "24 18% 11%",
+        ["--popover-foreground" as any]: "30 25% 92%",
+        ["--primary" as any]: "18 100% 58%",
+        ["--primary-foreground" as any]: "24 30% 8%",
+        ["--secondary" as any]: "24 14% 16%",
+        ["--secondary-foreground" as any]: "30 25% 92%",
+        ["--muted" as any]: "24 12% 14%",
+        ["--muted-foreground" as any]: "30 12% 65%",
+        ["--accent" as any]: "18 90% 52%",
+        ["--accent-foreground" as any]: "24 30% 8%",
+        ["--border" as any]: "24 14% 20%",
+        ["--input" as any]: "24 14% 20%",
+        ["--ring" as any]: "18 100% 58%",
+      }}
+    >
       {previewMode && (
         <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-700 dark:text-amber-300 px-4 md:px-8 py-2 text-xs flex items-center justify-between gap-3">
           <span className="flex items-center gap-2"><Eye className="h-3.5 w-3.5" /> Previewing the customer portal as staff — data shown is filtered to your own account.</span>
