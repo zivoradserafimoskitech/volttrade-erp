@@ -35,6 +35,7 @@ import Assets from "./pages/Assets";
 import AssetMonitoring from "./pages/AssetMonitoring";
 import PvMonitoring from "./pages/PvMonitoring";
 import SmartMeter from "./pages/SmartMeter";
+import Vatra from "./pages/Vatra";
 import ConsumerManager from "./pages/balancing/ConsumerManager";
 import SlpSynthesis from "./pages/balancing/SlpSynthesis";
 import Scheduling from "./pages/balancing/Scheduling";
@@ -102,6 +103,7 @@ const App = () => (
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin/audit" element={<AuditLog />} />
             <Route path="/admin/portal-links" element={<PortalLinks />} />
+            <Route path="/vatra" element={<Vatra />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
