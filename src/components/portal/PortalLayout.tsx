@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Zap, LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake } from "lucide-react";
+import { Zap, LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft } from "lucide-react";
 
 const items = [
   { to: "/portal", label: "Overview", icon: LayoutDashboard, end: true },
@@ -18,8 +18,17 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
   const navigate = useNavigate();
   if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/auth" replace />;
+  const previewMode = (() => { try { return sessionStorage.getItem('viewAsCustomer') === '1'; } catch { return false; } })();
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {previewMode && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-700 dark:text-amber-300 px-4 md:px-8 py-2 text-xs flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2"><Eye className="h-3.5 w-3.5" /> Previewing the customer portal as staff — data shown is filtered to your own account.</span>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { try { sessionStorage.removeItem('viewAsCustomer'); } catch {} ; navigate('/'); }}>
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to staff ERP
+          </Button>
+        </div>
+      )}
       <header className="h-16 border-b border-border px-4 md:px-8 flex items-center justify-between bg-card/40 backdrop-blur">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ background: "var(--gradient-primary)" }}><Zap className="h-5 w-5 text-primary-foreground" /></div>
