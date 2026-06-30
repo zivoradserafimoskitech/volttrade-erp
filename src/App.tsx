@@ -48,6 +48,10 @@ import PortalEdus from "./pages/portal/Edus";
 import PortalInvoices from "./pages/portal/PortalInvoices";
 import PortalReadings from "./pages/portal/PortalReadings";
 import PortalHourly from "./pages/portal/PortalHourly";
+import PortalTariffs from "./pages/portal/PortalTariffs";
+import PortalSavings from "./pages/portal/PortalSavings";
+import PortalRefer from "./pages/portal/PortalRefer";
+import PortalEv from "./pages/portal/PortalEv";
 import PortalPpa from "./pages/portal/PortalPpa";
 import PortalProfile from "./pages/portal/Profile";
 
@@ -99,6 +103,10 @@ const App = () => (
             <Route path="/portal/invoices" element={<PortalInvoices />} />
             <Route path="/portal/readings" element={<PortalReadings />} />
             <Route path="/portal/hourly" element={<PortalHourly />} />
+            <Route path="/portal/tariffs" element={<PortalTariffs />} />
+            <Route path="/portal/savings" element={<PortalSavings />} />
+            <Route path="/portal/refer" element={<PortalRefer />} />
+            <Route path="/portal/ev" element={<PortalEv />} />
             <Route path="/portal/ppa" element={<PortalPpa />} />
             <Route path="/portal/profile" element={<PortalProfile />} />
             <Route path="/admin/users" element={<UsersAdmin />} />
