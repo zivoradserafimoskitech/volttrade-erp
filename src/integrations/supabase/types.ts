@@ -720,6 +720,113 @@ export type Database = {
         }
         Relationships: []
       }
+      ev_charge_plans: {
+        Row: {
+          avg_price_eur_mwh: number | null
+          client_id: string
+          created_at: string
+          est_cost_eur: number
+          est_kwh: number
+          id: string
+          plan_for_date: string
+          schedule: Json
+          vehicle_id: string
+        }
+        Insert: {
+          avg_price_eur_mwh?: number | null
+          client_id: string
+          created_at?: string
+          est_cost_eur?: number
+          est_kwh?: number
+          id?: string
+          plan_for_date: string
+          schedule: Json
+          vehicle_id: string
+        }
+        Update: {
+          avg_price_eur_mwh?: number | null
+          client_id?: string
+          created_at?: string
+          est_cost_eur?: number
+          est_kwh?: number
+          id?: string
+          plan_for_date?: string
+          schedule?: Json
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ev_charge_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ev_charge_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "ev_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ev_vehicles: {
+        Row: {
+          battery_kwh: number
+          client_id: string
+          created_at: string
+          current_soc_pct: number
+          id: string
+          make: string | null
+          max_charge_kw: number
+          model: string | null
+          nickname: string
+          plugged_in: boolean
+          ready_by_time: string
+          target_soc_pct: number
+          updated_at: string
+        }
+        Insert: {
+          battery_kwh?: number
+          client_id: string
+          created_at?: string
+          current_soc_pct?: number
+          id?: string
+          make?: string | null
+          max_charge_kw?: number
+          model?: string | null
+          nickname: string
+          plugged_in?: boolean
+          ready_by_time?: string
+          target_soc_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          battery_kwh?: number
+          client_id?: string
+          created_at?: string
+          current_soc_pct?: number
+          id?: string
+          make?: string | null
+          max_charge_kw?: number
+          model?: string | null
+          nickname?: string
+          plugged_in?: boolean
+          ready_by_time?: string
+          target_soc_pct?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ev_vehicles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forecasts: {
         Row: {
           budget_eur: number | null
@@ -1467,6 +1574,199 @@ export type Database = {
           },
         ]
       }
+      referrals: {
+        Row: {
+          code: string
+          created_at: string
+          credit_eur: number
+          credited_at: string | null
+          id: string
+          referred_email: string | null
+          referred_name: string | null
+          referrer_client_id: string
+          signed_up_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          credit_eur?: number
+          credited_at?: string | null
+          id?: string
+          referred_email?: string | null
+          referred_name?: string | null
+          referrer_client_id: string
+          signed_up_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          credit_eur?: number
+          credited_at?: string | null
+          id?: string
+          referred_email?: string | null
+          referred_name?: string | null
+          referrer_client_id?: string
+          signed_up_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_referrer_client_id_fkey"
+            columns: ["referrer_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rewards_ledger: {
+        Row: {
+          amount_eur: number
+          client_id: string
+          created_at: string
+          entry_type: string
+          id: string
+          note: string | null
+          points: number
+          reference_id: string | null
+        }
+        Insert: {
+          amount_eur?: number
+          client_id: string
+          created_at?: string
+          entry_type: string
+          id?: string
+          note?: string | null
+          points?: number
+          reference_id?: string | null
+        }
+        Update: {
+          amount_eur?: number
+          client_id?: string
+          created_at?: string
+          entry_type?: string
+          id?: string
+          note?: string | null
+          points?: number
+          reference_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rewards_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_session_signups: {
+        Row: {
+          actual_kwh: number | null
+          baseline_kwh: number | null
+          client_id: string
+          created_at: string
+          credit_eur: number | null
+          id: string
+          opted_in_at: string
+          points_awarded: number | null
+          saved_kwh: number | null
+          session_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actual_kwh?: number | null
+          baseline_kwh?: number | null
+          client_id: string
+          created_at?: string
+          credit_eur?: number | null
+          id?: string
+          opted_in_at?: string
+          points_awarded?: number | null
+          saved_kwh?: number | null
+          session_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_kwh?: number | null
+          baseline_kwh?: number | null
+          client_id?: string
+          created_at?: string
+          credit_eur?: number | null
+          id?: string
+          opted_in_at?: string
+          points_awarded?: number | null
+          saved_kwh?: number | null
+          session_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saving_session_signups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saving_session_signups_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "saving_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saving_sessions: {
+        Row: {
+          baseline_method: string
+          created_at: string
+          description: string | null
+          eur_per_point: number
+          id: string
+          points_per_kwh: number
+          status: string
+          title: string
+          updated_at: string
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          baseline_method?: string
+          created_at?: string
+          description?: string | null
+          eur_per_point?: number
+          id?: string
+          points_per_kwh?: number
+          status?: string
+          title: string
+          updated_at?: string
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          baseline_method?: string
+          created_at?: string
+          description?: string | null
+          eur_per_point?: number
+          id?: string
+          points_per_kwh?: number
+          status?: string
+          title?: string
+          updated_at?: string
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       schedule_lines: {
         Row: {
           created_at: string
@@ -1918,6 +2218,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "switch_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tariff_switch_requests: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          processed_at: string | null
+          requested_at: string
+          status: string
+          target_tariff_code: string
+          target_tariff_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          target_tariff_code: string
+          target_tariff_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          target_tariff_code?: string
+          target_tariff_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tariff_switch_requests_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"

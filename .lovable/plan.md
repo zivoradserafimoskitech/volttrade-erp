@@ -1,73 +1,60 @@
-## Supply business expansion — 3 modules
+## Octopus-style upgrades for Vatra (consumer portal)
 
-Add a new sidebar group **Supply Operations** with three pages plus a separate customer-facing portal route.
+Five new portal areas, all themed in the existing Ember palette and reachable from the Vatra top nav.
 
----
+### 1. Account home redesign (`/portal`)
+Reshape `Overview.tsx` around an Octopus-style account summary:
+- Big **Balance** tile (credit / debit) with next direct-debit date and amount, pulled from `invoices` + `payments`.
+- "Your energy this month" card: live month-to-date kWh, vs same month last year, vs forecast for the month.
+- Tariff strip showing current plan + current unit rate (or live Agile price if on Agile).
+- Quick links to Smart actions, Tariffs, EV charging, Refer a friend.
 
-### 1. Customer Onboarding / KYC (`/supply/onboarding`)
+### 2. Agile / tracker tariff browser (`/portal/tariffs`)
+- Today + tomorrow half-hourly price chart (bar chart, color-graded green→amber→red).
+- "Current price" tile and "Cheapest 3 hours today/tomorrow" tile.
+- 30-day price trend line.
+- Available plans cards (Vatra Fixed, Vatra Tracker, Vatra Agile, Vatra Go for EV) with a "Switch to this tariff" CTA that writes a `tariff_switch_request`.
+- Data source: existing `market_prices` table; fall back to a deterministic synthetic curve when the table is empty so the UI is never blank.
 
-Pipeline: **Lead → Qualified → Quote → Contract Sent → KYC → Activated → Lost**.
+### 3. Smart actions & savings (`/portal/savings`)
+New tables for opt-in demand-response style events:
+- `saving_sessions` (window, baseline kWh, points-per-kWh saved, status).
+- `saving_session_signups` (client opt-ins, measured reduction kWh, points awarded).
+A page listing upcoming sessions with **Opt in** buttons, a live "session in progress" banner during the window, and a history table showing kWh saved + points earned per session. Total points + lifetime savings shown at the top.
 
-- Kanban board (drag between stages) + table view toggle.
-- "New lead" dialog: company name, contact, expected annual MWh, source (web/referral/cold/switch-in), assigned owner.
-- Lead drawer with tabs:
-  - **Quote** — pick tariff template, contract term, margin €/MWh → auto-calc indicative annual cost; "Generate quote PDF".
-  - **KYC documents** — upload company registration, ID of signatory, proof of address, last 12 months of invoices (storage bucket `kyc-docs`, private). Status per doc: pending/approved/rejected with reviewer note.
-  - **Contract** — generate supply contract PDF from quote + KYC; e-sign placeholder; once signed → "Activate" creates a `clients` row + `supply_contracts` + initial EDU shell.
-- KPI tiles: pipeline value (€), conversion rate, avg days to close, KYC backlog.
+### 4. Refer a friend & rewards (`/portal/refer`)
+- Personal referral code generated per client and a copyable link.
+- New tables `referrals` (referrer, referred email, status, credit_eur) and `rewards_ledger` (client, type, amount_eur, balance, note).
+- Page shows referral link, status of pending/successful referrals, and a rewards ledger with running balance. Credits applied here also feed the Account home balance tile.
 
-### 2. Switching / Change-of-supplier (`/supply/switching`)
+### 5. Intelligent EV charging (`/portal/ev`)
+- Per-client EV vehicles: new `ev_vehicles` table (make/model, battery kWh, max charge kW, plug-in time, target SoC %, ready-by time).
+- New `ev_charge_plans` table storing the optimised schedule: per-hour kW for the next 24h chosen from cheapest price slots that hit the target SoC by the deadline.
+- Page lets the customer add a vehicle, set ready-by time + target SoC, and shows the generated schedule overlaid on the half-hourly price chart, with an estimated charge cost.
+- Optimiser runs client-side (no edge function): greedy fill of cheapest half-hours from `market_prices` until the energy need is met.
 
-Two queues: **Switch-in** (gaining) and **Switch-out** (losing).
+### Branding & nav
+- Add nav entries: Tariffs, Savings, Refer, EV — under the existing Vatra header. On mobile the nav already scrolls horizontally.
+- Keep Space Grotesk + Ember palette; reuse `EMBER = #FF6B2C` and the existing chart styling so all new pages feel native to Vatra.
 
-- Each row: EDU code, current/new supplier, requested date, DSO message status (REQ_SENT → ACK → CONFIRMED / REJECTED), gain/loss volume estimate, win-back flag.
-- Actions: send DSO request (stub edge function `dso-switch-message` generating a message envelope), import DSO response (CSV upload), trigger **win-back** workflow on switch-out (assigns task to retention owner + logs offered discount).
-- Monthly gain/loss chart, churn rate KPI, top loss reasons.
-- Auto-creates a contract record on confirmed switch-in; flips contract status to `terminated` on confirmed switch-out.
+### Technical section
 
-### 3. Customer Self-Service Portal (`/portal` — separate layout)
+Files added:
+- `src/pages/portal/PortalTariffs.tsx`
+- `src/pages/portal/PortalSavings.tsx`
+- `src/pages/portal/PortalRefer.tsx`
+- `src/pages/portal/PortalEv.tsx`
+- `src/lib/evOptimiser.ts` (greedy half-hour scheduler)
 
-Public route (still auth-gated, but with `customer` role and a stripped-down layout — no ERP sidebar). End-customers see only their own data via RLS keyed on `clients.portal_user_id`.
+Files modified:
+- `src/pages/portal/Overview.tsx` — balance tile, MTD card, current tariff strip, new quick links.
+- `src/components/portal/PortalLayout.tsx` — add nav items + icons.
+- `src/App.tsx` — register four new routes.
 
-Pages:
-- `/portal` — overview: contract summary, next invoice due, last 12-month consumption chart.
-- `/portal/edus` — list of own EDUs with monthly consumption.
-- `/portal/invoices` — download PDFs, see paid/unpaid.
-- `/portal/readings` — submit self-reads (writes to `meter_readings` with `source='customer'`, `is_estimated=false`, validation gates from existing MeterReadings page).
-- `/portal/profile` — update contact details, change password.
+Database migration (single migration call, with GRANTs + RLS, scoped to `current_portal_client_id()`):
+- `tariff_switch_requests`
+- `saving_sessions`, `saving_session_signups`
+- `referrals`, `rewards_ledger`
+- `ev_vehicles`, `ev_charge_plans`
 
-Add new app role `customer`. Portal layout (`PortalLayout`) hides admin nav entirely.
-
----
-
-### Data changes
-
-New tables:
-- `leads` (company, contact, stage, owner, est_mwh, source, lost_reason, converted_client_id)
-- `lead_quotes` (lead_id, tariff_id, term_months, margin_eur_mwh, annual_cost_eur, pdf_url, status)
-- `kyc_documents` (lead_id, doc_type, file_path, status, reviewer_note, reviewed_by, reviewed_at)
-- `switch_requests` (edu_code, direction in/out, current_supplier, new_supplier, requested_date, dso_status, confirmed_date, volume_estimate_mwh, win_back_offered, lost_reason)
-
-New columns:
-- `clients.portal_user_id uuid` (FK to auth.users, nullable) — links a customer login to their company record.
-
-New role: `customer` added to `app_role` enum.
-
-New storage bucket: `kyc-docs` (private, RLS — only owner + supply_manager/admin can read).
-
-New edge function: `dso-switch-message` (stub that builds an XML envelope and stores it for download).
-
-RLS: leads/quotes/kyc/switches → `supply_manager`, `management`, `admin` full access. Portal tables (clients/invoices/meter_readings/metering_points) get extra policies allowing access where `auth.uid() = clients.portal_user_id`.
-
----
-
-### Build order
-
-1. Migration: enum + tables + RLS + grants + portal policies + storage bucket.
-2. `src/pages/supply/Onboarding.tsx` (kanban + drawer).
-3. `src/pages/supply/Switching.tsx` (queues + DSO actions).
-4. `src/components/portal/PortalLayout.tsx` + 5 portal pages.
-5. Routes in `App.tsx`, sidebar entries for staff pages, "Invite to portal" button on Customers page (generates magic link, sets `portal_user_id`, grants `customer` role).
-6. Edge function stub for DSO messages.
-
-Approve and I'll ship it.
+I'll ship the migration first (you'll approve it), then build the pages on top.
