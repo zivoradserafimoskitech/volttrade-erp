@@ -48,7 +48,7 @@ export default function PortalHourly() {
     const { data: cl } = await supabase.from("clients").select("id").eq("portal_user_id", user.id).maybeSingle();
     if (!cl) return;
     setClientId(cl.id);
-    const { data: m } = await supabase.from("metering_points").select("id, ean, address").eq("client_id", cl.id);
+    const { data: m } = await supabase.from("metering_points").select("id, edu_code, address").eq("client_id", cl.id);
     setMps(m ?? []);
     if (m && m.length && !mpId) setMpId(m[0].id);
   })(); }, [user]);
@@ -136,7 +136,7 @@ export default function PortalHourly() {
             <Select value={mpId} onValueChange={setMpId}>
               <SelectTrigger><SelectValue placeholder="Select EDU" /></SelectTrigger>
               <SelectContent>
-                {mps.map(m => <SelectItem key={m.id} value={m.id}>{m.address || m.ean}</SelectItem>)}
+                {mps.map(m => <SelectItem key={m.id} value={m.id}>{m.address || m.edu_code}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
