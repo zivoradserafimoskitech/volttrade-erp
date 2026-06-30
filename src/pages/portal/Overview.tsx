@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import {
   Zap, Receipt, Leaf, TrendingDown, TrendingUp, Flame, Sun, Gauge, ArrowRight,
-  MapPin, Handshake,
+  MapPin, Handshake, Sparkles, Car, Gift, Wallet,
 } from "lucide-react";
 
 const EMBER = "#FF6B2C";
@@ -27,6 +27,8 @@ export default function PortalOverview() {
   const [series, setSeries] = useState<{ month: string; kwh: number }[]>([]);
   const [edus, setEdus] = useState<any[]>([]);
   const [ppaCount, setPpaCount] = useState(0);
+  const [balance, setBalance] = useState<number>(0);
+  const [rewards, setRewards] = useState<number>(0);
 
   useEffect(() => { (async () => {
     if (!user) return;
@@ -40,6 +42,17 @@ export default function PortalOverview() {
       supabase.from("ppa_agreements").select("id").eq("client_id", cl.id),
     ]);
     setContract(c); setInvoice(inv); setEdus(mps ?? []); setPpaCount((ppas ?? []).length);
+    // Balance = outstanding invoice total - payments made + rewards credit
+    const [{ data: openInv }, { data: pays }, { data: rl }] = await Promise.all([
+      supabase.from("invoices").select("total_eur").eq("client_id", cl.id).in("status", ["issued","overdue","draft"]),
+      supabase.from("payments").select("amount_eur").eq("client_id", cl.id),
+      supabase.from("rewards_ledger").select("amount_eur").eq("client_id", cl.id),
+    ]);
+    const owed = (openInv ?? []).reduce((s: number, x: any) => s + Number(x.total_eur || 0), 0);
+    const paid = (pays ?? []).reduce((s: number, x: any) => s + Number(x.amount_eur || 0), 0);
+    const rewardsTotal = (rl ?? []).reduce((s: number, x: any) => s + Number(x.amount_eur || 0), 0);
+    setBalance(owed - paid - rewardsTotal);
+    setRewards(rewardsTotal);
     const ids = (mps ?? []).map((m: any) => m.id);
     if (ids.length) {
       const { data: rd } = await supabase.from("meter_readings").select("reading_at, import_kwh, export_kwh").in("metering_point_id", ids);
@@ -112,10 +125,13 @@ export default function PortalOverview() {
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={Receipt} label="Next invoice" value={invoice ? `€${fmtNum(invoice.total_eur)}` : "—"} sub={invoice?.due_date ? `Due ${invoice.due_date}` : "No open invoice"} accent={!!invoice} />
+        <Kpi icon={Wallet} label="Account balance"
+             value={`${balance < 0 ? "+" : ""}€${fmtNum(Math.abs(balance))}`}
+             sub={balance > 0 ? "You owe" : balance < 0 ? "In credit" : "Settled"}
+             accent={balance > 0} />
+        <Kpi icon={Receipt} label="Next invoice" value={invoice ? `€${fmtNum(invoice.total_eur)}` : "—"} sub={invoice?.due_date ? `Due ${invoice.due_date}` : "No open invoice"} />
         <Kpi icon={Zap} label="Last 12m" value={`${fmtNum(totals.total / 1000)} MWh`} sub={`Avg ${fmtNum(totals.avg)} kWh/mo`} />
-        <Kpi icon={Sun} label="PV potential" value={totals.pvKw ? `${fmtNum(totals.pvKw)} kWp` : "—"} sub={totals.pvKw ? `~${fmtNum(totals.pvMonthlyKwh)} kWh/mo` : "No PV installed"} />
-        <Kpi icon={Leaf} label="CO₂ footprint" value={`${fmtNum(co2Kg)} kg`} sub="Last 12 months" />
+        <Kpi icon={Gift} label="Rewards" value={`€${fmtNum(rewards)}`} sub="Credits earned" />
       </div>
 
       {/* Charts row */}
@@ -197,10 +213,12 @@ export default function PortalOverview() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Quick actions</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 gap-2">
+            <ActionLink to="/portal/tariffs" icon={Zap} label="Tariffs & live prices" />
+            <ActionLink to="/portal/savings" icon={Sparkles} label="Saving Sessions" />
+            <ActionLink to="/portal/ev" icon={Car} label="EV smart charging" />
+            <ActionLink to="/portal/refer" icon={Gift} label="Refer a friend · €50" />
             <ActionLink to="/portal/invoices" icon={Receipt} label="Pay an invoice" />
             <ActionLink to="/portal/readings" icon={Gauge} label="Submit meter reading" />
-            <ActionLink to="/portal/ppa" icon={Handshake} label={`My PPAs${ppaCount ? ` (${ppaCount})` : ""}`} />
-            <ActionLink to="/portal/edus" icon={MapPin} label="Manage supply points" />
           </CardContent>
         </Card>
       </div>
