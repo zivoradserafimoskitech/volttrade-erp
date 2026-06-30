@@ -33,6 +33,7 @@ import Position from "./pages/risk/Position";
 import Forecasting from "./pages/Forecasting";
 import Assets from "./pages/Assets";
 import AssetMonitoring from "./pages/AssetMonitoring";
+import PvMonitoring from "./pages/PvMonitoring";
 import SmartMeter from "./pages/SmartMeter";
 import ConsumerManager from "./pages/balancing/ConsumerManager";
 import SlpSynthesis from "./pages/balancing/SlpSynthesis";
