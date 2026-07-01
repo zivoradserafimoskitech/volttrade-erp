@@ -83,8 +83,15 @@ export default function SupplyContracts() {
                   <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent></Select>
               </div>
               <div className="space-y-2 col-span-2"><Label>Tariff</Label>
-                <Select name="tariff_id"><SelectTrigger><SelectValue placeholder="Select tariff (optional)" /></SelectTrigger>
-                  <SelectContent>{tariffs.map(t => <SelectItem key={t.id} value={t.id}>{t.code} — {t.name}</SelectItem>)}</SelectContent></Select>
+                <Select name="tariff_id" disabled={tariffs.length === 0}>
+                  <SelectTrigger><SelectValue placeholder={tariffs.length === 0 ? "No tariffs yet — create one first" : "Select tariff (optional)"} /></SelectTrigger>
+                  <SelectContent>{tariffs.map(t => <SelectItem key={t.id} value={t.id}>{t.code} — {t.name}</SelectItem>)}</SelectContent>
+                </Select>
+                {tariffs.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    You need at least one tariff. <a href="/tariffs" className="underline text-primary">Create a tariff →</a>
+                  </p>
+                )}
               </div>
               <F name="start_date" label="Start date" type="date" required />
               <F name="end_date" label="End date" type="date" />
