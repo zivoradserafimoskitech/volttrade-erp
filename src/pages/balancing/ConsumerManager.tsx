@@ -30,7 +30,7 @@ export default function ConsumerManager() {
 
   async function load() {
     const [{ data: cps }, { data: bgs }] = await Promise.all([
-      supabase.from("connection_points").select("*").order("created_at", { ascending: false }),
+      supabase.from("metering_points").select("*").order("created_at", { ascending: false }),
       supabase.from("balance_groups").select("id,name,code").order("name"),
     ]);
     setRows(cps ?? []); setGroups(bgs ?? []);
@@ -56,7 +56,26 @@ export default function ConsumerManager() {
       toast({ title: "Pick SLP category", description: "Profiled customers need an SLP profile.", variant: "destructive" });
       return;
     }
-    const { error } = await supabase.from("connection_points").insert(draft);
+    const payload: any = {
+      edu_code: draft.eic_metering_id || `MP-${Date.now()}`,
+      consumer_category: draft.metering_category === "PROFILED" ? "slp" : "smart_hourly",
+      metering_category: draft.metering_category,
+      slp_category: draft.slp_category ?? null,
+      consumer_type: draft.consumer_type,
+      voltage_level: draft.voltage_level ?? null,
+      connected_power_kw: draft.connection_power_kw ?? null,
+      eic_metering_id: draft.eic_metering_id ?? null,
+      dso_meter_id: draft.dso_meter_id ?? null,
+      tariff_type: draft.tariff_type ?? null,
+      balance_group_id: draft.balance_group_id ?? null,
+      has_private_meter: !!draft.has_private_meter,
+      is_prosumer: !!draft.is_prosumer,
+      pv_capacity_kw: draft.pv_capacity_kwp ?? null,
+      has_pv: !!draft.is_prosumer,
+      prosumer_scheme: draft.is_prosumer ? (draft.prosumer_scheme ?? null) : null,
+      status: draft.status ?? "active",
+    };
+    const { error } = await supabase.from("metering_points").insert(payload);
     if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Saved" });
     setOpen(false); setDraft({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active" });
