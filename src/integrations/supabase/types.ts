@@ -489,98 +489,6 @@ export type Database = {
           },
         ]
       }
-      connection_points: {
-        Row: {
-          balance_group_id: string | null
-          connection_power_kw: number | null
-          consumer_type: Database["public"]["Enums"]["consumer_type"]
-          created_at: string
-          customer_id: string | null
-          dso_meter_id: string | null
-          eic_metering_id: string | null
-          has_private_meter: boolean
-          id: string
-          is_prosumer: boolean
-          metering_category: Database["public"]["Enums"]["metering_category"]
-          metering_point_id: string | null
-          prosumer_scheme: Database["public"]["Enums"]["prosumer_scheme"] | null
-          pv_capacity_kwp: number | null
-          slp_category: Database["public"]["Enums"]["slp_category"] | null
-          status: string
-          tariff_type: string | null
-          updated_at: string
-          voltage_level: string | null
-        }
-        Insert: {
-          balance_group_id?: string | null
-          connection_power_kw?: number | null
-          consumer_type?: Database["public"]["Enums"]["consumer_type"]
-          created_at?: string
-          customer_id?: string | null
-          dso_meter_id?: string | null
-          eic_metering_id?: string | null
-          has_private_meter?: boolean
-          id?: string
-          is_prosumer?: boolean
-          metering_category: Database["public"]["Enums"]["metering_category"]
-          metering_point_id?: string | null
-          prosumer_scheme?:
-            | Database["public"]["Enums"]["prosumer_scheme"]
-            | null
-          pv_capacity_kwp?: number | null
-          slp_category?: Database["public"]["Enums"]["slp_category"] | null
-          status?: string
-          tariff_type?: string | null
-          updated_at?: string
-          voltage_level?: string | null
-        }
-        Update: {
-          balance_group_id?: string | null
-          connection_power_kw?: number | null
-          consumer_type?: Database["public"]["Enums"]["consumer_type"]
-          created_at?: string
-          customer_id?: string | null
-          dso_meter_id?: string | null
-          eic_metering_id?: string | null
-          has_private_meter?: boolean
-          id?: string
-          is_prosumer?: boolean
-          metering_category?: Database["public"]["Enums"]["metering_category"]
-          metering_point_id?: string | null
-          prosumer_scheme?:
-            | Database["public"]["Enums"]["prosumer_scheme"]
-            | null
-          pv_capacity_kwp?: number | null
-          slp_category?: Database["public"]["Enums"]["slp_category"] | null
-          status?: string
-          tariff_type?: string | null
-          updated_at?: string
-          voltage_level?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "connection_points_balance_group_id_fkey"
-            columns: ["balance_group_id"]
-            isOneToOne: false
-            referencedRelation: "balance_groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "connection_points_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "connection_points_metering_point_id_fkey"
-            columns: ["metering_point_id"]
-            isOneToOne: false
-            referencedRelation: "metering_points"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       consumption_readings: {
         Row: {
           actual_mwh: number | null
@@ -1248,64 +1156,111 @@ export type Database = {
         Row: {
           address: string | null
           annual_consumption_mwh: number | null
+          balance_group_id: string | null
           capacity_kw: number | null
           client_id: string
           connected_power_kw: number | null
           connection_type: string | null
           consumer_category: string
+          consumer_type: Database["public"]["Enums"]["consumer_type"] | null
           created_at: string
           dso_area: string | null
+          dso_meter_id: string | null
           edu_code: string
+          eic_metering_id: string | null
+          has_private_meter: boolean
           has_pv: boolean
           id: string
+          is_prosumer: boolean
           meter_id: string | null
+          metering_category:
+            | Database["public"]["Enums"]["metering_category"]
+            | null
           notes: string | null
+          prosumer_scheme: Database["public"]["Enums"]["prosumer_scheme"] | null
           pv_capacity_kw: number | null
+          slp_category: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code: string | null
           status: string
+          tariff_type: string | null
           voltage_level: string | null
         }
         Insert: {
           address?: string | null
           annual_consumption_mwh?: number | null
+          balance_group_id?: string | null
           capacity_kw?: number | null
           client_id: string
           connected_power_kw?: number | null
           connection_type?: string | null
           consumer_category?: string
+          consumer_type?: Database["public"]["Enums"]["consumer_type"] | null
           created_at?: string
           dso_area?: string | null
+          dso_meter_id?: string | null
           edu_code: string
+          eic_metering_id?: string | null
+          has_private_meter?: boolean
           has_pv?: boolean
           id?: string
+          is_prosumer?: boolean
           meter_id?: string | null
+          metering_category?:
+            | Database["public"]["Enums"]["metering_category"]
+            | null
           notes?: string | null
+          prosumer_scheme?:
+            | Database["public"]["Enums"]["prosumer_scheme"]
+            | null
           pv_capacity_kw?: number | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code?: string | null
           status?: string
+          tariff_type?: string | null
           voltage_level?: string | null
         }
         Update: {
           address?: string | null
           annual_consumption_mwh?: number | null
+          balance_group_id?: string | null
           capacity_kw?: number | null
           client_id?: string
           connected_power_kw?: number | null
           connection_type?: string | null
           consumer_category?: string
+          consumer_type?: Database["public"]["Enums"]["consumer_type"] | null
           created_at?: string
           dso_area?: string | null
+          dso_meter_id?: string | null
           edu_code?: string
+          eic_metering_id?: string | null
+          has_private_meter?: boolean
           has_pv?: boolean
           id?: string
+          is_prosumer?: boolean
           meter_id?: string | null
+          metering_category?:
+            | Database["public"]["Enums"]["metering_category"]
+            | null
           notes?: string | null
+          prosumer_scheme?:
+            | Database["public"]["Enums"]["prosumer_scheme"]
+            | null
           pv_capacity_kw?: number | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code?: string | null
           status?: string
+          tariff_type?: string | null
           voltage_level?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "metering_points_balance_group_id_fkey"
+            columns: ["balance_group_id"]
+            isOneToOne: false
+            referencedRelation: "balance_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "metering_points_client_id_fkey"
             columns: ["client_id"]
