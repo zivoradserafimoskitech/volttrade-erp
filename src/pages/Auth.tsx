@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Zap } from "lucide-react";
@@ -28,12 +27,6 @@ export default function AuthPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) toast.error(error.message); else { toast.success("Welcome back"); navigate("/"); }
-  };
-  const signUp = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true);
-    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
-    setBusy(false);
-    if (error) toast.error(error.message); else toast.success("Account created — you can sign in now.");
   };
   const signInGoogle = async () => {
     setBusy(true);
@@ -66,8 +59,8 @@ export default function AuthPage() {
         </div>
         <Card className="border-border/70" style={{ boxShadow: "var(--shadow-card)" }}>
           <CardHeader>
-            <CardTitle>Sign in to your workspace</CardTitle>
-            <CardDescription>Manage clients, market prices, nominations and invoices.</CardDescription>
+            <CardTitle>Sign in</CardTitle>
+            <CardDescription>VoltTrade ERP staff and Vatra customers sign in here.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button type="button" variant="outline" className="w-full mb-4" disabled={busy} onClick={signInGoogle}>
@@ -78,36 +71,33 @@ export default function AuthPage() {
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
               <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">or with email</span></div>
             </div>
-            <Tabs defaultValue="signin">
-              <TabsList className="grid grid-cols-2 w-full mb-4">
-                <TabsTrigger value="signin">Sign in</TabsTrigger>
-                <TabsTrigger value="signup">Create account</TabsTrigger>
-              </TabsList>
-              {(["signin","signup"] as const).map(t => (
-                <TabsContent key={t} value={t}>
-                  <form className="space-y-4" onSubmit={t === "signin" ? signIn : signUp}>
-                    <div className="space-y-2">
-                      <Label htmlFor={`email-${t}`}>Email</Label>
-                      <Input id={`email-${t}`} type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="trader@volttrade.eu" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`pw-${t}`}>Password</Label>
-                      <Input id={`pw-${t}`} type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-                    </div>
-                    {t === "signin" && (
-                      <div className="text-right -mt-2">
-                        <button type="button" className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2" onClick={() => { setForgotEmail(email); setForgotOpen(true); }}>
-                          Forgot password?
-                        </button>
-                      </div>
-                    )}
-                    <Button type="submit" disabled={busy} className="w-full" style={{ background: "var(--gradient-primary)" }}>
-                      {busy ? "Please wait…" : t === "signin" ? "Sign in" : "Create account"}
-                    </Button>
-                  </form>
-                </TabsContent>
-              ))}
-            </Tabs>
+            <form className="space-y-4" onSubmit={signIn}>
+              <div className="space-y-2">
+                <Label htmlFor="email-signin">Email</Label>
+                <Input id="email-signin" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pw-signin">Password</Label>
+                <Input id="pw-signin" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+              </div>
+              <div className="text-right -mt-2">
+                <button type="button" className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2" onClick={() => { setForgotEmail(email); setForgotOpen(true); }}>
+                  Forgot password?
+                </button>
+              </div>
+              <Button type="submit" disabled={busy} className="w-full" style={{ background: "var(--gradient-primary)" }}>
+                {busy ? "Please wait…" : "Sign in"}
+              </Button>
+            </form>
+            <div className="mt-6 pt-4 border-t border-border/60 space-y-2 text-xs text-center text-muted-foreground">
+              <div>
+                <span className="font-medium text-foreground">Vatra customer?</span>{" "}
+                <Link to="/vatra/signup" className="underline underline-offset-2 text-primary">Create your account</Link>
+              </div>
+              <div>
+                VoltTrade ERP access is by invitation only. Ask your administrator to send you an invite.
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
