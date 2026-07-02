@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Zap } from "lucide-react";
 import { lovable } from "@/integrations/lovable";
@@ -17,6 +18,8 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
 
   useEffect(() => { if (user) navigate("/", { replace: true }); }, [user, navigate]);
 
@@ -38,6 +41,15 @@ export default function AuthPage() {
     if (result.error) { toast.error(result.error.message ?? "Google sign-in failed"); setBusy(false); return; }
     if (result.redirected) return;
     navigate("/");
+  };
+  const sendReset = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setBusy(false);
+    if (error) toast.error(error.message);
+    else { toast.success("Password reset email sent — check your inbox."); setForgotOpen(false); }
   };
 
   return (
@@ -82,6 +94,13 @@ export default function AuthPage() {
                       <Label htmlFor={`pw-${t}`}>Password</Label>
                       <Input id={`pw-${t}`} type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
                     </div>
+                    {t === "signin" && (
+                      <div className="text-right -mt-2">
+                        <button type="button" className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2" onClick={() => { setForgotEmail(email); setForgotOpen(true); }}>
+                          Forgot password?
+                        </button>
+                      </div>
+                    )}
                     <Button type="submit" disabled={busy} className="w-full" style={{ background: "var(--gradient-primary)" }}>
                       {busy ? "Please wait…" : t === "signin" ? "Sign in" : "Create account"}
                     </Button>
@@ -91,6 +110,23 @@ export default function AuthPage() {
             </Tabs>
           </CardContent>
         </Card>
+        <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset your password</DialogTitle>
+              <DialogDescription>Enter your email and we'll send you a link to set a new password.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={sendReset} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email</Label>
+                <Input id="forgot-email" type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="you@example.com" />
+              </div>
+              <Button type="submit" disabled={busy} className="w-full" style={{ background: "var(--gradient-primary)" }}>
+                {busy ? "Sending…" : "Send reset link"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
