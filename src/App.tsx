@@ -10,6 +10,7 @@ import Market from "./pages/Market";
 import Trading from "./pages/Trading";
 import Invoices from "./pages/Invoices";
 import AuthPage from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import SupplyPoints from "./pages/SupplyPoints";
 import Tariffs from "./pages/Tariffs";
@@ -67,6 +68,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/supply-points" element={<SupplyPoints />} />
