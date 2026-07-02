@@ -8,3 +8,12 @@ verify_jwt = true
 
 [functions.import-dso-reads]
 verify_jwt = false
+
+[functions.link-consumer-pod]
+verify_jwt = true
+
+[functions.admin-invite-user]
+verify_jwt = true
+
+[functions.admin-invite-consumer]
+verify_jwt = true

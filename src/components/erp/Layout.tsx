@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Sidebar } from "./Sidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 
 export function ErpLayout({ children, title, subtitle, actions }: { children: ReactNode; title: string; subtitle?: string; actions?: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, needsMfa } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/auth" replace />;
+  if (needsMfa && location.pathname !== "/2fa") return <Navigate to="/2fa" replace />;
 
   return (
     <div className="min-h-screen flex w-full bg-background">
