@@ -1,6 +1,7 @@
-// Self-signup consumer links their auth user to a client by proving they know
-// the POD/EIC code AND the email on the client record matches their auth email.
-// Requires an authenticated request (verify_jwt = true).
+// Self-signup consumer submits a Vatra application. We match the POD/EIC to a
+// client and confirm the account email matches the client record, then create a
+// PENDING consumer_application row. An admin must approve it in the ERP before
+// portal_user_id is set on the client (activating portal access).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -51,6 +52,9 @@ Deno.serve(async (req) => {
     if (client.portal_user_id && client.portal_user_id !== user.id) {
       return json({ error: "This supply point is already linked to another account. Contact support." }, 409);
     }
+    if (client.portal_user_id === user.id) {
+      return json({ ok: true, already_linked: true, client_id: client.id });
+    }
 
     const userEmail = (user.email ?? "").toLowerCase();
     const clientEmail = (client.contact_email ?? "").toLowerCase();
@@ -58,11 +62,26 @@ Deno.serve(async (req) => {
       return json({ error: "The email on your account doesn't match the email on this supply point. Contact your supplier to update it, or ask them to invite you." }, 403);
     }
 
-    if (!client.portal_user_id) {
-      const { error: upErr } = await admin.from("clients").update({ portal_user_id: user.id }).eq("id", client.id);
-      if (upErr) return json({ error: upErr.message }, 500);
+    // Do NOT link yet. Create (or refresh) a pending application for admin approval.
+    const { data: existing } = await admin
+      .from("consumer_applications")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const prev = existing?.[0];
+    if (prev?.status === "pending") {
+      await admin.from("consumer_applications")
+        .update({ pod_code: pod, client_id: client.id, user_email: userEmail })
+        .eq("id", prev.id);
+      return json({ ok: true, pending: true, application_id: prev.id });
     }
-    return json({ ok: true, client_id: client.id });
+    const { data: inserted, error: insErr } = await admin
+      .from("consumer_applications")
+      .insert({ user_id: user.id, user_email: userEmail, pod_code: pod, client_id: client.id, status: "pending" })
+      .select("id").single();
+    if (insErr) return json({ error: insErr.message }, 500);
+    return json({ ok: true, pending: true, application_id: inserted.id });
   } catch (e) {
     return json({ error: String((e as Error).message ?? e) }, 500);
   }
