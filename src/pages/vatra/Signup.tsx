@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Flame } from "lucide-react";
 
-type Step = "signup" | "link";
+type Step = "signup" | "link" | "pending";
 
 export default function VatraSignup() {
   const navigate = useNavigate();
@@ -37,11 +37,16 @@ export default function VatraSignup() {
     });
     setBusy(false);
     if (error || (data as any)?.error) return toast.error((data as any)?.error ?? error?.message ?? "Could not link account");
-    toast.success("Account linked to your supply point");
-    navigate("/portal", { replace: true });
+    if ((data as any)?.already_linked) {
+      toast.success("Account already active");
+      return navigate("/portal", { replace: true });
+    }
+    toast.success("Application submitted — awaiting admin approval");
+    setStep("pending");
   };
 
   const skipLink = () => navigate("/portal", { replace: true });
+  const signOutAndHome = async () => { await supabase.auth.signOut(); navigate("/auth", { replace: true }); };
 
   return (
     <div className="vatra-portal min-h-screen grid place-items-center p-4"
@@ -102,7 +107,7 @@ export default function VatraSignup() {
             <>
               <CardHeader>
                 <CardTitle>Link your supply point</CardTitle>
-                <CardDescription>Enter your POD / EIC code (found on your invoice). We'll match it to the email on your account.</CardDescription>
+                <CardDescription>Enter your POD / EIC code (found on your invoice). We'll match it to the email on your account and send your application to an admin for approval.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form className="space-y-4" onSubmit={doLink}>
@@ -111,10 +116,27 @@ export default function VatraSignup() {
                     <Input id="pod" required value={pod} onChange={e => setPod(e.target.value)} placeholder="e.g. MK00X1234567890" />
                   </div>
                   <Button type="submit" disabled={busy || !pod.trim()} className="w-full" style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}>
-                    {busy ? "Linking…" : "Link my account"}
+                    {busy ? "Submitting…" : "Submit for approval"}
                   </Button>
                   <Button type="button" variant="ghost" className="w-full" onClick={skipLink}>Skip for now</Button>
                 </form>
+              </CardContent>
+            </>
+          )}
+          {step === "pending" && (
+            <>
+              <CardHeader>
+                <CardTitle>Application received</CardTitle>
+                <CardDescription>
+                  Thanks — your Vatra application is <strong>pending admin approval</strong>. You'll get an email as soon as your supplier activates your account. You can safely close this window.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="rounded-md border border-border/60 p-3 text-xs text-muted-foreground">
+                  POD / EIC: <span className="font-mono text-foreground">{pod}</span><br />
+                  Email: <span className="font-mono text-foreground">{email}</span>
+                </div>
+                <Button type="button" variant="outline" className="w-full" onClick={signOutAndHome}>Done</Button>
               </CardContent>
             </>
           )}
