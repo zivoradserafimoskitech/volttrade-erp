@@ -11,6 +11,8 @@ import Trading from "./pages/Trading";
 import Invoices from "./pages/Invoices";
 import AuthPage from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
+import TwoFactor from "./pages/TwoFactor";
+import VatraSignup from "./pages/vatra/Signup";
 import NotFound from "./pages/NotFound";
 import SupplyPoints from "./pages/SupplyPoints";
 import Tariffs from "./pages/Tariffs";
@@ -69,6 +71,8 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/2fa" element={<TwoFactor />} />
+            <Route path="/vatra/signup" element={<VatraSignup />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/supply-points" element={<SupplyPoints />} />
