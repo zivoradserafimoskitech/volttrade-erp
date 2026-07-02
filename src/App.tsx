@@ -46,6 +46,7 @@ import Settlement from "./pages/balancing/Settlement";
 import Onboarding from "./pages/supply/Onboarding";
 import Switching from "./pages/supply/Switching";
 import PortalLinks from "./pages/admin/PortalLinks";
+import ConsumerApplications from "./pages/admin/ConsumerApplications";
 import PortalOverview from "./pages/portal/Overview";
 import PortalEdus from "./pages/portal/Edus";
 import PortalInvoices from "./pages/portal/PortalInvoices";
@@ -121,6 +122,7 @@ const App = () => (
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin/audit" element={<AuditLog />} />
             <Route path="/admin/portal-links" element={<PortalLinks />} />
+            <Route path="/admin/consumer-applications" element={<ConsumerApplications />} />
             <Route path="/vatra" element={<Vatra />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
