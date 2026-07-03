@@ -60,6 +60,7 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
       )}
       <header className="h-16 border-b border-border px-4 md:px-8 flex items-center justify-between bg-card/40 backdrop-blur">
         <div className="flex items-center gap-3">
+          <Flame className="h-8 w-8 shrink-0" style={{ color: "#FF6B2C" }} />
           <div>
             <div className="font-semibold tracking-tight text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               vatra<span style={{ color: "#FF6B2C" }}>.</span>
