@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Flame } from "lucide-react";
+
 
 type Step = "signup" | "link" | "pending";
 
@@ -65,9 +65,6 @@ export default function VatraSignup() {
       }}>
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 justify-center mb-6">
-          <div className="h-11 w-11 rounded-xl grid place-items-center" style={{ background: "#241E17", border: "1px solid #3A3128" }}>
-            <Flame className="h-6 w-6" style={{ color: "#FF6B2C" }} />
-          </div>
           <div>
             <div className="text-xl font-semibold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               vatra<span style={{ color: "#FF6B2C" }}>.</span>
