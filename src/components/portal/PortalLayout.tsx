@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Flame, LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell } from "lucide-react";
+import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell } from "lucide-react";
 
 const items = [
   { to: "/portal", label: "Overview", icon: LayoutDashboard, end: true },
@@ -60,9 +60,6 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
       )}
       <header className="h-16 border-b border-border px-4 md:px-8 flex items-center justify-between bg-card/40 backdrop-blur">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ background: "#241E17", border: "1px solid #3A3128" }}>
-            <Flame className="h-5 w-5" style={{ color: "#FF6B2C" }} />
-          </div>
           <div>
             <div className="font-semibold tracking-tight text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               vatra<span style={{ color: "#FF6B2C" }}>.</span>
