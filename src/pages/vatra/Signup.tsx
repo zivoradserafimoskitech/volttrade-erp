@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Flame } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ export default function VatraSignup() {
       }}>
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 justify-center mb-6">
+          <Flame className="h-8 w-8 shrink-0" style={{ color: "#FF6B2C" }} />
           <div>
             <div className="text-xl font-semibold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               vatra<span style={{ color: "#FF6B2C" }}>.</span>
