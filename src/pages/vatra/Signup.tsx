@@ -69,7 +69,7 @@ export default function VatraSignup() {
             <div className="text-xl font-semibold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               vatra<span style={{ color: "#FF6B2C" }}>.</span>
             </div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Your energy</div>
+            <div className="text-sm uppercase tracking-widest text-muted-foreground">Your energy</div>
           </div>
         </div>
         <Card className="border-border/70">
