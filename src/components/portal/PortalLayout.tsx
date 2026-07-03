@@ -59,14 +59,11 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
         </div>
       )}
       <header className="h-16 border-b border-border px-4 md:px-8 flex items-center justify-between bg-card/40 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <Flame className="h-8 w-8 shrink-0" style={{ color: "#FF6B2C" }} />
-          <div>
-            <div className="font-semibold tracking-tight text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              vatra<span style={{ color: "#FF6B2C" }}>.</span>
-            </div>
-            <div className="text-sm uppercase tracking-widest text-muted-foreground">Your energy</div>
+        <div>
+          <div className="font-semibold tracking-tight text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            vatra<span style={{ color: "#FF6B2C" }}>.</span>
           </div>
+          <div className="text-sm uppercase tracking-widest text-muted-foreground">Your energy</div>
         </div>
         <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate("/auth"); }}><LogOut className="h-4 w-4 mr-2" />Sign out</Button>
       </header>
