@@ -1,60 +1,55 @@
-## Octopus-style upgrades for Vatra (consumer portal)
+# Take Volttrade ERP to production
 
-Five new portal areas, all themed in the existing Ember palette and reachable from the Vatra top nav.
+Goal: live, hardened production deployment on a custom domain, using a separate Lovable Cloud environment starting with clean data.
 
-### 1. Account home redesign (`/portal`)
-Reshape `Overview.tsx` around an Octopus-style account summary:
-- Big **Balance** tile (credit / debit) with next direct-debit date and amount, pulled from `invoices` + `payments`.
-- "Your energy this month" card: live month-to-date kWh, vs same month last year, vs forecast for the month.
-- Tariff strip showing current plan + current unit rate (or live Agile price if on Agile).
-- Quick links to Smart actions, Tariffs, EV charging, Refer a friend.
+I'll drive this end-to-end and only stop for the few inputs only you can provide (domain, first admin email, slug).
 
-### 2. Agile / tracker tariff browser (`/portal/tariffs`)
-- Today + tomorrow half-hourly price chart (bar chart, color-graded green→amber→red).
-- "Current price" tile and "Cheapest 3 hours today/tomorrow" tile.
-- 30-day price trend line.
-- Available plans cards (Vatra Fixed, Vatra Tracker, Vatra Agile, Vatra Go for EV) with a "Switch to this tariff" CTA that writes a `tariff_switch_request`.
-- Data source: existing `market_prices` table; fall back to a deterministic synthetic curve when the table is empty so the UI is never blank.
+## Phase 1 — Harden the current build (no user input needed)
 
-### 3. Smart actions & savings (`/portal/savings`)
-New tables for opt-in demand-response style events:
-- `saving_sessions` (window, baseline kWh, points-per-kWh saved, status).
-- `saving_session_signups` (client opt-ins, measured reduction kWh, points awarded).
-A page listing upcoming sessions with **Opt in** buttons, a live "session in progress" banner during the window, and a history table showing kWh saved + points earned per session. Total points + lifetime savings shown at the top.
+Run in this order, block on failures:
 
-### 4. Refer a friend & rewards (`/portal/refer`)
-- Personal referral code generated per client and a copyable link.
-- New tables `referrals` (referrer, referred email, status, credit_eur) and `rewards_ledger` (client, type, amount_eur, balance, note).
-- Page shows referral link, status of pending/successful referrals, and a rewards ledger with running balance. Credits applied here also feed the Account home balance tile.
+1. **Security scan** (`security--run_security_scan`) + **Supabase linter** (`supabase--linter`) + **dependency scan** (`code--dependency_scan`). Resolve every critical/high; ignore only with written rationale saved to security memory.
+2. **RLS review** on every public table: `clients`, `metering_points`, `consumption_readings`, `market_prices`, `nominations`, `user_roles`, `consumer_applications`, plus the `kyc-docs` storage bucket. Confirm portal users are scoped via `current_portal_client_id()` and staff mutations go through `has_role` / `has_any_role`. Confirm each table has explicit `GRANT`s matching its policies.
+3. **Auth config** via `supabase--configure_auth`:
+   - Disable anonymous sign-ups.
+   - Require email confirmation.
+   - Enable Password HIBP (leaked-password) check.
+   - Verify Google provider is configured; add production redirect URLs once the domain is known.
+4. **Edge functions**: lock `seed-demo-data` behind `admin` role (currently open to any authed user); re-verify `admin-invite-user`, `admin-invite-consumer`, `decide-consumer-application`, `link-consumer-pod`, `import-dso-reads`, `submit-schedule` role checks.
+5. **SEO / metadata**: update `index.html` `<title>` and `<meta name="description">` to Volttrade ERP + matching `og:` / `twitter:` tags (currently generic).
 
-### 5. Intelligent EV charging (`/portal/ev`)
-- Per-client EV vehicles: new `ev_vehicles` table (make/model, battery kWh, max charge kW, plug-in time, target SoC %, ready-by time).
-- New `ev_charge_plans` table storing the optimised schedule: per-hour kW for the next 24h chosen from cheapest price slots that hit the target SoC by the deadline.
-- Page lets the customer add a vehicle, set ready-by time + target SoC, and shows the generated schedule overlaid on the half-hourly price chart, with an estimated charge cost.
-- Optimiser runs client-side (no edge function): greedy fill of cheapest half-hours from `market_prices` until the energy need is met.
+## Phase 2 — Separate production Cloud environment
 
-### Branding & nav
-- Add nav entries: Tariffs, Savings, Refer, EV — under the existing Vatra header. On mobile the nav already scrolls horizontally.
-- Keep Space Grotesk + Ember palette; reuse `EMBER = #FF6B2C` and the existing chart styling so all new pages feel native to Vatra.
+Lovable Cloud has Test and Live backends. We'll use **Live** so real customer data never mixes with dev data.
 
-### Technical section
+1. Enable the Live environment.
+2. Replay every migration against Live so schema, roles, functions, triggers, and the `kyc-docs` bucket match.
+3. Re-add runtime secrets on Live (`LOVABLE_API_KEY` and any integration keys). Supabase env vars auto-populate.
+4. Deploy all edge functions to Live.
+5. Do **not** run `seed-demo-data` on Live — production starts empty.
+6. Invite the first production admin and assign the `admin` role in `user_roles` (needs your email).
 
-Files added:
-- `src/pages/portal/PortalTariffs.tsx`
-- `src/pages/portal/PortalSavings.tsx`
-- `src/pages/portal/PortalRefer.tsx`
-- `src/pages/portal/PortalEv.tsx`
-- `src/lib/evOptimiser.ts` (greedy half-hour scheduler)
+## Phase 3 — Publish + custom domain
 
-Files modified:
-- `src/pages/portal/Overview.tsx` — balance tile, MTD card, current tariff strip, new quick links.
-- `src/components/portal/PortalLayout.tsx` — add nav items + icons.
-- `src/App.tsx` — register four new routes.
+1. Publish to the Lovable URL (slug of your choice).
+2. Connect the custom domain in Project Settings → Domains (auto-setup where possible; otherwise A `@` and `www` → `185.158.133.1` + TXT `_lovable` verification; enable proxy mode if Cloudflare).
+3. Wait for DNS propagation; Lovable auto-provisions SSL.
+4. Add the production domain to Google OAuth redirect URLs.
+5. Optional: hide the "Edit with Lovable" badge (Pro plan).
 
-Database migration (single migration call, with GRANTs + RLS, scoped to `current_portal_client_id()`):
-- `tariff_switch_requests`
-- `saving_sessions`, `saving_session_signups`
-- `referrals`, `rewards_ledger`
-- `ev_vehicles`, `ev_charge_plans`
+## Phase 4 — Post-go-live smoke test
 
-I'll ship the migration first (you'll approve it), then build the pages on top.
+Using the first real admin: create a client, invite a consumer, run a nomination, submit a schedule, run a billing cycle. Watch `supabase--cloud_status`, edge function logs, and Project monitoring.
+
+## Ongoing workflow
+
+Keep building on the dev/preview environment. Publish to Live only after review — publishing is the promotion step.
+
+## Inputs I need from you
+
+1. **Custom domain** (e.g. `app.volttrade.com`) and whether it sits behind Cloudflare.
+2. **Lovable URL slug** (default: `volttrade-erp`).
+3. **First production admin email**.
+4. Do you own the domain already, or should I point you at Lovable's "Buy new domain" flow?
+
+I'll start Phase 1 as soon as you approve this plan; Phases 3–4 wait on the answers above.
