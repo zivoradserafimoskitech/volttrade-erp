@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" id="html">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#17130E" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How Vatra works — from the sun to your bill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#17130E; --bg2:#110E09; --card:#231D16; --line:#3A3128;
+    --ember:#FF6B2C; --amber:#FFB454; --ash:#F7F1E7; --dim:#D9D1C4; --moss:#4CAF8B; --sky:#FFD9A8;
+    --head:'Space Grotesk',sans-serif; --body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;background:#17130E !important;color-scheme:dark}
+  body{background:#17130E !important;color:var(--ash);font-family:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--ember);outline-offset:3px;border-radius:8px}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--ember)}
+  h1{font-family:var(--head);font-weight:700;font-size:clamp(34px,6vw,62px);line-height:1.02;letter-spacing:-.03em}
+  h2{font-family:var(--head);font-weight:700;font-size:clamp(26px,4vw,40px);line-height:1.06;letter-spacing:-.02em}
+  .muted{color:var(--dim)}
+  .lead{font-size:clamp(16px,2vw,19px);color:var(--sky);max-width:52ch}
+  section{padding:84px 0}
+  .band{background:var(--bg2)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;font-weight:700;font-size:15px;padding:12px 28px;border-radius:99px;cursor:pointer;border:1px solid transparent;transition:transform .15s}
+  .btn-primary{background:var(--ember);color:#17130E;box-shadow:0 8px 30px rgba(255,107,44,.28)}
+  .btn-primary:hover{transform:translateY(-2px)}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--ash)}
+  .btn-ghost:hover{border-color:var(--ember);color:var(--ember)}
+
+  nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(12px);background:rgba(23,19,14,.72);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:1060px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .logo{font-family:var(--head);font-weight:700;font-size:22px}
+  .logo span{color:var(--ember)}
+  .lang-btn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:var(--head);font-weight:700;font-size:13px;min-width:48px;min-height:44px;padding:0 14px;border-radius:99px;cursor:pointer}
+  .lang-btn:hover{border-color:var(--ember);color:var(--ember)}
+
+  .diagram{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:26px;margin-top:40px;overflow:hidden}
+  .diagram svg{width:100%;height:auto;display:block}
+  .cap{display:flex;gap:18px;flex-wrap:wrap;margin-top:18px;font-size:13px;color:var(--dim)}
+  .cap i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+  .explain{margin-top:22px;font-size:16px;color:var(--dim);max-width:64ch}
+  .explain b{color:var(--ash)}
+
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .gcard{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px;text-align:center}
+  .gcard svg.gph{width:100%;height:120px;display:block;margin-bottom:16px}
+  .gcard h3{font-family:var(--head);font-size:18px;font-weight:700;margin-bottom:8px}
+  .gcard p{font-size:14px;color:var(--dim)}
+  @media(max-width:820px){.grid3{grid-template-columns:1fr}}
+
+  .final{text-align:center;position:relative;overflow:hidden}
+  .final .glow{position:absolute;left:50%;top:24%;transform:translateX(-50%);width:880px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(255,107,44,.2),transparent 62%);pointer-events:none}
+  .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px;position:relative}
+  footer{border-top:1px solid var(--line);padding:34px 0;font-size:12.5px;color:var(--dim)}
+
+  @media(prefers-reduced-motion:reduce){.motion{display:none}}
+</style>
+</head>
+<body>
+<div style="position:fixed;inset:0;background:#17130E;z-index:-1" aria-hidden="true"></div>
+
+<nav>
+  <div class="nav-in">
+    <a class="logo" href="vatra-site.html">vatra<span>.</span></a>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="lang-btn" onclick="setLang(LANG==='en'?'mk':'en')" aria-label="Switch language"><span class="lang-en">МК</span><span class="lang-mk" style="display:none">EN</span></button>
+      <a href="mailto:hello@vatra.mk" class="btn btn-primary" style="min-height:44px;padding:8px 20px;font-size:14px" data-en="Get my offer" data-mk="Побарај понуда">Get my offer</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════ HERO + MASTER FLOW ══════════ -->
+<header style="padding:140px 0 40px">
+  <div class="wrap">
+    <div class="eyebrow" data-en="How it works" data-mk="Како функционира">How it works</div>
+    <h1 style="margin-top:16px;max-width:16ch" data-en="From the sun to your bill" data-mk="Од сонцето до твојата сметка">From the sun to your bill</h1>
+    <p class="lead" style="margin-top:20px" data-en="One picture, the whole system: a solar plant, a battery, an algorithm — and a flat price at the end of the wire." data-mk="Една слика, целиот систем: соларна централа, батерија, алгоритам — и фиксна цена на крајот од жицата.">One picture, the whole system: a solar plant, a battery, an algorithm — and a flat price at the end of the wire.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 960 360" role="img" aria-label="Energy flow from solar plant through battery, AI trading and grid to your business">
+        <defs>
+          <linearGradient id="wire" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#FFB454"/><stop offset="1" stop-color="#FF6B2C"/>
+          </linearGradient>
+        </defs>
+        <!-- wire path -->
+        <path id="pipe" d="M120 200 C 220 200, 240 120, 330 120 C 420 120, 430 220, 520 220 C 610 220, 620 140, 710 140 C 790 140, 800 200, 860 200" fill="none" stroke="url(#wire)" stroke-width="3" stroke-linecap="round" opacity=".85"/>
+        <!-- energy dots -->
+        <g class="motion">
+          <circle r="6" fill="#FFB454"><animateMotion dur="6s" repeatCount="indefinite"><mpath href="#pipe"/></animateMotion></circle>
+          <circle r="6" fill="#FF6B2C"><animateMotion dur="6s" begin="2s" repeatCount="indefinite"><mpath href="#pipe"/></animateMotion></circle>
+          <circle r="6" fill="#FFD9A8"><animateMotion dur="6s" begin="4s" repeatCount="indefinite"><mpath href="#pipe"/></animateMotion></circle>
+        </g>
+        <!-- SUN + PLANT -->
+        <g transform="translate(60,150)">
+          <circle cx="60" cy="-60" r="26" fill="none" stroke="#FFB454" stroke-width="3"/>
+          <g stroke="#FFB454" stroke-width="3" stroke-linecap="round">
+            <line x1="60" y1="-102" x2="60" y2="-92"/><line x1="60" y1="-28" x2="60" y2="-18"/>
+            <line x1="18" y1="-60" x2="28" y2="-60"/><line x1="92" y1="-60" x2="102" y2="-60"/>
+            <line x1="30" y1="-90" x2="37" y2="-83"/><line x1="83" y1="-37" x2="90" y2="-30"/>
+            <line x1="90" y1="-90" x2="83" y2="-83"/><line x1="37" y1="-37" x2="30" y2="-30"/>
+          </g>
+          <!-- panel -->
+          <g transform="translate(10,20)">
+            <rect x="0" y="10" width="100" height="46" rx="6" fill="none" stroke="#F7F1E7" stroke-width="3" transform="skewX(-12)"/>
+            <line x1="28" y1="10" x2="20" y2="56" stroke="#F7F1E7" stroke-width="2" transform="skewX(-12)"/>
+            <line x1="61" y1="10" x2="53" y2="56" stroke="#F7F1E7" stroke-width="2" transform="skewX(-12)"/>
+            <line x1="-4" y1="33" x2="96" y2="33" stroke="#F7F1E7" stroke-width="2" transform="skewX(-12)"/>
+            <line x1="40" y1="56" x2="40" y2="76" stroke="#F7F1E7" stroke-width="3"/>
+            <line x1="20" y1="76" x2="60" y2="76" stroke="#F7F1E7" stroke-width="3"/>
+          </g>
+          <text x="55" y="120" text-anchor="middle" fill="#F7F1E7" font-family="Space Grotesk" font-weight="700" font-size="17" data-en="Solar plant" data-mk="Соларна централа">Solar plant</text>
+          <text x="55" y="140" text-anchor="middle" fill="#D9D1C4" font-size="12.5" data-en="cheap power at midday" data-mk="евтина струја напладне">cheap power at midday</text>
+        </g>
+        <!-- BATTERY -->
+        <g transform="translate(280,60)">
+          <rect x="10" y="10" width="86" height="44" rx="8" fill="none" stroke="#FF6B2C" stroke-width="3"/>
+          <rect x="96" y="24" width="8" height="16" rx="2" fill="#FF6B2C"/>
+          <rect x="18" y="18" width="22" height="28" rx="3" fill="#FF6B2C" opacity=".9">
+            <animate class="motion" attributeName="width" values="22;66;66;22" keyTimes="0;.45;.55;1" dur="6s" repeatCount="indefinite"/>
+          </rect>
+          <text x="53" y="84" text-anchor="middle" fill="#F7F1E7" font-family="Space Grotesk" font-weight="700" font-size="17" data-en="Battery" data-mk="Батерија">Battery</text>
+          <text x="53" y="104" text-anchor="middle" fill="#D9D1C4" font-size="12.5" data-en="stores the surplus" data-mk="го чува вишокот">stores the surplus</text>
+        </g>
+        <!-- AI -->
+        <g transform="translate(470,160)">
+          <rect x="6" y="6" width="92" height="60" rx="12" fill="none" stroke="#FFB454" stroke-width="3"/>
+          <polyline points="18,50 34,34 48,44 66,20 86,32" fill="none" stroke="#FFB454" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="66" cy="20" r="4" fill="#FFB454"/>
+          <text x="52" y="96" text-anchor="middle" fill="#F7F1E7" font-family="Space Grotesk" font-weight="700" font-size="17" data-en="AI trading" data-mk="АИ тргување">AI trading</text>
+          <text x="52" y="116" text-anchor="middle" fill="#D9D1C4" font-size="12.5" data-en="day-ahead + intraday" data-mk="ден-однапред + во денот">day-ahead + intraday</text>
+        </g>
+        <!-- GRID pylon -->
+        <g transform="translate(665,72)" stroke="#4CAF8B" stroke-width="3" stroke-linecap="round">
+          <line x1="30" y1="70" x2="45" y2="8"/><line x1="60" y1="70" x2="45" y2="8"/>
+          <line x1="24" y1="52" x2="66" y2="52"/><line x1="30" y1="30" x2="60" y2="30"/>
+          <line x1="16" y1="30" x2="30" y2="30"/><line x1="60" y1="30" x2="74" y2="30"/>
+          <line x1="16" y1="30" x2="12" y2="44"/><line x1="74" y1="30" x2="78" y2="44"/>
+          <text x="45" y="102" text-anchor="middle" fill="#F7F1E7" font-family="Space Grotesk" font-weight="700" font-size="17" stroke="none" data-en="Grid" data-mk="Мрежа">Grid</text>
+          <text x="45" y="122" text-anchor="middle" fill="#D9D1C4" font-size="12.5" stroke="none" data-en="regulated delivery" data-mk="регулирана достава">regulated delivery</text>
+        </g>
+        <!-- BUSINESS -->
+        <g transform="translate(820,120)">
+          <path d="M6 80 V38 l22 14 V38 l22 14 V22 h26 v58 Z" fill="none" stroke="#F7F1E7" stroke-width="3" stroke-linejoin="round"/>
+          <text x="40" y="112" text-anchor="middle" fill="#F7F1E7" font-family="Space Grotesk" font-weight="700" font-size="17" data-en="Your business" data-mk="Твој бизнис">Your business</text>
+          <text x="40" y="132" text-anchor="middle" fill="#D9D1C4" font-size="12.5" data-en="one flat price" data-mk="една фиксна цена">one flat price</text>
+        </g>
+      </svg>
+    </div>
+    <p class="explain" data-en="The moving dots are your kilowatt-hours. They're made cheaply at midday, parked in the battery, released when the algorithm says the moment is right — and arrive at your meter at a price that never surprises you." data-mk="Точките што се движат се твоите киловат-часови. Се произведуваат евтино напладне, се паркираат во батеријата, се пуштаат кога алгоритмот ќе каже дека е вистинскиот момент — и стигнуваат до твоето броило по цена што никогаш не те изненадува.">The moving dots are your kilowatt-hours. They're made cheaply at midday, parked in the battery, released when the algorithm says the moment is right — and arrive at your meter at a price that never surprises you.</p>
+  </div>
+</header>
+
+<!-- ══════════ THE PRICE DAY ══════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="eyebrow" data-en="The trick" data-mk="Трикот">The trick</div>
+    <h2 style="margin-top:14px;max-width:22ch" data-en="Power has a cheap hour and an expensive hour. We arbitrage the gap." data-mk="Струјата има евтин час и скап час. Ние ја користиме разликата.">Power has a cheap hour and an expensive hour. We arbitrage the gap.</h2>
+
+    <div class="diagram">
+      <svg viewBox="0 0 960 340" role="img" aria-label="Electricity price over a day: cheap at midday when the battery charges, expensive in the evening when it discharges">
+        <!-- axes -->
+        <line x1="60" y1="270" x2="920" y2="270" stroke="#3A3128" stroke-width="2"/>
+        <line x1="60" y1="40" x2="60" y2="270" stroke="#3A3128" stroke-width="2"/>
+        <text x="30" y="60" fill="#D9D1C4" font-size="12" transform="rotate(-90 30 60)" data-en="price €/MWh" data-mk="цена €/MWh">price €/MWh</text>
+        <!-- hour labels -->
+        <text x="60" y="295" fill="#D9D1C4" font-size="12" text-anchor="middle">00</text>
+        <text x="275" y="295" fill="#D9D1C4" font-size="12" text-anchor="middle">06</text>
+        <text x="490" y="295" fill="#D9D1C4" font-size="12" text-anchor="middle">12</text>
+        <text x="705" y="295" fill="#D9D1C4" font-size="12" text-anchor="middle">18</text>
+        <text x="920" y="295" fill="#D9D1C4" font-size="12" text-anchor="middle">24</text>
+        <!-- charge window shading (10-16h) -->
+        <rect x="418" y="40" width="216" height="230" fill="#4CAF8B" opacity=".10"/>
+        <!-- discharge window (18-22h) -->
+        <rect x="705" y="40" width="143" height="230" fill="#FF6B2C" opacity=".12"/>
+        <!-- price curve: high morning, deep midday valley (solar), steep evening peak -->
+        <path id="price" d="M60 150 C 130 140, 180 120, 240 110 C 300 100, 360 150, 430 205 C 480 235, 560 235, 620 195 C 680 155, 720 80, 770 62 C 810 50, 850 90, 920 120"
+              fill="none" stroke="#FFB454" stroke-width="4" stroke-linecap="round"/>
+        <g class="motion">
+          <circle r="7" fill="#F7F1E7"><animateMotion dur="10s" repeatCount="indefinite"><mpath href="#price"/></animateMotion></circle>
+        </g>
+        <!-- battery charge arrow -->
+        <g transform="translate(500,120)">
+          <text x="26" y="-4" fill="#4CAF8B" font-family="Space Grotesk" font-weight="700" font-size="15" text-anchor="middle" data-en="CHARGE" data-mk="ПОЛНИ">CHARGE</text>
+          <path d="M26 4 v46 m-12 -14 l12 14 12 -14" fill="none" stroke="#4CAF8B" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="26" y="82" fill="#4CAF8B" font-size="12" text-anchor="middle" data-en="solar floods the grid" data-mk="сонцето ја преплавува мрежата">solar floods the grid</text>
+        </g>
+        <!-- discharge arrow -->
+        <g transform="translate(745,96)">
+          <text x="26" y="-8" fill="#FF6B2C" font-family="Space Grotesk" font-weight="700" font-size="15" text-anchor="middle" data-en="DISCHARGE" data-mk="ПРАЗНИ">DISCHARGE</text>
+          <path d="M26 46 v-46 m-12 14 l12 -14 12 14" fill="none" stroke="#FF6B2C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="26" y="70" fill="#FF6B2C" font-size="12" text-anchor="middle" data-en="evening peak" data-mk="вечерен шпиц">evening peak</text>
+        </g>
+      </svg>
+      <div class="cap">
+        <span><i style="background:#FFB454"></i><span data-en="market price through the day" data-mk="пазарна цена низ денот">market price through the day</span></span>
+        <span><i style="background:#4CAF8B;opacity:.5"></i><span data-en="battery charges (cheap)" data-mk="батеријата полни (евтино)">battery charges (cheap)</span></span>
+        <span><i style="background:#FF6B2C;opacity:.5"></i><span data-en="battery sells (expensive)" data-mk="батеријата продава (скапо)">battery sells (expensive)</span></span>
+      </div>
+    </div>
+    <p class="explain" data-en="<b>Why prices dip at noon:</b> thousands of solar panels produce at once and the market drowns in cheap power. <b>Why they spike at dusk:</b> the sun clocks off exactly when everyone comes home. Our battery buys the noon and sells the dusk — the AI decides the exact minutes, every day, on the day-ahead and intraday markets. That spread pays for your flat price." data-mk="<b>Зошто цената паѓа напладне:</b> илјадници панели произведуваат истовремено и пазарот се дави во евтина струја. <b>Зошто скока на квечерина:</b> сонцето заминува точно кога сите се враќаат дома. Нашата батерија го купува пладнето и ја продава квечерината — АИ ги одредува точните минути, секој ден, на пазарот ден-однапред и во текот на денот. Таа разлика ја плаќа твојата фиксна цена.">...</p>
+  </div>
+</section>
+
+<!-- ══════════ YOUR THREE STEPS ══════════ -->
+<section>
+  <div class="wrap">
+    <div class="eyebrow" data-en="Your part is easy" data-mk="Твојот дел е лесен">Your part is easy</div>
+    <h2 style="margin-top:14px" data-en="Three steps, one photo" data-mk="Три чекори, една слика">Three steps, one photo</h2>
+    <div class="grid3">
+      <div class="gcard">
+        <svg class="gph" viewBox="0 0 200 120" aria-hidden="true">
+          <rect x="60" y="14" width="80" height="96" rx="8" fill="none" stroke="#F7F1E7" stroke-width="3"/>
+          <line x1="74" y1="36" x2="126" y2="36" stroke="#D9D1C4" stroke-width="3" stroke-linecap="round"/>
+          <line x1="74" y1="52" x2="112" y2="52" stroke="#D9D1C4" stroke-width="3" stroke-linecap="round"/>
+          <line x1="74" y1="68" x2="120" y2="68" stroke="#D9D1C4" stroke-width="3" stroke-linecap="round"/>
+          <rect x="74" y="82" width="52" height="14" rx="4" fill="#FF6B2C"/>
+          <circle cx="150" cy="92" r="20" fill="none" stroke="#FFB454" stroke-width="3"/>
+          <circle cx="150" cy="92" r="8" fill="none" stroke="#FFB454" stroke-width="3"/>
+        </svg>
+        <h3 data-en="1 · Send one bill" data-mk="1 · Прати една сметка">1 · Send one bill</h3>
+        <p data-en="A photo of last month's electricity bill tells us everything: usage, profile, and where you're overpaying." data-mk="Слика од минатомесечната сметка ни кажува сè: потрошувачка, профил и каде преплаќаш.">A photo of last month's electricity bill tells us everything: usage, profile, and where you're overpaying.</p>
+      </div>
+      <div class="gcard">
+        <svg class="gph" viewBox="0 0 200 120" aria-hidden="true">
+          <rect x="40" y="26" width="120" height="70" rx="10" fill="none" stroke="#F7F1E7" stroke-width="3"/>
+          <text x="100" y="72" text-anchor="middle" fill="#FF6B2C" font-family="Space Grotesk" font-weight="700" font-size="28">ФИКС</text>
+          <path d="M160 40 l14 -14 M160 82 l14 14" stroke="#4CAF8B" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="30" cy="60" r="4" fill="#FFB454"/><circle cx="18" cy="60" r="3" fill="#FFB454" opacity=".6"/>
+        </svg>
+        <h3 data-en="2 · Get a flat price in 48h" data-mk="2 · Фиксна цена за 48 часа">2 · Get a flat price in 48h</h3>
+        <p data-en="One clear monthly number for your energy, matched to clean local generation. No obligation." data-mk="Еден јасен месечен износ за енергијата, поврзан со чисто локално производство. Без обврска.">One clear monthly number for your energy, matched to clean local generation. No obligation.</p>
+      </div>
+      <div class="gcard">
+        <svg class="gph" viewBox="0 0 200 120" aria-hidden="true">
+          <rect x="72" y="10" width="56" height="100" rx="12" fill="none" stroke="#F7F1E7" stroke-width="3"/>
+          <rect x="82" y="26" width="36" height="10" rx="3" fill="#FF6B2C"/>
+          <rect x="82" y="44" width="36" height="6" rx="3" fill="#3A3128"/>
+          <rect x="82" y="44" width="22" height="6" rx="3" fill="#FFB454"/>
+          <path d="M84 76 l8 -10 6 6 10 -14 8 8" fill="none" stroke="#4CAF8B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h3 data-en="3 · Watch it work" data-mk="3 · Гледај како работи">3 · Watch it work</h3>
+        <p data-en="Live usage, your plant generating, your flat bill — all in the app, updated as you go." data-mk="Потрошувачка во живо, твојата централа како произведува, фиксната сметка — сè во апликацијата.">Live usage, your plant generating, your flat bill — all in the app, updated as you go.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CTA ══════════ -->
+<section class="final band">
+  <div class="glow"></div>
+  <div class="wrap" style="position:relative">
+    <h2 data-en="Seen enough?" data-mk="Доволно виде?">Seen enough?</h2>
+    <p class="muted" style="max-width:44ch;margin:14px auto 0" data-en="Send one bill, get one number, compare it to what you pay now. If we don't clearly win — don't switch." data-mk="Прати една сметка, добиј еден износ, спореди го со тоа што плаќаш сега. Ако не победуваме очигледно — не менувај.">Send one bill, get one number, compare it to what you pay now. If we don't clearly win — don't switch.</p>
+    <div class="cta-row">
+      <a href="mailto:hello@vatra.mk" class="btn btn-primary" data-en="Get my offer" data-mk="Побарај понуда">Get my offer</a>
+      <a href="vatra-site.html" class="btn btn-ghost" data-en="Back to main site" data-mk="Назад на главната страница">Back to main site</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" data-en="Vatra is a brand of Serafimoski Tech DOOEL · Pilot stage — illustrative, not an offer of supply or investment. © 2026" data-mk="Vatra е бренд на Серафимоски Тех ДООЕЛ · Пилот фаза — илустративно, не е понуда за снабдување или инвестиција. © 2026">Vatra is a brand of Serafimoski Tech DOOEL · Pilot stage — illustrative, not an offer of supply or investment. © 2026</footer>
+
+<script>
+  var LANG='en';
+  var TITLES={en:'How Vatra works — from the sun to your bill',mk:'Како функционира Vatra — од сонцето до твојата сметка'};
+  function setLang(l){
+    LANG=l;
+    document.querySelectorAll('[data-'+l+']').forEach(function(e){
+      var t=e.getAttribute('data-'+l); if(t==null) return;
+      if(t.indexOf('<b>')>-1){ e.innerHTML=t; } else { e.textContent=t; }
+    });
+    document.title=TITLES[l];
+    document.getElementById('html').setAttribute('lang',l);
+    document.querySelector('.lang-en').style.display=l==='en'?'inline':'none';
+    document.querySelector('.lang-mk').style.display=l==='mk'?'inline':'none';
+    try{localStorage.setItem('vatra_lang',l);}catch(e){}
+  }
+  (function(){
+    var saved;try{saved=localStorage.getItem('vatra_lang');}catch(e){}
+    var nv=(navigator.language||'').toLowerCase();
+    setLang(saved||(nv.indexOf('mk')===0?'mk':'en'));
+  })();
+</script>
+</body>
+</html>
