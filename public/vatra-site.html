@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en" id="html">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#17130E" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vatra — the electricity supplier that pays you back</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#17130E; --bg2:#110E09; --card:#231D16; --card2:#2B241B; --line:#3A3128;
+    --ember:#FF6B2C; --amber:#FFB454; --ash:#F7F1E7; --dim:#D9D1C4; --moss:#4CAF8B; --sky:#FFD9A8;
+    --head:'Space Grotesk',sans-serif; --body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;background:#17130E !important;color-scheme:dark}
+  body{background:#17130E !important;color:var(--ash);font-family:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  /* a11y: visible keyboard focus everywhere (skill: focus-states, HIGH) */
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--ember);outline-offset:3px;border-radius:8px}
+  .skip{position:absolute;left:-9999px;top:0;background:var(--ember);color:#17130E;padding:10px 18px;border-radius:0 0 10px 0;font-weight:700;z-index:100}
+  .skip:focus{left:0}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--ember)}
+  h2{font-family:var(--head);font-weight:700;font-size:clamp(30px,4.6vw,50px);line-height:1.04;letter-spacing:-.025em}
+  .muted{color:var(--dim)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;font-weight:700;font-size:15px;padding:12px 28px;border-radius:99px;cursor:pointer;border:1px solid transparent;transition:transform .15s,background .2s,box-shadow .2s}
+  .btn-primary{background:var(--ember);color:#17130E;box-shadow:0 8px 30px rgba(255,107,44,.28)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(255,107,44,.4)}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--ash)}
+  .btn-ghost:hover{border-color:var(--ember);color:var(--ember);transform:translateY(-2px)}
+
+  /* icons (SVG, stroke style — skill anti-pattern: no emoji as icons) */
+  .ic-wrap{width:52px;height:52px;border-radius:14px;background:rgba(255,107,44,.13);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+  .ic-wrap svg{width:26px;height:26px}
+  .ic-round{width:64px;height:64px;border-radius:50%;background:rgba(76,175,139,.15);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+  .ic-round svg{width:30px;height:30px}
+  .ic-sm{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;background:rgba(255,180,84,.12)}
+  .ic-sm svg{width:22px;height:22px}
+
+  /* nav */
+  nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(12px);background:rgba(23,19,14,.7);border-bottom:1px solid transparent;transition:border-color .3s}
+  nav.scrolled{border-bottom-color:var(--line)}
+  .nav-in{max-width:1160px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .logo{font-family:var(--head);font-weight:700;font-size:23px}
+  .logo span{color:var(--ember)}
+  .nav-links{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:500}
+  .nav-links a{color:var(--dim);transition:color .2s;padding:12px 12px;border-radius:10px;min-height:44px;display:inline-flex;align-items:center}
+  .nav-links a:hover{color:var(--ash)}
+  .nav-right{display:flex;align-items:center;gap:10px}
+  .nav-cta{background:var(--ember);color:#17130E;padding:0 20px;border-radius:99px;font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center}
+  .lang-btn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:var(--head);font-weight:700;font-size:13px;min-width:48px;min-height:44px;padding:0 14px;border-radius:99px;cursor:pointer;transition:border-color .2s,color .2s}
+  .lang-btn:hover{border-color:var(--ember);color:var(--ember)}
+  .menu-btn{display:none;background:none;border:1px solid var(--line);border-radius:10px;color:var(--ash);font-size:20px;cursor:pointer;min-width:44px;min-height:44px}
+  @media(max-width:860px){.nav-links{display:none}.menu-btn{display:block}}
+
+  /* hero */
+  .hero{position:relative;padding:150px 0 90px;overflow:hidden}
+  .hearth{position:absolute;right:-10%;top:-20%;width:900px;height:900px;border-radius:50%;
+    background:radial-gradient(circle at 50% 50%,rgba(255,107,44,.34),rgba(255,180,84,.10) 34%,transparent 62%);
+    filter:blur(6px);animation:breathe 8s ease-in-out infinite;pointer-events:none}
+  @keyframes breathe{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.07)}}
+  .hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center}
+  .hero h1{font-family:var(--head);font-weight:700;font-size:clamp(38px,6.4vw,72px);line-height:1.0;letter-spacing:-.03em}
+  .hero h1 .dot{color:var(--ember)}
+  .hero .lead{font-size:clamp(17px,2vw,20px);color:var(--sky);margin-top:22px;max-width:40ch}
+  .hero .sub{font-size:16px;color:#EAE3D7;margin-top:14px;max-width:46ch}
+  .hero .cta-row{margin-top:32px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .trust{margin-top:22px;font-size:13px;color:var(--dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .trust b{color:var(--amber)}
+  @media(max-width:860px){.hero-grid{grid-template-columns:1fr;gap:44px}.hero{padding:120px 0 60px}}
+
+  /* phone */
+  .phone{justify-self:center;width:290px;height:590px;background:var(--bg);border-radius:40px;border:1px solid var(--line);
+    box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 0 9px #1E1810, 0 0 60px rgba(255,107,44,.14);padding:16px 14px;position:relative}
+  .phone .notch{width:110px;height:22px;background:#1E1810;border-radius:0 0 14px 14px;position:absolute;top:0;left:50%;transform:translateX(-50%)}
+  .ph-logo{font-family:var(--head);font-weight:700;font-size:17px;text-align:center;margin:14px 0 12px}
+  .ph-logo span{color:var(--ember)}
+  .ph-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}
+  .ph-lbl{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:700}
+  .ph-big{font-family:var(--head);font-weight:700;font-size:34px;line-height:1;margin-top:6px}
+  .ph-sub{font-size:11px;color:var(--dim);margin-top:5px}
+  .ph-bar{height:7px;border-radius:4px;background:var(--line);margin-top:10px;overflow:hidden}
+  .ph-bar>i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--amber),var(--ember))}
+  .ph-glow{background:linear-gradient(150deg,rgba(76,175,139,.16),var(--card));border-color:rgba(76,175,139,.3)}
+  .ph-tabs{position:absolute;bottom:12px;left:14px;right:14px;display:flex;justify-content:space-around;border-top:1px solid var(--line);padding-top:8px}
+  .ph-tabs svg{width:20px;height:20px;padding:8px;box-sizing:content-box}
+
+  section{position:relative;padding:92px 0}
+  .band{background:var(--bg2)}
+  .reveal{opacity:1}
+  .reveal.pre{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none}.hearth{animation:none}}
+  .sec-head{max-width:22ch}
+  .sec-intro{color:#E6DFD3;font-size:17px;max-width:56ch;margin-top:16px}
+
+  .vp{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+  .vp-card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px;transition:transform .2s,border-color .2s}
+  .vp-card:hover{transform:translateY(-4px);border-color:var(--ember)}
+  .vp-card h3{font-family:var(--head);font-size:20px;font-weight:700;margin-bottom:10px}
+  .vp-card p{font-size:14.5px;color:#E6DFD3}
+  @media(max-width:860px){.vp{grid-template-columns:1fr}}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px}
+  /* engine flow diagram */
+  .flow{display:flex;align-items:stretch;gap:10px;margin-top:36px;flex-wrap:wrap}
+  .flow-node{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 16px;text-align:center}
+  .flow-node b{display:block;font-family:var(--head);font-size:15.5px;font-weight:700;margin-bottom:6px;color:var(--ash)}
+  .flow-node small{display:block;font-size:12.5px;color:#D9D1C4;line-height:1.45}
+  .flow-ic{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+  .flow-ic svg{width:22px;height:22px}
+  .flow-arr{align-self:center;color:var(--ember);font-size:22px;font-weight:700;flex:0 0 auto}
+  @media(max-width:860px){.flow{flex-direction:column}.flow-arr{transform:rotate(90deg);margin:-2px auto}}
+  .step .n{font-family:var(--head);font-size:15px;font-weight:700;color:#17130E;background:var(--ember);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .step h3{font-family:var(--head);font-size:19px;font-weight:600;margin-bottom:8px}
+  .step p{font-size:14.5px;color:#E6DFD3}
+  @media(max-width:860px){.steps{grid-template-columns:1fr}}
+
+  .packs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
+  .pack{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px;position:relative;transition:transform .2s,border-color .2s}
+  .pack:hover{transform:translateY(-4px)}
+  .pack.best{border-color:var(--ember);background:linear-gradient(160deg,rgba(255,107,44,.09),var(--card))}
+  .pack .tag{position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#17130E;background:var(--amber);padding:4px 12px;border-radius:99px}
+  .pack .pname{font-family:var(--head);font-size:18px;font-weight:600}
+  .pack .pfit{font-size:12px;color:var(--dim);margin-top:2px}
+  .pack .price{font-family:var(--head);font-size:34px;font-weight:700;margin-top:16px}
+  .pack .price small{font-size:14px;color:var(--dim);font-weight:500}
+  .pack .nethint{font-size:11px;color:var(--dim);margin-top:4px}
+  .pack .kwh{font-size:14px;color:var(--ash);font-weight:600;margin-top:8px}
+  .pack ul{list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:8px}
+  .pack li{font-size:13px;color:var(--dim);display:flex;gap:8px;align-items:flex-start}
+  .pack li svg{width:14px;height:14px;flex-shrink:0;margin-top:3px}
+  .seg-toggle{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:4px;margin-top:24px}
+  .seg-toggle button{border:none;background:transparent;color:var(--dim);font-weight:700;font-size:13px;min-height:44px;padding:0 20px;border-radius:99px;cursor:pointer;font-family:var(--body)}
+  .seg-toggle button.on{background:var(--ember);color:#17130E}
+  @media(max-width:860px){.packs{grid-template-columns:1fr}}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;margin-top:20px}
+  .split.flip .s-text{order:2}
+  .s-text h3{font-family:var(--head);font-size:clamp(24px,3.2vw,34px);font-weight:700;line-height:1.1;margin:12px 0 14px}
+  .s-text p{color:#E6DFD3;font-size:16px;max-width:46ch}
+  .s-visual{border-radius:24px;border:1px solid var(--line);background:linear-gradient(155deg,var(--card2),var(--card));min-height:300px;display:flex;align-items:center;justify-content:center;padding:30px;overflow:hidden;position:relative}
+  @media(max-width:860px){.split{grid-template-columns:1fr;gap:24px}.split.flip .s-text{order:0}}
+  .plantcard{text-align:center}
+  .plantcard .big{font-family:var(--head);font-size:34px;font-weight:700}
+  .barsviz{display:flex;align-items:flex-end;gap:8px;height:170px;width:100%;max-width:300px}
+  .barsviz>i{flex:1;border-radius:5px 5px 0 0}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
+  .stat{padding:22px 20px;border-left:2px solid var(--ember)}
+  .stat b{display:block;font-family:var(--head);font-size:clamp(28px,3.4vw,40px);font-weight:700}
+  .stat span{font-size:13px;color:#CDC4B6}
+  @media(max-width:860px){.stats{grid-template-columns:1fr 1fr}}
+
+  .inv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .inv-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px}
+  .inv-card h4{font-family:var(--head);font-size:17px;font-weight:600;margin-bottom:8px}
+  .inv-card p{font-size:14px;color:#E6DFD3}
+  .edge{margin-top:26px;background:rgba(76,175,139,.08);border:1px solid rgba(76,175,139,.28);border-radius:18px;padding:24px;font-size:15.5px}
+  .edge b{color:var(--moss)}
+  @media(max-width:860px){.inv-grid{grid-template-columns:1fr}}
+
+  .faq{margin-top:40px;border-top:1px solid var(--line)}
+  .faq details{border-bottom:1px solid var(--line);padding:6px 0}
+  .faq summary{cursor:pointer;list-style:none;padding:20px 8px;font-family:var(--head);font-size:17px;font-weight:600;display:flex;justify-content:space-between;align-items:center;min-height:44px;border-radius:10px}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+";color:var(--ember);font-size:22px;font-weight:400;transition:transform .2s}
+  .faq details[open] summary::after{transform:rotate(45deg)}
+  .faq p{padding:0 8px 20px;color:#E6DFD3;font-size:15px;max-width:70ch}
+
+  .final{text-align:center;position:relative;overflow:hidden}
+  .final .glow{position:absolute;left:50%;top:30%;transform:translateX(-50%);width:920px;height:640px;border-radius:50%;background:radial-gradient(circle,rgba(255,107,44,.2),transparent 62%);pointer-events:none}
+  .final h2{position:relative;max-width:20ch;margin:0 auto}
+  .final .quote{position:relative;color:var(--amber);font-size:clamp(18px,2.4vw,22px);margin-top:16px;font-style:italic}
+  .final .cta-row{position:relative;margin-top:32px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .disc{font-size:12px;color:#CFC6B8;margin-top:20px}
+
+  footer{border-top:1px solid var(--line);padding:46px 0 40px}
+  .foot-in{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .foot-links{display:flex;gap:44px;flex-wrap:wrap}
+  .foot-col b{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:12px}
+  .foot-col a{display:inline-flex;align-items:center;min-height:38px;font-size:14px;opacity:.85;padding:2px 4px;border-radius:8px}
+  .foot-col a:hover{color:var(--ember)}
+  .foot-note{margin-top:32px;font-size:12.5px;color:#CFC6B8;max-width:74ch;line-height:1.6}
+</style>
+</head>
+<body>
+<div style="position:fixed;inset:0;background:#17130E;z-index:-1" aria-hidden="true"></div>
+<a class="skip" href="#main" data-en="Skip to content" data-mk="Прескокни до содржината">Skip to content</a>
+
+<!-- SVG icon sprite (skill: SVG icons, never emoji) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2c1 4-4 5.5-4 10a6 6 0 0 0 12 0c0-2.5-1.5-4-2.5-5.5-.5 1.5-1.5 2-2.5 2 .8-2.5-.5-5-3-6.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M6 18C6 10 12 5 20 4c1 8-3 15-11 15-1.2 0-2.2-.3-3-.8M6 18c0 0-1 1.5-1.5 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.2-3.2 4-5 7.5-5s6.3 1.8 7.5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-factory" viewBox="0 0 24 24"><path d="M3 21V9l6 4V9l6 4V4h6v17H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 17h2m4 0h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-batt" viewBox="0 0 24 24"><rect x="2" y="8" width="17" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M22 11v3" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M11.5 9.5 8.5 13h3l-2.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<nav id="nav">
+  <div class="nav-in">
+    <div class="logo">vatra<span>.</span></div>
+    <div class="nav-links" id="navLinks">
+      <a href="#how" data-en="How it works" data-mk="Како функционира">How it works</a>
+      <a href="#offer" data-en="Your offer" data-mk="Понуда">Your offer</a>
+      <a href="#business" data-en="Business" data-mk="Бизнис">Business</a>
+      <a href="#investors" data-en="Investors" data-mk="Инвеститори">Investors</a>
+    </div>
+    <div class="nav-right">
+      <button class="lang-btn" onclick="setLang(LANG==='en'?'mk':'en')" aria-label="Switch language"><span class="lang-en">МК</span><span class="lang-mk" style="display:none">EN</span></button>
+      <a href="#join" class="nav-cta" data-en="Join the pilot" data-mk="Приклучи се">Join the pilot</a>
+      <button class="menu-btn" aria-label="Menu" onclick="var n=document.getElementById('navLinks');n.style.display=(getComputedStyle(n).display==='none'?'flex':'none')">☰</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="main">
+  <div class="hearth"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow" data-en="Electricity, reimagined" data-mk="Струја, одново замислена">Electricity, reimagined</div>
+      <h1 style="margin-top:16px"><span data-en="Power you can actually understand" data-mk="Струја што навистина ја разбираш">Power you can actually understand</span><span class="dot">.</span></h1>
+      <p class="lead" data-en="A flat monthly price. Real usage in your pocket. Clean energy from a solar farm you can name." data-mk="Фиксна месечна цена. Реална потрошувачка во џебот. Чиста енергија од соларна централа што можеш да ја именуваш.">A flat monthly price. Real usage in your pocket. Clean energy from a solar farm you can name.</p>
+      <p class="sub" data-en="No mystery bills, no jargon, no games — electricity that finally makes sense for shops, restaurants and factories. Coming first to North Macedonia." data-mk="Без мистериозни сметки, без жаргон, без игри — струја што конечно има смисла за продавници, ресторани и фабрики. Прво во Северна Македонија.">No mystery bills, no jargon, no games — electricity that finally makes sense for shops, restaurants and factories. Coming first to North Macedonia.</p>
+      <div class="cta-row">
+        <a href="#join" class="btn btn-primary" data-en="Join the pilot" data-mk="Приклучи се на пилотот">Join the pilot</a>
+        <a href="vatra-how.html" class="btn btn-ghost" data-en="See how it works" data-mk="Види како функционира">See how it works</a>
+      </div>
+      <div class="trust">
+        <span data-en="Backed by real solar &amp; storage." data-mk="Поддржано со реална соларна енергија и батерии.">Backed by real solar &amp; storage.</span>
+        <b data-en="Built by energy people, not just coders." data-mk="Направено од луѓе од енергетиката, не само програмери.">Built by energy people, not just coders.</b>
+      </div>
+    </div>
+
+    <div class="phone" aria-hidden="true">
+      <div class="notch"></div>
+      <div class="ph-logo">vatra<span>.</span></div>
+      <div class="ph-card">
+        <div class="ph-lbl" data-en="Right now" data-mk="Во моментов">Right now</div>
+        <div class="ph-big">3.4<small style="font-size:15px;color:var(--dim)"> kW</small></div>
+        <div class="ph-sub" data-en="Today: 48 kWh · 346 ден" data-mk="Денес: 48 kWh · 346 ден">Today: 48 kWh · 346 ден</div>
+      </div>
+      <div class="ph-card">
+        <div class="ph-lbl" style="color:var(--amber)" data-en="Your monthly plan" data-mk="Твој месечен план">Your monthly plan</div>
+        <div class="ph-sub" style="margin-top:6px">640 / 1.500 kWh</div>
+        <div class="ph-bar"><i style="width:43%"></i></div>
+        <div class="ph-sub" style="color:var(--moss);margin-top:6px" data-en="On track ✓" data-mk="На добар пат ✓">On track ✓</div>
+      </div>
+      <div class="ph-card ph-glow">
+        <div class="ph-lbl" style="color:var(--moss)" data-en="Your plant" data-mk="Твоја централа">Your plant</div>
+        <div class="ph-sub" style="margin-top:5px;color:var(--ash);font-weight:600">Ovche Pole Solar · 8.4 MW</div>
+      </div>
+      <div class="ph-tabs">
+        <svg style="color:var(--ember)"><use href="#i-flame"/></svg>
+        <svg style="color:var(--dim)"><use href="#i-chart"/></svg>
+        <svg style="color:var(--dim)"><use href="#i-leaf"/></svg>
+        <svg style="color:var(--dim)"><use href="#i-user"/></svg>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="why">
+  <div class="wrap reveal">
+    <div class="eyebrow" data-en="Why Vatra" data-mk="Зошто Vatra">Why Vatra</div>
+    <h2 class="sec-head" style="margin-top:14px" data-en="Electricity should feel this simple" data-mk="Струјата треба да е вака едноставна">Electricity should feel this simple</h2>
+    <div class="vp">
+      <div class="vp-card">
+        <div class="ic-wrap" style="color:var(--ember)"><svg><use href="#i-flame"/></svg></div>
+        <h3 data-en="One price, every month" data-mk="Една цена, секој месец">One price, every month</h3>
+        <p data-en="Pick a pack, pay the same amount, done. Leftover kilowatt-hours roll into next month and the cheap midday hours are on us." data-mk="Избери пакет, плаќај ист износ, готово. Неискористените киловат-часови се пренесуваат, а евтините попладневни часови се на наша сметка.">Pick a pack, pay the same amount, done. Leftover kilowatt-hours roll into next month and the cheap midday hours are on us.</p>
+      </div>
+      <div class="vp-card">
+        <div class="ic-wrap" style="color:var(--amber)"><svg><use href="#i-chart"/></svg></div>
+        <h3 data-en="See every watt" data-mk="Види го секој ват">See every watt</h3>
+        <p data-en="Live usage in the app, hour by hour, with simple nudges on when power is cheapest and greenest. No more guessing at the bill." data-mk="Потрошувачка во живо во апликацијата, час по час, со едноставни совети кога струјата е најевтина и најчиста. Крај на погодувањето на сметката.">Live usage in the app, hour by hour, with simple nudges on when power is cheapest and greenest. No more guessing at the bill.</p>
+      </div>
+      <div class="vp-card">
+        <div class="ic-wrap" style="color:var(--moss)"><svg><use href="#i-leaf"/></svg></div>
+        <h3 data-en="A plant you can name" data-mk="Централа што можеш да ја именуваш">A plant you can name</h3>
+        <p data-en="Your power is matched to a real, local solar farm. Watch it generate live and download a clean-energy certificate. Not a vague promise — a name." data-mk="Твојата струја е поврзана со реална, локална соларна централа. Гледај ја како произведува во живо и преземи сертификат за чиста енергија. Не нејасно ветување — име.">Your power is matched to a real, local solar farm. Watch it generate live and download a clean-energy certificate. Not a vague promise — a name.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="how">
+  <div class="wrap reveal">
+    <div class="eyebrow" data-en="How it works" data-mk="Како функционира">How it works</div>
+    <h2 class="sec-head" style="margin-top:14px" data-en="Up and running in three steps" data-mk="Подготвено за три чекори">Up and running in three steps</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <h3 data-en="Get your offer" data-mk="Добиј понуда">Get your offer</h3>
+        <p data-en="Send us a recent bill and we shape one flat monthly price to your business — shop, restaurant, or factory." data-mk="Прати ни скорешна сметка и ти кроиме една фиксна месечна цена за твојот бизнис — продавница, ресторан или фабрика.">Send us a recent bill and we shape one flat monthly price to your business — shop, restaurant, or factory.</p>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <h3 data-en="We switch you over" data-mk="Ние те префрламе">We switch you over</h3>
+        <p data-en="We handle the paperwork and connect to your meter. Your supply comes from clean local generation." data-mk="Ние ја средуваме документацијата и се поврзуваме со твоето броило. Твојата струја доаѓа од чисто локално производство.">We handle the paperwork and connect to your meter. Your supply comes from clean local generation.</p>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <h3 data-en="Live in the app" data-mk="Живеј во апликацијата">Live in the app</h3>
+        <p data-en="Watch your usage, your plant, and your flat bill — all in one place, updated as you go." data-mk="Следи ја потрошувачката, твојата централа и фиксната сметка — сè на едно место, ажурирано во од.">Watch your usage, your plant, and your flat bill — all in one place, updated as you go.</p>
+      </div>
+    </div>
+
+    <!-- behind the socket: full engine flow -->
+    <div style="margin-top:72px">
+      <div class="eyebrow" style="color:var(--moss)" data-en="Behind the socket" data-mk="Зад приклучокот">Behind the socket</div>
+      <h3 style="font-family:var(--head);font-size:clamp(22px,3vw,30px);font-weight:700;margin-top:12px;max-width:26ch" data-en="What happens between the sun and your bill" data-mk="Што се случува меѓу сонцето и твојата сметка">What happens between the sun and your bill</h3>
+      <div class="flow">
+        <div class="flow-node">
+          <div class="flow-ic" style="color:var(--amber)"><svg><use href="#i-sun"/></svg></div>
+          <b data-en="Solar plant" data-mk="Соларна централа">Solar plant</b>
+          <small data-en="generates cheap, clean power at midday" data-mk="произведува евтина, чиста струја напладне">generates cheap, clean power at midday</small>
+        </div>
+        <div class="flow-arr" aria-hidden="true">→</div>
+        <div class="flow-node">
+          <div class="flow-ic" style="color:var(--ember)"><svg><use href="#i-batt"/></svg></div>
+          <b data-en="Battery" data-mk="Батерија">Battery</b>
+          <small data-en="stores the midday surplus instead of wasting it" data-mk="го чува пладневниот вишок наместо да пропадне">stores the midday surplus instead of wasting it</small>
+        </div>
+        <div class="flow-arr" aria-hidden="true">→</div>
+        <div class="flow-node">
+          <div class="flow-ic" style="color:var(--amber)"><svg><use href="#i-chart"/></svg></div>
+          <b data-en="AI trading" data-mk="АИ тргување">AI trading</b>
+          <small data-en="buys and sells on day-ahead &amp; intraday markets" data-mk="купува и продава на пазарот ден-однапред и во текот на денот">buys and sells on day-ahead &amp; intraday markets</small>
+        </div>
+        <div class="flow-arr" aria-hidden="true">→</div>
+        <div class="flow-node">
+          <div class="flow-ic" style="color:var(--moss)"><svg><use href="#i-bolt"/></svg></div>
+          <b data-en="Grid" data-mk="Мрежа">Grid</b>
+          <small data-en="delivers the power through the regulated network" data-mk="ја носи струјата преку регулираната мрежа">delivers the power through the regulated network</small>
+        </div>
+        <div class="flow-arr" aria-hidden="true">→</div>
+        <div class="flow-node">
+          <div class="flow-ic" style="color:var(--ash)"><svg><use href="#i-factory"/></svg></div>
+          <b data-en="Your business" data-mk="Твојот бизнис">Your business</b>
+          <small data-en="pays one flat, predictable price for energy" data-mk="плаќа една фиксна, предвидлива цена за енергија">pays one flat, predictable price for energy</small>
+        </div>
+      </div>
+      <p class="sec-intro" style="margin-top:28px" data-en="Every step exists to make your kilowatt-hour cheaper: the sun makes it, the battery shifts it, the algorithm times it, and you get one number that doesn't jump around." data-mk="Секој чекор постои за твојот киловат-час да биде поевтин: сонцето го прави, батеријата го поместува, алгоритмот го темпира — а ти добиваш еден износ што не скока.">Every step exists to make your kilowatt-hour cheaper: the sun makes it, the battery shifts it, the algorithm times it, and you get one number that doesn't jump around.</p>
+    </div>
+  </div>
+</section>
+
+<section id="offer">
+  <div class="wrap reveal">
+    <div class="eyebrow" data-en="Your offer" data-mk="Твоја понуда">Your offer</div>
+    <h2 class="sec-head" style="margin-top:14px" data-en="We price around your business, not a menu" data-mk="Цената ја кроиме според твојот бизнис, не по мени">We price around your business, not a menu</h2>
+    <p class="sec-intro" data-en="A bakery's ovens, a market's cold room and a factory's compressors don't use power the same way — so they shouldn't pay the same way. Send us a recent bill and we'll build you one flat monthly price shaped to how you actually work." data-mk="Печките на пекарата, ладилникот на маркетот и компресорите на фабриката не трошат струја на ист начин — па не треба ни да плаќаат исто. Прати ни една скорешна сметка и ќе ти направиме една фиксна месечна цена скроена според тоа како навистина работиш.">A bakery's ovens, a market's cold room and a factory's compressors don't use power the same way — so they shouldn't pay the same way. Send us a recent bill and we'll build you one flat monthly price shaped to how you actually work.</p>
+    <div class="steps" style="margin-top:40px">
+      <div class="step">
+        <div class="n">1</div>
+        <h3 data-en="Send one bill" data-mk="Прати една сметка">Send one bill</h3>
+        <p data-en="A photo of last month's electricity bill is enough — it tells us your usage, your profile and what you're overpaying." data-mk="Слика од минатомесечната сметка за струја е доволна — таа ни кажува колку трошиш, каков ти е профилот и каде преплаќаш.">A photo of last month's electricity bill is enough — it tells us your usage, your profile and what you're overpaying.</p>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <h3 data-en="Get your flat price in 48h" data-mk="Добиј фиксна цена за 48 часа">Get your flat price in 48h</h3>
+        <p data-en="One clear monthly number for your energy, matched to clean local generation. No obligation, no fine print." data-mk="Еден јасен месечен износ за твојата енергија, поврзан со чисто локално производство. Без обврска, без ситни букви.">One clear monthly number for your energy, matched to clean local generation. No obligation, no fine print.</p>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <h3 data-en="Compare and decide" data-mk="Спореди и одлучи">Compare and decide</h3>
+        <p data-en="Put our number next to your current bill. If it doesn't clearly win, don't switch — that's the whole deal." data-mk="Стави го нашиот износ до сегашната сметка. Ако не е очигледно подобар, не менувај — тоа е целиот договор.">Put our number next to your current bill. If it doesn't clearly win, don't switch — that's the whole deal.</p>
+      </div>
+    </div>
+    <div style="margin-top:36px">
+      <a href="mailto:hello@vatra.mk" class="btn btn-primary" data-en="Get my offer" data-mk="Побарај понуда">Get my offer</a>
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:20px" data-en="Offers cover the energy portion, in denars. Regulated network fees, access charge and VAT are added separately on your bill, as required by law." data-mk="Понудите се однесуваат на енергетскиот дел, во денари. Регулираната мрежарина, надоместокот за пристап и ДДВ се додаваат посебно на сметката, како што бара законот.">Offers cover the energy portion, in denars. Regulated network fees, access charge and VAT are added separately on your bill, as required by law.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap reveal">
+    <div class="split">
+      <div class="s-text">
+        <div class="eyebrow" style="color:var(--moss)" data-en="Your own plant" data-mk="Твоја централа">Your own plant</div>
+        <h3 data-en="Meet the solar farm behind your socket" data-mk="Запознај ја соларната централа зад твојот приклучок">Meet the solar farm behind your socket</h3>
+        <p data-en="Every pack is matched to a real, named solar farm. Open the app and watch it generate in real time, see the clean energy behind your supply, and pull a certificate whenever you need one. It's the warm feeling of &ldquo;this is my plant&rdquo; — with none of the paperwork of owning one." data-mk="Секој пакет е поврзан со реална, именувана соларна централа. Отвори ја апликацијата и гледај ја како произведува во реално време, види ја чистата енергија зад твојата струја и повлечи сертификат кога ти треба. Тоа е топлото чувство „ова е мојата централа“ — без хартиите на вистинско поседување.">Every pack is matched to a real, named solar farm. Open the app and watch it generate in real time, see the clean energy behind your supply, and pull a certificate whenever you need one. It's the warm feeling of "this is my plant" — with none of the paperwork of owning one.</p>
+      </div>
+      <div class="s-visual">
+        <div class="plantcard">
+          <div class="ic-round" style="color:var(--moss)"><svg><use href="#i-sun"/></svg></div>
+          <div class="ph-lbl" style="color:var(--moss)" data-en="Generating now" data-mk="Произведува сега">Generating now</div>
+          <div class="big">8.4<span style="font-size:15px;color:var(--dim)"> MW</span></div>
+          <div class="ph-sub" style="margin-top:8px">Ovche Pole Solar · 12 MWp · Sveti Nikole</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap reveal">
+    <div class="split flip">
+      <div class="s-text">
+        <div class="eyebrow" data-en="Usage you can act on" data-mk="Потрошувачка на која реагираш">Usage you can act on</div>
+        <h3 data-en="Power is cheap at midday. We'll tell you." data-mk="Струјата е евтина напладне. Ние ќе ти кажеме.">Power is cheap at midday. We'll tell you.</h3>
+        <p data-en="See your day hour by hour, coloured by cost — orange when it's dear, grey when it's cheap. Run the compressor, the ovens or the cold room's deep-freeze cycle in the free window and the savings show up on their own." data-mk="Види го денот час по час, обоен според цената — портокалово кога е скапо, сиво кога е евтино. Пушти го компресорот, печките или длабокото ладење во бесплатниот прозорец и заштедите се појавуваат сами.">See your day hour by hour, coloured by cost — orange when it's dear, grey when it's cheap. Run the compressor, the ovens or the cold room's deep-freeze cycle in the free window and the savings show up on their own.</p>
+      </div>
+      <div class="s-visual">
+        <div class="barsviz" role="img" aria-label="Hourly electricity cost chart">
+          <i style="height:20%;background:#6E6354"></i><i style="height:15%;background:#6E6354"></i>
+          <i style="height:52%;background:var(--amber)"></i><i style="height:28%;background:#6E6354"></i>
+          <i style="height:24%;background:#6E6354"></i><i style="height:44%;background:var(--amber)"></i>
+          <i style="height:92%;background:var(--ember)"></i><i style="height:80%;background:var(--ember)"></i>
+          <i style="height:46%;background:var(--amber)"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI + BESS TRADING -->
+<section id="engine">
+  <div class="wrap reveal">
+    <div class="split">
+      <div class="s-text">
+        <div class="eyebrow" data-en="The engine" data-mk="Моторот">The engine</div>
+        <h3 data-en="A battery and an algorithm work for you around the clock" data-mk="Батерија и алгоритам работат за тебе деноноќно">A battery and an algorithm work for you around the clock</h3>
+        <p data-en="Behind your flat price sits real hardware and real trading. Our AI trades battery storage on the day-ahead and intraday markets — charging when solar floods the grid and power is cheap, discharging into the expensive evening peak. Every well-timed trade lowers the cost of the energy we supply you. That's how the price stays flat without games." data-mk="Зад твојата фиксна цена стојат вистински хардвер и вистинско тргување. Нашата вештачка интелигенција тргува со батериски системи на пазарот ден-однапред и во текот на денот — полни кога сончевата енергија ја преплавува мрежата и струјата е евтина, а празни во скапиот вечерен шпиц. Секоја добро темпирана трговија ја намалува цената на енергијата што ти ја испорачуваме. Затоа цената останува фиксна, без игри.">Behind your flat price sits real hardware and real trading. Our AI trades battery storage on the day-ahead and intraday markets — charging when solar floods the grid and power is cheap, discharging into the expensive evening peak. Every well-timed trade lowers the cost of the energy we supply you. That's how the price stays flat without games.</p>
+      </div>
+      <div class="s-visual">
+        <div class="plantcard">
+          <div class="ic-round" style="color:var(--ember);background:rgba(255,107,44,.13)"><svg><use href="#i-batt"/></svg></div>
+          <div class="ph-lbl" style="color:var(--amber)" data-en="AI trading · live" data-mk="АИ тргување · во живо">AI trading · live</div>
+          <div class="big" style="margin-top:6px"><span data-en="Buy low" data-mk="Купи евтино">Buy low</span> <span style="color:var(--ember)">→</span> <span data-en="sell the peak" data-mk="продај во шпиц">sell the peak</span></div>
+          <div class="ph-sub" style="margin-top:8px" data-en="Day-ahead + intraday · battery-backed" data-mk="Ден-однапред + во текот на денот · со батерии">Day-ahead + intraday · battery-backed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="business">
+  <div class="wrap reveal">
+    <div class="eyebrow" data-en="For business" data-mk="За бизниси">For business</div>
+    <h2 class="sec-head" style="margin-top:14px" data-en="Price certainty for the workshop you run" data-mk="Сигурна цена за работилницата што ја водиш">Price certainty for the workshop you run</h2>
+    <p class="sec-intro" data-en="From a corner shop to a cold-storage plant — flat packs, peak-demand alerts that dodge costly penalties, and for bigger loads, a long-term power purchase agreement at a fixed price with an ESG-ready green claim." data-mk="Од мала продавница до ладилница — фиксни пакети, предупредувања за врвна побарувачка што ги избегнуваат скапите казни и, за поголеми потрошувачи, долгорочен договор за откуп на струја по фиксна цена со зелен статус подготвен за ESG.">From a corner shop to a cold-storage plant — flat packs, peak-demand alerts that dodge costly penalties, and for bigger loads, a long-term power purchase agreement at a fixed price with an ESG-ready green claim.</p>
+    <div class="stats">
+      <div class="stat"><b data-en="Flat" data-mk="Фиксно">Flat</b><span data-en="predictable monthly cost" data-mk="предвидлив месечен трошок">predictable monthly cost</span></div>
+      <div class="stat"><b>−6.800 ден</b><span data-en="typical monthly peak-penalty saving" data-mk="типична месечна заштеда од казни">typical monthly peak-penalty saving</span></div>
+      <div class="stat"><b>PPA</b><span data-en="fixed price, years ahead" data-mk="фиксна цена, години однапред">fixed price, years ahead</span></div>
+      <div class="stat"><b>ESG</b><span data-en="certificates for reporting" data-mk="сертификати за известување">certificates for reporting</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="investors">
+  <div class="wrap reveal">
+    <div class="eyebrow" data-en="For investors" data-mk="За инвеститори">For investors</div>
+    <h2 class="sec-head" style="margin-top:14px" data-en="A retail energy brand with a supply-side moat" data-mk="Бренд за продажба на струја со предност на страната на снабдувањето">A retail energy brand with a supply-side moat</h2>
+    <div class="stats">
+      <div class="stat"><b>~2M</b><span data-en="people in North Macedonia" data-mk="жители во Северна Македонија">people in North Macedonia</span></div>
+      <div class="stat"><b>100%</b><span data-en="retail market open to competition" data-mk="малопродажен пазар отворен за конкуренција">retail market open to competition</span></div>
+      <div class="stat"><b>6</b><span data-en="Balkan markets to expand into" data-mk="балкански пазари за ширење">Balkan markets to expand into</span></div>
+      <div class="stat"><b data-en="Pilot" data-mk="Пилот">Pilot</b><span data-en="product built, customers next" data-mk="производот е изграден, следат корисници">product built, customers next</span></div>
+    </div>
+    <div class="inv-grid">
+      <div class="inv-card">
+        <div class="ic-sm" style="color:var(--amber)"><svg><use href="#i-factory"/></svg></div>
+        <h4 data-en="We own the supply side" data-mk="Ја поседуваме страната на снабдувањето">We own the supply side</h4>
+        <p data-en="Founder's EPC and battery-storage work provides the generation and the hedge — and our AI trades that storage on day-ahead and intraday markets, turning cheap solar hours into margin." data-mk="EPC и батериската работа на основачот обезбедуваат производство и заштита — а нашата вештачка интелигенција тргува со тие батерии на пазарот ден-однапред и во текот на денот, претворајќи ги евтините сончеви часови во маржа.">Founder's EPC and battery-storage work provides the generation and the hedge — and our AI trades that storage on day-ahead and intraday markets, turning cheap solar hours into margin.</p>
+      </div>
+      <div class="inv-card">
+        <div class="ic-sm" style="color:var(--ember)"><svg><use href="#i-lock"/></svg></div>
+        <h4 data-en="Sticky by design" data-mk="Лепливо по дизајн">Sticky by design</h4>
+        <p data-en="Flat packs lock customers in; a plant they feel is theirs deepens loyalty every month — without the weight of a financial product." data-mk="Фиксните пакети ги задржуваат корисниците; централа што ја чувствуваат како своја ја продлабочува лојалноста секој месец — без тежината на финансиски производ.">Flat packs lock customers in; a plant they feel is theirs deepens loyalty every month — without the weight of a financial product.</p>
+      </div>
+      <div class="inv-card">
+        <div class="ic-sm" style="color:var(--moss)"><svg><use href="#i-globe"/></svg></div>
+        <h4 data-en="A region, not a country" data-mk="Регион, не само држава">A region, not a country</h4>
+        <p data-en="Start in North Macedonia, template across six liberalised Balkan markets with the same diaspora and referral playbook." data-mk="Почни во Северна Македонија, пресликај го моделот низ шест либерализирани балкански пазари со истата дијаспорска стратегија.">Start in North Macedonia, template across six liberalised Balkan markets with the same diaspora and referral playbook.</p>
+      </div>
+    </div>
+    <div class="edge">
+      <b data-en="The edge:" data-mk="Предноста:">The edge:</b> <span data-en="the app is roughly 15% of this business. The other 85% — licence, capital, sourcing, and generation — sits in domains we already operate across. A software team can copy the screens; almost none can build the plant behind them." data-mk="апликацијата е околу 15% од бизнисот. Другите 85% — лиценца, капитал, набавка и производство — се во области во кои веќе работиме. Софтверски тим може да ги копира екраните; речиси никој не може да ја изгради централата зад нив.">the app is roughly 15% of this business. The other 85% — licence, capital, sourcing, and generation — sits in domains we already operate across. A software team can copy the screens; almost none can build the plant behind them.</span>
+    </div>
+    <div style="margin-top:28px"><a href="#join" class="btn btn-ghost" data-en="Request the investor deck" data-mk="Побарај презентација за инвеститори">Request the investor deck</a></div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap reveal">
+    <div class="eyebrow" data-en="Questions" data-mk="Прашања">Questions</div>
+    <h2 class="sec-head" style="margin-top:14px" data-en="The honest answers" data-mk="Искрените одговори">The honest answers</h2>
+    <div class="faq">
+      <details open>
+        <summary data-en="Do I earn money from the plant?" data-mk="Дали заработувам од централата?">Do I earn money from the plant?</summary>
+        <p data-en="No — and that's on purpose. Your plan buys electricity, not a share of a plant. &ldquo;Your plant&rdquo; means we match your supply to a real solar farm and show it to you. You get clean power and a certificate, never a payout. That keeps it simple and keeps it a proper electricity service." data-mk="Не — и тоа е намерно. Твојот план купува струја, не удел во централа. „Твоја централа“ значи дека ја поврзуваме твојата струја со реална соларна централа и ти ја покажуваме. Добиваш чиста струја и сертификат, никогаш исплата. Така останува едноставно и останува вистинска услуга за струја.">No — and that's on purpose. Your plan buys electricity, not a share of a plant.</p>
+      </details>
+      <details>
+        <summary data-en="Is the price really flat?" data-mk="Дали цената е навистина фиксна?">Is the price really flat?</summary>
+        <p data-en="The energy part of your plan is a flat amount each month, in denars. Regulated network fees, the access charge and VAT are added separately on your bill, exactly as the law requires — but the electricity you're buying from us is fixed and predictable." data-mk="Енергетскиот дел од твојот план е фиксен износ секој месец, во денари. Регулираната мрежарина, надоместокот за пристап и ДДВ се додаваат посебно на сметката, точно како што бара законот — но струјата што ја купуваш од нас е фиксна и предвидлива.">The energy part of your plan is a flat amount each month, in denars.</p>
+      </details>
+      <details>
+        <summary data-en="When can I actually sign up?" data-mk="Кога навистина можам да се пријавам?">When can I actually sign up?</summary>
+        <p data-en="Vatra is at pilot stage. The app is built and the model is ready; we're securing the supply licence and the first plant. Join the pilot list and you'll be among the first we switch on." data-mk="Vatra е во пилот фаза. Апликацијата е изградена и моделот е подготвен; ја обезбедуваме лиценцата за снабдување и првата централа. Приклучи се на пилот-листата и ќе бидеш меѓу првите што ги вклучуваме.">Vatra is at pilot stage. Join the pilot list and you'll be among the first we switch on.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="final" id="join">
+  <div class="glow"></div>
+  <div class="wrap reveal">
+    <h2 data-en="Ready for electricity that makes sense?" data-mk="Подготвен за струја што има смисла?">Ready for electricity that makes sense?</h2>
+    <p class="quote" data-en="We sell dignity, not kilowatt-hours." data-mk="Продаваме достоинство, не киловат-часови.">We sell dignity, not kilowatt-hours.</p>
+    <p class="muted" style="max-width:46ch;margin:12px auto 0" data-en="Want cleaner, simpler power — or to back the company building it? Start here." data-mk="Сакаш почиста, поедноставна струја — или да ја поддржиш компанијата што ја гради? Почни тука.">Want cleaner, simpler power — or to back the company building it? Start here.</p>
+    <div class="cta-row">
+      <a href="mailto:hello@vatra.mk" class="btn btn-primary" data-en="Join the pilot" data-mk="Приклучи се на пилотот">Join the pilot</a>
+      <a href="mailto:invest@vatra.mk" class="btn btn-ghost" data-en="Investors — request the deck" data-mk="Инвеститори — побарајте презентација">Investors — request the deck</a>
+    </div>
+    <p class="disc" data-en="Pilot stage. Product is a working demo; supply is not yet live to the public. Vatra is a brand of Serafimoski Tech DOOEL." data-mk="Пилот фаза. Производот е функционален прототип; снабдувањето сè уште не е достапно за јавноста. Vatra е бренд на Серафимоски Тех ДООЕЛ.">Pilot stage. Product is a working demo; supply is not yet live to the public. Vatra is a brand of Serafimoski Tech DOOEL.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <div>
+      <div class="logo">vatra<span>.</span></div>
+      <p class="muted" style="font-size:13px;margin-top:10px;max-width:32ch" data-en="Electricity you can actually understand. North Macedonia &amp; the Western Balkans." data-mk="Струја што навистина ја разбираш. Северна Македонија и Западен Балкан.">Electricity you can actually understand. North Macedonia &amp; the Western Balkans.</p>
+    </div>
+    <div class="foot-links">
+      <div class="foot-col">
+        <b data-en="Product" data-mk="Производ">Product</b>
+        <a href="#how" data-en="How it works" data-mk="Како функционира">How it works</a><br/>
+        <a href="#offer" data-en="Your offer" data-mk="Понуда">Your offer</a><br/>
+        <a href="#business" data-en="Business" data-mk="Бизнис">Business</a>
+      </div>
+      <div class="foot-col">
+        <b data-en="Company" data-mk="Компанија">Company</b>
+        <a href="#investors" data-en="Investors" data-mk="Инвеститори">Investors</a><br/>
+        <a href="mailto:hello@vatra.mk" data-en="Contact" data-mk="Контакт">Contact</a><br/>
+        <a href="#join" data-en="Join the pilot" data-mk="Приклучи се">Join the pilot</a>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <p class="foot-note" data-en="Serafimoski Tech DOOEL · s. Zubovce, Vrapčište, North Macedonia. Vatra is at pilot stage; figures and features shown are illustrative and not an offer of electricity supply, securities, or investment. © 2026 Serafimoski Tech DOOEL." data-mk="Серафимоски Тех ДООЕЛ · с. Зубовце, Врапчиште, Северна Македонија. Vatra е во пилот фаза; прикажаните бројки и функции се илустративни и не претставуваат понуда за снабдување со струја, хартии од вредност или инвестиција. © 2026 Серафимоски Тех ДООЕЛ.">Serafimoski Tech DOOEL · s. Zubovce, Vrapčište, North Macedonia. Vatra is at pilot stage; figures and features shown are illustrative and not an offer of electricity supply, securities, or investment. © 2026 Serafimoski Tech DOOEL.</p>
+  </div>
+</footer>
+
+<script>
+  var nav=document.getElementById('nav');
+  addEventListener('scroll',function(){nav.classList.toggle('scrolled',scrollY>20)});
+
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){el.classList.add('pre');io.observe(el)});
+
+  var LANG='en';
+  var TITLES={en:'Vatra — the electricity supplier that pays you back',mk:'Vatra — снабдувачот со струја што ти враќа'};
+  function setLang(l){
+    LANG=l;
+    document.querySelectorAll('[data-'+l+']').forEach(function(e){
+      var t=e.getAttribute('data-'+l);
+      if(t!=null) e.textContent=t;
+    });
+    document.title=TITLES[l];
+    document.getElementById('html').setAttribute('lang',l);
+    document.querySelector('.lang-en').style.display=l==='en'?'inline':'none';
+    document.querySelector('.lang-mk').style.display=l==='mk'?'inline':'none';
+    try{localStorage.setItem('vatra_lang',l);}catch(e){}
+  }
+  (function(){
+    var saved;try{saved=localStorage.getItem('vatra_lang');}catch(e){}
+    var nv=(navigator.language||'').toLowerCase();
+    setLang(saved||(nv.indexOf('mk')===0?'mk':'en'));
+  })();
+</script>
+</body>
+</html>
