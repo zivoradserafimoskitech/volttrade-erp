@@ -60,6 +60,11 @@ import PortalPpa from "./pages/portal/PortalPpa";
 import PortalProfile from "./pages/portal/Profile";
 import PortalNotifications from "./pages/portal/PortalNotifications";
 
+const ExternalRedirect = ({ to }: { to: string }) => {
+  if (typeof window !== "undefined") window.location.replace(to);
+  return null;
+};
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -74,6 +79,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/2fa" element={<TwoFactor />} />
             <Route path="/vatra/signup" element={<VatraSignup />} />
+            <Route path="/site" element={<ExternalRedirect to="/vatra-site.html" />} />
+            <Route path="/how" element={<ExternalRedirect to="/vatra-how.html" />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/supply-points" element={<SupplyPoints />} />
