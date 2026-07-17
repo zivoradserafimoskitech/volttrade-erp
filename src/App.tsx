@@ -74,6 +74,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/2fa" element={<TwoFactor />} />
             <Route path="/vatra/signup" element={<VatraSignup />} />
+            <Route path="/site" element={<ExternalRedirect to="/vatra-site.html" />} />
+            <Route path="/how" element={<ExternalRedirect to="/vatra-how.html" />} />
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/supply-points" element={<SupplyPoints />} />
