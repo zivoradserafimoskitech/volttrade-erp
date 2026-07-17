@@ -60,6 +60,11 @@ import PortalPpa from "./pages/portal/PortalPpa";
 import PortalProfile from "./pages/portal/Profile";
 import PortalNotifications from "./pages/portal/PortalNotifications";
 
+const ExternalRedirect = ({ to }: { to: string }) => {
+  if (typeof window !== "undefined") window.location.replace(to);
+  return null;
+};
+
 const queryClient = new QueryClient();
 
 const App = () => (
