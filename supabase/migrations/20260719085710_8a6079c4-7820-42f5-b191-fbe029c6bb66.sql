@@ -1,0 +1,2 @@
+ALTER TABLE public.metering_points ADD COLUMN IF NOT EXISTS kimi_meter_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_metering_points_kimi_meter_id ON public.metering_points(kimi_meter_id) WHERE kimi_meter_id IS NOT NULL;

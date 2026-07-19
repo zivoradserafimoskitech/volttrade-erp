@@ -1222,6 +1222,7 @@ export type Database = {
           has_pv: boolean
           id: string
           is_prosumer: boolean
+          kimi_meter_id: number | null
           meter_id: string | null
           metering_category:
             | Database["public"]["Enums"]["metering_category"]
@@ -1254,6 +1255,7 @@ export type Database = {
           has_pv?: boolean
           id?: string
           is_prosumer?: boolean
+          kimi_meter_id?: number | null
           meter_id?: string | null
           metering_category?:
             | Database["public"]["Enums"]["metering_category"]
@@ -1288,6 +1290,7 @@ export type Database = {
           has_pv?: boolean
           id?: string
           is_prosumer?: boolean
+          kimi_meter_id?: number | null
           meter_id?: string | null
           metering_category?:
             | Database["public"]["Enums"]["metering_category"]
