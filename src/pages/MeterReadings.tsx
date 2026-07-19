@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Plus, Check, X } from "lucide-react";
+import { Plus, Check, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
 
@@ -61,6 +61,22 @@ export default function MeterReadings() {
     toast.success("Reading recorded"); setOpen(false); load();
   };
 
+  const [syncing, setSyncing] = useState(false);
+  const syncKimi = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-kimi-meters", { body: { window_minutes: 1440, bucket_minutes: 60 } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Sync failed");
+      toast.success(`Kimi sync: ${data.readings_synced} register reads, ${data.intervals_synced} interval rows (${data.meters} meters)`);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Kimi sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const setStatus = async (id: string, status: string) => {
     const { error } = await supabase.from("meter_readings").update({ validation_status: status, validated_by: user!.id, validated_at: new Date().toISOString() }).eq("id", id);
     if (error) return toast.error(error.message);
@@ -71,7 +87,10 @@ export default function MeterReadings() {
 
   return (
     <ErpLayout title="Meter Readings" subtitle="Consumption data feeding the billing engine"
-      actions={
+      actions={<>
+        <Button variant="outline" onClick={syncKimi} disabled={syncing}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />{syncing ? "Syncing…" : "Sync from Kimi"}
+        </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />Add reading</Button></DialogTrigger>
           <DialogContent>
@@ -95,7 +114,7 @@ export default function MeterReadings() {
             </form>
           </DialogContent>
         </Dialog>
-      }>
+      </>}>
       <div className="flex items-center gap-2">
         <Label className="text-xs text-muted-foreground">Filter:</Label>
         <Select value={filterMp} onValueChange={setFilterMp}>
