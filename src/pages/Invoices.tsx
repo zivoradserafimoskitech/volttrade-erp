@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { fmtEur, fmtMwh, fmtNum } from "@/lib/format";
-import { FileDown, FileSpreadsheet, Receipt, Trash2 } from "lucide-react";
+import { FileDown, FileSpreadsheet, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -25,7 +23,6 @@ export default function Invoices() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [busy, setBusy] = useState(false);
   const [lang, setLang] = useState<InvoiceLang | "auto">("auto");
 
   const load = async () => {
@@ -34,58 +31,6 @@ export default function Invoices() {
     setClients((cs as any) ?? []); setInvoices((inv as any) ?? []);
   };
   useEffect(() => { load(); }, [user]);
-
-  const generate = async (form: FormData) => {
-    setBusy(true);
-    try {
-      const client_id = String(form.get("client_id"));
-      const period_start = String(form.get("period_start"));
-      const period_end = String(form.get("period_end"));
-      const client = clients.find(c => c.id === client_id);
-      if (!client) throw new Error("Pick a client");
-
-      // Fetch readings for client's meters in period
-      const { data: meters } = await supabase.from("metering_points").select("id").eq("client_id", client_id);
-      const meterIds = (meters ?? []).map((m: any) => m.id);
-      if (!meterIds.length) throw new Error("Client has no metering points");
-
-      const startISO = new Date(period_start).toISOString();
-      const endISO = new Date(new Date(period_end).getTime() + 24*3600*1000 - 1).toISOString();
-
-      const { data: readings } = await supabase.from("consumption_readings")
-        .select("reading_at, actual_mwh")
-        .in("metering_point_id", meterIds)
-        .gte("reading_at", startISO).lte("reading_at", endISO);
-
-      const { data: prices } = await supabase.from("market_prices")
-        .select("delivery_at, price_eur_mwh")
-        .gte("delivery_at", startISO).lte("delivery_at", endISO);
-
-      const priceMap = new Map<string, number>();
-      (prices ?? []).forEach((p: any) => priceMap.set(new Date(p.delivery_at).toISOString().slice(0, 13), Number(p.price_eur_mwh)));
-
-      let totalMwh = 0, energy = 0;
-      (readings ?? []).forEach((r: any) => {
-        const mwh = Number(r.actual_mwh ?? 0);
-        totalMwh += mwh;
-        const key = new Date(r.reading_at).toISOString().slice(0, 13);
-        const price = client.contract_type === "fixed" ? Number(client.fixed_price_eur_mwh ?? 0) : (priceMap.get(key) ?? 0);
-        energy += mwh * price;
-      });
-      const margin = totalMwh * Number(client.margin_eur_mwh);
-      const total = energy + margin;
-      const invoice_number = `INV-${format(new Date(), "yyyyMM")}-${Math.floor(Math.random()*9000+1000)}`;
-
-      const { error } = await supabase.from("invoices").insert({
-        user_id: user!.id, client_id, invoice_number,
-        period_start, period_end, total_mwh: totalMwh,
-        energy_amount_eur: energy, margin_amount_eur: margin, total_eur: total, status: "issued",
-      });
-      if (error) throw error;
-      toast.success(`Invoice ${invoice_number} generated`);
-      load();
-    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
-  };
 
   const exportPdf = async (inv: Invoice) => {
     const client = clients.find(c => c.id === inv.client_id);
@@ -119,7 +64,7 @@ export default function Invoices() {
   };
 
   return (
-    <ErpLayout title="Billing & Invoicing" subtitle="Generate hourly-priced invoices and export reports"
+    <ErpLayout title="Billing & Invoicing" subtitle="Invoice register — status, PDF and Excel exports"
       actions={
         <div className="flex items-center gap-2">
           <Select value={lang} onValueChange={(v) => setLang(v as any)}>
@@ -135,22 +80,8 @@ export default function Invoices() {
         </div>
       }>
       <Card className="border-border/60">
-        <CardHeader><CardTitle>Generate invoice</CardTitle><CardDescription>Calculates Σ(actual MWh × hourly price) + margin</CardDescription></CardHeader>
-        <CardContent>
-          <form onSubmit={e => { e.preventDefault(); generate(new FormData(e.currentTarget)); }} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-            <div className="space-y-2 md:col-span-2">
-              <Label>Client</Label>
-              <Select name="client_id" required>
-                <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
-                <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.company_name} — {c.contract_type}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2"><Label>Period start</Label><Input name="period_start" type="date" required /></div>
-            <div className="space-y-2"><Label>Period end</Label><Input name="period_end" type="date" required /></div>
-            <Button type="submit" disabled={busy} className="md:col-span-4" style={{ background: "var(--gradient-primary)" }}>
-              <Receipt className="h-4 w-4 mr-2" />{busy ? "Calculating…" : "Generate invoice"}
-            </Button>
-          </form>
+        <CardContent className="py-3 text-sm text-muted-foreground">
+          Invoices are generated by <a href="/billing" className="text-primary underline">Supply Billing Runs</a> (contracts × tariffs × validated consumption). This page is the invoice register: status, PDF and Excel export.
         </CardContent>
       </Card>
 

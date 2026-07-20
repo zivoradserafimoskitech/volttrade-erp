@@ -11,7 +11,7 @@ import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, C
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { shape24h, SlpCategory, seasonOf, dayTypeOf } from "@/lib/slpSynthesis";
-import { CalendarClock, Lock, Send, Activity } from "lucide-react";
+import { CalendarClock, Lock, Send, Activity, Download } from "lucide-react";
 
 export default function Scheduling() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -25,6 +25,30 @@ export default function Scheduling() {
   const [gateClosed, setGateClosed] = useState<string | null>(null);
 
   useEffect(() => { supabase.from("balance_groups").select("id,name").then(({ data }) => { setGroups(data ?? []); if (data?.[0]) setBg(data[0].id); }); }, []);
+
+  // Bridge: daily client forecasts → MTU nomination inputs.
+  // Splits the day's total forecast into PROFILED/MEASURED legs using
+  // connection_points.metering_category weighted by connection_power_kw.
+  async function loadFromForecast() {
+    const [{ data: fc }, { data: cps }] = await Promise.all([
+      supabase.from("forecasts").select("client_id, forecast_mwh").eq("forecast_date", date),
+      (supabase.from as any)("connection_points").select("customer_id, metering_category, connection_power_kw").eq("status", "active"),
+    ]);
+    if (!fc?.length) { toast({ title: "No forecasts for this date", description: "Create daily forecasts in Forecasting first.", variant: "destructive" }); return; }
+    const total = fc.reduce((s, r: any) => s + Number(r.forecast_mwh || 0), 0);
+    let prof = 0, meas = 0;
+    for (const r of fc as any[]) {
+      const clientCps = (cps ?? []).filter((c: any) => c.customer_id === r.client_id);
+      if (!clientCps.length) { prof += Number(r.forecast_mwh || 0); continue; } // unclassified → profiled
+      const w = (cat: string) => clientCps.filter((c: any) => c.metering_category === cat).reduce((s: number, c: any) => s + Number(c.connection_power_kw || 1), 0);
+      const wp = w("PROFILED"), wm = w("MEASURED"), ws = wp + wm || 1;
+      prof += Number(r.forecast_mwh || 0) * wp / ws;
+      meas += Number(r.forecast_mwh || 0) * wm / ws;
+    }
+    setProfiledMwh(+prof.toFixed(3));
+    setMeasuredMwh(+meas.toFixed(3));
+    toast({ title: `Forecast loaded: ${total.toFixed(1)} MWh`, description: `Profiled ${prof.toFixed(1)} / Measured ${meas.toFixed(1)} — adjust before publishing if needed.` });
+  }
 
   const rows = useMemo(() => {
     const d = new Date(date + "T00:00:00");
@@ -75,6 +99,7 @@ export default function Scheduling() {
   return (
     <ErpLayout title="Scheduling & Nomination" subtitle="Profiled (SLP) + Measured + PV legs · NOP per MTU"
       actions={<>
+        <Button size="sm" variant="outline" onClick={loadFromForecast}><Download className="h-4 w-4 mr-1" />Load from forecast</Button>
         <Button size="sm" variant="outline" onClick={publish}><Lock className="h-4 w-4 mr-1" />Publish v{version}</Button>
         <Button size="sm" onClick={submitToTso}><Send className="h-4 w-4 mr-1" />Submit to TSO</Button>
       </>}>

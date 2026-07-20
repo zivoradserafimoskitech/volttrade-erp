@@ -49,28 +49,67 @@ export default function BillingRuns() {
     const { data: clients } = await supabase.from("clients").select("id,country_code");
     const { data: countries } = await supabase.from("countries").select("code,vat_percent");
     const { data: links } = await supabase.from("supply_contract_points").select("*");
-    const { data: readings } = await supabase.from("meter_readings").select("*").eq("validation_status", "validated").gte("reading_at", run.period_start).lte("reading_at", run.period_end + "T23:59:59");
+    const startISO = run.period_start + "T00:00:00";
+    const endISO = run.period_end + "T23:59:59";
+    // Interval consumption is the billing truth (filled by Kimi sync + DSO imports).
+    const { data: intervals } = await supabase.from("consumption_readings").select("metering_point_id, reading_at, actual_mwh").gte("reading_at", startISO).lte("reading_at", endISO);
+    // meter_readings holds CUMULATIVE register snapshots — only usable as max−min delta, never summed.
+    const { data: registers } = await supabase.from("meter_readings").select("metering_point_id, reading_at, import_kwh").eq("validation_status", "validated").gte("reading_at", startISO).lte("reading_at", endISO);
+    // Hourly market prices for indexed tariffs
+    const { data: prices } = await supabase.from("market_prices").select("delivery_at, price_eur_mwh").gte("delivery_at", startISO).lte("delivery_at", endISO);
+    const priceMap = new Map<string, number>();
+    (prices ?? []).forEach((p: any) => priceMap.set(new Date(p.delivery_at).toISOString().slice(0, 13), Number(p.price_eur_mwh)));
+
+    const mpIntervalMwh = (mpIds: string[]) => (intervals ?? []).filter((r: any) => mpIds.includes(r.metering_point_id)).reduce((s: number, r: any) => s + Number(r.actual_mwh || 0), 0);
+    const mpRegisterDeltaKwh = (mpIds: string[]) => {
+      let total = 0;
+      for (const id of mpIds) {
+        const rs = (registers ?? []).filter((r: any) => r.metering_point_id === id).map((r: any) => Number(r.import_kwh || 0)).filter((v: number) => v > 0);
+        if (rs.length >= 2) total += Math.max(...rs) - Math.min(...rs);
+      }
+      return total;
+    };
+    const indexedEnergyEur = (mpIds: string[], marginEurMwh: number) => {
+      let eur = 0, mwh = 0;
+      for (const r of (intervals ?? []).filter((x: any) => mpIds.includes(x.metering_point_id))) {
+        const key = new Date(r.reading_at).toISOString().slice(0, 13);
+        const p = priceMap.get(key) ?? 0;
+        eur += Number(r.actual_mwh || 0) * (p + marginEurMwh);
+        mwh += Number(r.actual_mwh || 0);
+      }
+      return { eur, mwh };
+    };
 
     let invoiceCount = 0, totalEur = 0, totalMwh = 0, skipped = 0;
     for (const c of (contracts ?? [])) {
       const t = (tariffs ?? []).find((x: any) => x.id === c.tariff_id);
       if (!t) continue;
       const comps = (Array.isArray(t.components) ? t.components : []) as any[];
-      const energy = comps.find((x: any) => x.type === 'energy')?.value ?? 0;
+      const energyPrice = comps.find((x: any) => x.type === 'energy')?.value ?? 0;
       const fixed = comps.find((x: any) => x.type === 'fixed_fee')?.value ?? 0;
+      const marginComp = comps.find((x: any) => x.type === 'margin')?.value ?? 0;
       const mpIds = (links ?? []).filter((l: any) => l.contract_id === c.id).map((l: any) => l.metering_point_id);
-      const kwh = (readings ?? []).filter((r: any) => mpIds.includes(r.metering_point_id)).reduce((s: number, r: any) => s + Number(r.import_kwh || 0), 0);
-      if (kwh <= 0 && Number(fixed) <= 0) { skipped++; continue; }
-      const mwh = kwh / 1000;
-      const energy_amount = mwh * Number(energy);
+
+      let mwh: number; let energy_amount: number; let priceLabel: number;
+      if ((t as any).model === 'indexed') {
+        const r = indexedEnergyEur(mpIds, Number(marginComp));
+        mwh = r.mwh; energy_amount = r.eur; priceLabel = mwh > 0 ? energy_amount / mwh : 0;
+      } else {
+        const intervalMwh = mpIntervalMwh(mpIds);
+        mwh = intervalMwh > 0 ? intervalMwh : mpRegisterDeltaKwh(mpIds) / 1000;
+        energy_amount = mwh * Number(energyPrice);
+        priceLabel = Number(energyPrice);
+      }
+      if (mwh <= 0 && Number(fixed) <= 0) { skipped++; continue; }
       const subtotal = energy_amount + Number(fixed);
       const country = (clients ?? []).find((x: any) => x.id === c.client_id)?.country_code;
       const vatPct = (countries ?? []).find((x: any) => x.code === country)?.vat_percent ?? 0;
       const tax = subtotal * Number(vatPct) / 100;
       const total = subtotal + tax;
-      const invoice_number = `INV-${run.period_start.slice(0,7)}-${c.contract_number}`;
+      const { data: seqNum } = await (supabase.rpc as any)("next_invoice_number");
+      const invoice_number = (seqNum as unknown as string) || `INV-${run.period_start.slice(0,7)}-${c.contract_number}`;
       const components = [
-        { type: 'energy', label: 'Energy supply', mwh, price_eur_mwh: Number(energy), amount_eur: energy_amount },
+        { type: 'energy', label: (t as any).model === 'indexed' ? 'Energy supply (hourly indexed + margin)' : 'Energy supply', mwh, price_eur_mwh: priceLabel, amount_eur: energy_amount },
         { type: 'fixed_fee', label: 'Monthly fixed fee', amount_eur: Number(fixed) },
         { type: 'vat', label: `VAT ${vatPct}%`, amount_eur: tax },
       ];
