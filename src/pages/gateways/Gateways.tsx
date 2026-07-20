@@ -93,9 +93,9 @@ export default function Gateways() {
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard title="Linked meters" value={stats.total} icon={Radio} />
-        <StatCard title="Online (< 15 min)" value={stats.online} icon={Wifi} />
-        <StatCard title="Stale / offline" value={stats.stale} icon={WifiOff} />
+        <StatCard label="Linked meters" value={String(stats.total)} icon={Radio} />
+        <StatCard label="Online (< 15 min)" value={String(stats.online)} icon={Wifi} />
+        <StatCard label="Stale / offline" value={String(stats.stale)} icon={WifiOff} />
       </div>
 
       <Card>
