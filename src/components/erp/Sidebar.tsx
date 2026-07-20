@@ -45,6 +45,7 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/balancing/consumers", label: "Consumer Manager", icon: Network },
     { to: "/balancing/slp", label: "SLP Synthesis", icon: Sigma },
     { to: "/balancing/scheduling", label: "Scheduling", icon: CalendarClock },
+    { to: "/balancing/live", label: "Live Position", icon: Gauge },
     { to: "/balancing/settlement", label: "Imbalance Settlement", icon: GitMerge },
   ]},
   { title: "Supply Operations", items: [
