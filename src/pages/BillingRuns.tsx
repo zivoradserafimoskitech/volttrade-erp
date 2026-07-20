@@ -81,6 +81,19 @@ export default function BillingRuns() {
       return { eur, mwh };
     };
 
+    // Regulatory charges applicable to this period (RKE): PPEE %, PPEE price, MEMO fee, FX
+    const { data: regs } = await (supabase.from as any)("regulatory_charges").select("*")
+      .lte("valid_from", run.period_end)
+      .or(`valid_to.is.null,valid_to.gte.${run.period_start}`);
+    const reg = (code: string, fallback: number) => {
+      const rows = ((regs ?? []) as any[]).filter((r) => r.code === code).sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1));
+      return rows.length ? Number(rows[0].value) : fallback;
+    };
+    const ppeePct = reg("PPEE_PERCENT", 12.96);
+    const ppeePriceMkdKwh = reg("PPEE_PRICE", 5.5993826);
+    const memoFeeMkdMwh = reg("MEMO_FEE", 14.1);
+    const eurMkd = reg("EUR_MKD", 61.695);
+
     let invoiceCount = 0, totalEur = 0, totalMwh = 0, skipped = 0;
     for (const c of (contracts ?? [])) {
       const t = (tariffs ?? []).find((x: any) => x.id === c.tariff_id);
@@ -91,28 +104,43 @@ export default function BillingRuns() {
       const marginComp = comps.find((x: any) => x.type === 'margin')?.value ?? 0;
       const mpIds = (links ?? []).filter((l: any) => l.contract_id === c.id).map((l: any) => l.metering_point_id);
 
-      let mwh: number; let energy_amount: number; let priceLabel: number;
+      let mwh: number; let marketEnergyEur: number; let priceLabel: number;
       if ((t as any).model === 'indexed') {
         const r = indexedEnergyEur(mpIds, Number(marginComp));
-        mwh = r.mwh; energy_amount = r.eur; priceLabel = mwh > 0 ? energy_amount / mwh : 0;
+        mwh = r.mwh; marketEnergyEur = r.eur; priceLabel = mwh > 0 ? r.eur / mwh : 0;
       } else {
         const intervalMwh = mpIntervalMwh(mpIds);
         mwh = intervalMwh > 0 ? intervalMwh : mpRegisterDeltaKwh(mpIds) / 1000;
-        energy_amount = mwh * Number(energyPrice);
+        marketEnergyEur = mwh * Number(energyPrice);
         priceLabel = Number(energyPrice);
       }
       if (mwh <= 0 && Number(fixed) <= 0) { skipped++; continue; }
-      const subtotal = energy_amount + Number(fixed);
+
+      // MK supplier structure: delivered energy splits into market share and
+      // PPEE share (renewable obligation at regulated price); MEMO market fee
+      // applies to the full volume. Amounts in tariff currency.
+      const cur = ((t as any).currency || 'EUR') as string;
+      const mkdTo = (mkd: number) => cur === 'MKD' ? mkd : mkd / eurMkd;
+      const ppeeMwh = mwh * ppeePct / 100;
+      const marketMwh = mwh - ppeeMwh;
+      const energy_amount = marketEnergyEur * (marketMwh / (mwh || 1));
+      const ppeeAmount = mkdTo(ppeeMwh * 1000 * ppeePriceMkdKwh);
+      const memoAmount = mkdTo(mwh * memoFeeMkdMwh);
       const country = (clients ?? []).find((x: any) => x.id === c.client_id)?.country_code;
       const vatPct = (countries ?? []).find((x: any) => x.code === country)?.vat_percent ?? 0;
-      const tax = subtotal * Number(vatPct) / 100;
+      const vatOf = (v: number) => v * Number(vatPct) / 100;
+      const subtotal = energy_amount + ppeeAmount + memoAmount + Number(fixed);
+      const tax = vatOf(subtotal);
       const total = subtotal + tax;
       const { data: seqNum } = await (supabase.rpc as any)("next_invoice_number");
       const invoice_number = (seqNum as unknown as string) || `INV-${run.period_start.slice(0,7)}-${c.contract_number}`;
       const components = [
-        { type: 'energy', label: (t as any).model === 'indexed' ? 'Energy supply (hourly indexed + margin)' : 'Energy supply', mwh, price_eur_mwh: priceLabel, amount_eur: energy_amount },
-        { type: 'fixed_fee', label: 'Monthly fixed fee', amount_eur: Number(fixed) },
-        { type: 'vat', label: `VAT ${vatPct}%`, amount_eur: tax },
+        { type: 'energy', label: (t as any).model === 'indexed' ? 'Електрична енергија — индексирана цена' : 'Електрична енергија', mwh: marketMwh, price_eur_mwh: marketMwh > 0 ? energy_amount / marketMwh : priceLabel, amount_eur: energy_amount, vat_eur: vatOf(energy_amount) },
+        { type: 'ppee', label: `Обновлива Енергија (ППЕЕ) — ${ppeePct}%`, mwh: ppeeMwh, price_eur_mwh: ppeeMwh > 0 ? ppeeAmount / ppeeMwh : 0, amount_eur: ppeeAmount, vat_eur: vatOf(ppeeAmount) },
+        { type: 'market_fee', label: 'Надомест за користење на пазар на електрична енергија', mwh, price_eur_mwh: mwh > 0 ? memoAmount / mwh : 0, amount_eur: memoAmount, vat_eur: vatOf(memoAmount) },
+        ...(Number(fixed) > 0 ? [{ type: 'fixed_fee', label: 'Monthly fixed fee', amount_eur: Number(fixed), vat_eur: vatOf(Number(fixed)) }] : []),
+        { type: 'vat', label: `ДДВ ${vatPct}%`, amount_eur: tax },
+        { type: 'meta', label: `Цените се изразени во ${cur}${cur !== 'MKD' ? ` (EUR/MKD ${eurMkd})` : ''}`, amount_eur: 0 },
       ];
       const due = new Date(run.period_end); due.setDate(due.getDate() + (c.payment_terms_days ?? 14));
       const { error } = await supabase.from("invoices").insert({
