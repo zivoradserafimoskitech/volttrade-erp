@@ -23,6 +23,26 @@ export default function Scheduling() {
   const [profileCat, setProfileCat] = useState<SlpCategory>("Office");
   const [version, setVersion] = useState(1);
   const [gateClosed, setGateClosed] = useState<string | null>(null);
+  const [pvHourly, setPvHourly] = useState<number[] | null>(null); // MWh per hour from pv_forecasts
+
+  async function loadPvForecast() {
+    const dayStart = `${date}T00:00:00Z`;
+    const dayEnd = `${date}T23:59:59Z`;
+    const { data } = await (supabase.from as any)("pv_forecasts").select("ts, forecast_kwh").gte("ts", dayStart).lte("ts", dayEnd);
+    if (!data?.length) { setPvHourly(null); return false; }
+    const byHour = Array.from({ length: 24 }, () => 0);
+    for (const r of data as any[]) byHour[new Date(r.ts).getUTCHours()] += Number(r.forecast_kwh || 0) / 1000;
+    setPvHourly(byHour);
+    return true;
+  }
+  useEffect(() => { loadPvForecast(); }, [date]);
+
+  async function syncPv() {
+    const { data, error } = await supabase.functions.invoke("sync-pv-forecast", { body: { horizon_hours: 48 } });
+    if (error || !data?.ok) { toast({ title: "PV sync failed", description: error?.message ?? data?.error, variant: "destructive" }); return; }
+    const got = await loadPvForecast();
+    toast({ title: `PV forecast synced (${data.sites} sites, ${data.rows} hours)`, description: got ? "PV leg now uses the forecast." : "No rows for this date — sinusoid fallback." });
+  }
 
   useEffect(() => { supabase.from("balance_groups").select("id,name").then(({ data }) => { setGroups(data ?? []); if (data?.[0]) setBg(data[0].id); }); }, []);
 
@@ -57,9 +77,10 @@ export default function Scheduling() {
     return Array.from({ length: 96 }, (_, mtu) => {
       const h = Math.floor(mtu / 4);
       const share = shape[h] / 4;
-      // clear-sky-ish PV (solar curve)
+      // PV: real forecast (weather-based, per-site calibrated) when available;
+      // clear-sky sinusoid only as fallback for dates without forecast rows.
       const solar = h < 6 || h > 20 ? 0 : Math.sin(((h - 6) / 14) * Math.PI);
-      const pvMwh = (pvKwp * solar) / 1000 / 4;
+      const pvMwh = pvHourly ? pvHourly[h] / 4 : (pvKwp * solar) / 1000 / 4;
       const profiled = profiledMwh * share;
       // measured: stable + small peaks
       const m = (Math.exp(-Math.pow((h - 10) / 3, 2)) + Math.exp(-Math.pow((h - 19) / 3, 2))) ;
@@ -67,7 +88,7 @@ export default function Scheduling() {
       const nop = profiled + measured - pvMwh;
       return { mtu, label: `${String(Math.floor(mtu / 4)).padStart(2, "0")}:${String((mtu % 4) * 15).padStart(2, "0")}`, profiled: +profiled.toFixed(4), measured: +(measured / 4).toFixed(4), pv: +pvMwh.toFixed(4), nop: +nop.toFixed(4) };
     });
-  }, [date, profiledMwh, measuredMwh, pvKwp, profileCat]);
+  }, [date, profiledMwh, measuredMwh, pvKwp, profileCat, pvHourly]);
 
   const totals = {
     profiled: rows.reduce((s, r) => s + r.profiled, 0),
@@ -100,6 +121,7 @@ export default function Scheduling() {
     <ErpLayout title="Scheduling & Nomination" subtitle="Profiled (SLP) + Measured + PV legs · NOP per MTU"
       actions={<>
         <Button size="sm" variant="outline" onClick={loadFromForecast}><Download className="h-4 w-4 mr-1" />Load from forecast</Button>
+        <Button size="sm" variant="outline" onClick={syncPv}><Activity className="h-4 w-4 mr-1" />Sync PV{pvHourly ? " ✓" : ""}</Button>
         <Button size="sm" variant="outline" onClick={publish}><Lock className="h-4 w-4 mr-1" />Publish v{version}</Button>
         <Button size="sm" onClick={submitToTso}><Send className="h-4 w-4 mr-1" />Submit to TSO</Button>
       </>}>
