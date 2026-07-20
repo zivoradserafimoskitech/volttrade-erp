@@ -100,9 +100,9 @@ Deno.serve(async (req) => {
         import_kwh: r.energy_import_kwh ?? 0,
         export_kwh: r.energy_export_kwh ?? 0,
         source: "api",
-        validation_status: "validated",
+        validation_status: "pending",
         created_by: user.id,
-        notes: "Auto-synced from Kimi/Enertrek Timescale",
+        notes: "Auto-synced from Kimi/Enertrek Timescale — awaiting VEE",
       };
     });
     let readingsInserted = 0;
@@ -121,11 +121,10 @@ Deno.serve(async (req) => {
         return {
           metering_point_id: mp.id,
           reading_at: new Date(r.bucket).toISOString(),
-          import_kwh: Number(r.import_kwh ?? 0),
-          export_kwh: Number(r.export_kwh ?? 0),
-          interval_minutes: bucketMinutes,
-          source: "kimi",
-          user_id: user.id,
+          actual_mwh: Number(r.import_kwh ?? 0) / 1000,
+          source: "PRIVATE_SMART",
+          is_estimated: false,
+          quality: "measured",
         };
       });
     let intervalsInserted = 0;

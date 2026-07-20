@@ -17,3 +17,5 @@ verify_jwt = true
 
 [functions.admin-invite-consumer]
 verify_jwt = true
+[functions.validate-readings]
+verify_jwt = true

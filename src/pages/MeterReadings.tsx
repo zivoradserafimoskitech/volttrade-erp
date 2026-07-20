@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Plus, Check, X, RefreshCw } from "lucide-react";
+import { Plus, Check, X, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
 
@@ -62,6 +62,21 @@ export default function MeterReadings() {
   };
 
   const [syncing, setSyncing] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const runVee = async () => {
+    setValidating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("validate-readings", { body: { window_hours: 72 } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Validation failed");
+      toast.success(`VEE: ${data.registers_validated} validated, ${data.registers_flagged} registers flagged, ${data.intervals_flagged} intervals flagged, ${data.gaps_estimated} gaps estimated`);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Validation failed");
+    } finally {
+      setValidating(false);
+    }
+  };
   const syncKimi = async () => {
     setSyncing(true);
     try {
@@ -88,6 +103,9 @@ export default function MeterReadings() {
   return (
     <ErpLayout title="Meter Readings" subtitle="Consumption data feeding the billing engine"
       actions={<>
+        <Button variant="outline" onClick={runVee} disabled={validating}>
+          <ShieldCheck className="h-4 w-4 mr-2" />{validating ? "Validating…" : "Validate (VEE)"}
+        </Button>
         <Button variant="outline" onClick={syncKimi} disabled={syncing}>
           <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />{syncing ? "Syncing…" : "Sync from Kimi"}
         </Button>

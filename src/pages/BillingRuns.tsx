@@ -51,8 +51,9 @@ export default function BillingRuns() {
     const { data: links } = await supabase.from("supply_contract_points").select("*");
     const startISO = run.period_start + "T00:00:00";
     const endISO = run.period_end + "T23:59:59";
-    // Interval consumption is the billing truth (filled by Kimi sync + DSO imports).
-    const { data: intervals } = await supabase.from("consumption_readings").select("metering_point_id, reading_at, actual_mwh").gte("reading_at", startISO).lte("reading_at", endISO);
+    // Interval consumption is the billing truth (filled by Kimi sync + DSO imports). Flagged rows are excluded from billing.
+    const { data: intervalsRaw } = await supabase.from("consumption_readings").select("*").gte("reading_at", startISO).lte("reading_at", endISO);
+    const intervals = (intervalsRaw ?? []).filter((r: any) => (r.quality ?? "measured") !== "flagged");
     // meter_readings holds CUMULATIVE register snapshots — only usable as max−min delta, never summed.
     const { data: registers } = await supabase.from("meter_readings").select("metering_point_id, reading_at, import_kwh").eq("validation_status", "validated").gte("reading_at", startISO).lte("reading_at", endISO);
     // Hourly market prices for indexed tariffs
@@ -60,7 +61,7 @@ export default function BillingRuns() {
     const priceMap = new Map<string, number>();
     (prices ?? []).forEach((p: any) => priceMap.set(new Date(p.delivery_at).toISOString().slice(0, 13), Number(p.price_eur_mwh)));
 
-    const mpIntervalMwh = (mpIds: string[]) => (intervals ?? []).filter((r: any) => mpIds.includes(r.metering_point_id)).reduce((s: number, r: any) => s + Number(r.actual_mwh || 0), 0);
+    const mpIntervalMwh = (mpIds: string[]) => intervals.filter((r: any) => mpIds.includes(r.metering_point_id)).reduce((s: number, r: any) => s + Number(r.actual_mwh || 0), 0);
     const mpRegisterDeltaKwh = (mpIds: string[]) => {
       let total = 0;
       for (const id of mpIds) {
@@ -71,7 +72,7 @@ export default function BillingRuns() {
     };
     const indexedEnergyEur = (mpIds: string[], marginEurMwh: number) => {
       let eur = 0, mwh = 0;
-      for (const r of (intervals ?? []).filter((x: any) => mpIds.includes(x.metering_point_id))) {
+      for (const r of intervals.filter((x: any) => mpIds.includes(x.metering_point_id))) {
         const key = new Date(r.reading_at).toISOString().slice(0, 13);
         const p = priceMap.get(key) ?? 0;
         eur += Number(r.actual_mwh || 0) * (p + marginEurMwh);
