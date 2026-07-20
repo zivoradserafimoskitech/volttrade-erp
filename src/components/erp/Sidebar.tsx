@@ -47,6 +47,8 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/balancing/scheduling", label: "Scheduling", icon: CalendarClock },
     { to: "/balancing/live", label: "Live Position", icon: Gauge },
     { to: "/balancing/settlement", label: "Imbalance Settlement", icon: GitMerge },
+    { to: "/balancing/allocation", label: "Imbalance Allocation", icon: Scale },
+    { to: "/balancing/accuracy", label: "Forecast Accuracy", icon: Compass },
   ]},
   { title: "Supply Operations", items: [
     { to: "/supply/onboarding", label: "Onboarding / KYC", icon: UserPlus, roles: ['admin','management','supply_manager'] },
