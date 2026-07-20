@@ -39,6 +39,8 @@ import AssetMonitoring from "./pages/AssetMonitoring";
 import PvMonitoring from "./pages/PvMonitoring";
 import SmartMeter from "./pages/SmartMeter";
 import Vatra from "./pages/Vatra";
+import Gateways from "./pages/gateways/Gateways";
+import GatewayDetail from "./pages/gateways/GatewayDetail";
 import ConsumerManager from "./pages/balancing/ConsumerManager";
 import SlpSynthesis from "./pages/balancing/SlpSynthesis";
 import Scheduling from "./pages/balancing/Scheduling";
@@ -107,6 +109,8 @@ const App = () => (
             <Route path="/asset-monitoring" element={<AssetMonitoring />} />
             <Route path="/pv-monitoring" element={<PvMonitoring />} />
             <Route path="/smart-meter" element={<SmartMeter />} />
+            <Route path="/gateways" element={<Gateways />} />
+            <Route path="/gateways/:id" element={<GatewayDetail />} />
             <Route path="/balancing/consumers" element={<ConsumerManager />} />
             <Route path="/balancing/slp" element={<SlpSynthesis />} />
             <Route path="/balancing/scheduling" element={<Scheduling />} />
