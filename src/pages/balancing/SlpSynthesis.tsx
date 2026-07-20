@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 import { ErpLayout } from "@/components/erp/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/erp/StatCard";
-import { SLP_CATEGORIES, SlpCategory, synthesizeHourly, shape24h, seasonOf, dayTypeOf } from "@/lib/slpSynthesis";
+import { SLP_CATEGORIES, SlpCategory, synthesizeHourly, shape24h, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Area, AreaChart } from "recharts";
 import { Activity, BarChart3, Sigma } from "lucide-react";
 
@@ -18,6 +21,19 @@ export default function SlpSynthesis() {
   const [periodEnd, setPeriodEnd] = useState(() => new Date().toISOString().slice(0, 10));
   const [showFit, setShowFit] = useState(true);
   const [noisePct, setNoisePct] = useState(18);
+  useEffect(() => { loadSlpFromDb(supabase); loadHolidays(supabase); }, []);
+
+  // Autofill monthly kWh from the latest live volume-forecast snapshot for this category
+  async function fromLiveData() {
+    const monthISO = new Date().toISOString().slice(0, 8) + "01";
+    const { data } = await (supabase.from as any)("volume_forecasts")
+      .select("forecast_mwh, consumed_to_date_mwh, created_at")
+      .eq("scope", "slp_category").eq("slp_category", cat).eq("month", monthISO)
+      .order("created_at", { ascending: false }).limit(1);
+    if (!data?.length) { toast({ title: "No live forecast yet", description: "Run forecast-volumes first (or wait for the daily cron).", variant: "destructive" }); return; }
+    setMonthlyKwh(Math.round(Number(data[0].forecast_mwh) * 1000));
+    toast({ title: `Loaded live forecast for ${cat}`, description: `${Number(data[0].forecast_mwh).toFixed(2)} MWh projected (${Number(data[0].consumed_to_date_mwh).toFixed(2)} consumed to date)` });
+  }
 
   const data = useMemo(() => {
     const start = new Date(periodStart + "T00:00:00");
@@ -63,6 +79,7 @@ export default function SlpSynthesis() {
           <CardDescription>Monthly certified kWh × period × SLP category</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <Button size="sm" variant="outline" className="mb-2" onClick={fromLiveData}>From live data</Button>
           <Field label="SLP category"><Select value={cat} onValueChange={v => setCat(v as SlpCategory)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>{SLP_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}</SelectContent>

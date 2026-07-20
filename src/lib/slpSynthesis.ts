@@ -12,8 +12,33 @@ type Row = [SlpCategory, Season, DayType, number, number];
 const ROWS = coeffData as unknown as Row[];
 
 // Lookup map: cat|season|day|hour -> coeff
+// Seeded from the bundled JSON, OVERRIDDEN by the slp_coefficients DB table
+// when loadSlpFromDb() succeeds — the database is the single source of truth,
+// JSON is only the offline fallback.
 const MAP = new Map<string, number>();
 for (const [c, s, d, h, v] of ROWS) MAP.set(`${c}|${s}|${d}|${h}`, v);
+
+let dbLoaded = false;
+export async function loadSlpFromDb(supabase: any): Promise<boolean> {
+  if (dbLoaded) return true;
+  try {
+    const { data, error } = await supabase.from("slp_coefficients").select("slp_category, season, day_type, hour, coefficient");
+    if (error || !data?.length) return false;
+    for (const r of data) MAP.set(`${r.slp_category}|${r.season}|${r.day_type}|${r.hour}`, Number(r.coefficient));
+    dbLoaded = true;
+    return true;
+  } catch { return false; }
+}
+
+let HOLIDAYS: Set<string> = new Set();
+export async function loadHolidays(supabase: any): Promise<Set<string>> {
+  try {
+    const { data } = await supabase.from("public_holidays").select("holiday_date");
+    if (data?.length) HOLIDAYS = new Set(data.map((h: any) => String(h.holiday_date)));
+  } catch { /* keep whatever we have */ }
+  return HOLIDAYS;
+}
+export function holidaySet(): Set<string> { return HOLIDAYS; }
 
 export const SLP_CATEGORIES: SlpCategory[] = [
   "Office","Cafe_Restaurant","Market_Shop","Bakery","Street_Lighting",
@@ -29,7 +54,7 @@ export function seasonOf(d: Date): Season {
 }
 
 // Public-holiday calendar can be plugged in here. For now Sat=SA, Sun=SU.
-export function dayTypeOf(d: Date, holidays: Set<string> = new Set()): DayType {
+export function dayTypeOf(d: Date, holidays: Set<string> = HOLIDAYS): DayType {
   const iso = d.toISOString().slice(0, 10);
   if (holidays.has(iso)) return "SU";
   const wd = d.getDay();
@@ -48,7 +73,7 @@ export function synthesizeHourly(
   monthlyKwh: number,
   start: Date,
   end: Date,
-  holidays: Set<string> = new Set()
+  holidays: Set<string> = HOLIDAYS
 ): { ts: Date; kwh: number; coeff: number }[] {
   const out: { ts: Date; kwh: number; coeff: number }[] = [];
   let sumC = 0;

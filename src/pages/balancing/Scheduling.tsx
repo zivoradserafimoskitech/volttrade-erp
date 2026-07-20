@@ -10,7 +10,7 @@ import { StatCard } from "@/components/erp/StatCard";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { shape24h, SlpCategory, seasonOf, dayTypeOf } from "@/lib/slpSynthesis";
+import { shape24h, SlpCategory, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
 import { CalendarClock, Lock, Send, Activity, Download } from "lucide-react";
 
 export default function Scheduling() {
@@ -44,7 +44,7 @@ export default function Scheduling() {
     toast({ title: `PV forecast synced (${data.sites} sites, ${data.rows} hours)`, description: got ? "PV leg now uses the forecast." : "No rows for this date — sinusoid fallback." });
   }
 
-  useEffect(() => { supabase.from("balance_groups").select("id,name").then(({ data }) => { setGroups(data ?? []); if (data?.[0]) setBg(data[0].id); }); }, []);
+  useEffect(() => { supabase.from("balance_groups").select("id,name").then(({ data }) => { setGroups(data ?? []); if (data?.[0]) setBg(data[0].id); }); loadSlpFromDb(supabase); loadHolidays(supabase); }, []);
 
   // Bridge: daily client forecasts → MTU nomination inputs.
   // Splits the day's total forecast into PROFILED/MEASURED legs using
