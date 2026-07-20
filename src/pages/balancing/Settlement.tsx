@@ -73,10 +73,10 @@ export default function Settlement() {
       }
 
       // 2) Actuals per segment — internal (own meters) vs official (DSO)
-      const { data: cps } = await (supabase.from as any)("connection_points")
-        .select("metering_point_id, metering_category").eq("balance_group_id", bg).eq("status", "active");
+      const { data: cps } = await (supabase.from as any)("metering_points")
+        .select("id, metering_category").eq("balance_group_id", bg).eq("status", "active");
       const segOf = new Map<string, Seg>();
-      ((cps ?? []) as any[]).forEach(c => { if (c.metering_point_id) segOf.set(c.metering_point_id, c.metering_category === "MEASURED" ? "MEASURED" : "PROFILED"); });
+      ((cps ?? []) as any[]).forEach(c => segOf.set(c.id, c.metering_category === "MEASURED" ? "MEASURED" : "PROFILED"));
       const internal: Record<Seg, number | null> = { PROFILED: null, MEASURED: null, PV: null };
       const official: Record<Seg, number | null> = { PROFILED: null, MEASURED: null, PV: null };
       if (segOf.size) {

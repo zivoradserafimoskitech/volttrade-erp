@@ -22,9 +22,9 @@ Deno.serve(async (req) => {
     const sinceISO = new Date(Date.now() - windowHours * 3600_000).toISOString();
 
     // Connection power per metering point (physical plausibility limit)
-    const { data: cps } = await admin.from("connection_points").select("metering_point_id, connection_power_kw");
+    const { data: cps } = await admin.from("metering_points").select("id, connected_power_kw");
     const powerKw = new Map<string, number>();
-    (cps ?? []).forEach((c: any) => { if (c.metering_point_id) powerKw.set(c.metering_point_id, Number(c.connection_power_kw || 0)); });
+    (cps ?? []).forEach((c: any) => { powerKw.set(c.id, Number(c.connected_power_kw || 0)); });
     const limitKw = (mp: string) => powerKw.get(mp) || 100; // fallback if unclassified
 
     // ── 1. Register validation ────────────────────────────────────

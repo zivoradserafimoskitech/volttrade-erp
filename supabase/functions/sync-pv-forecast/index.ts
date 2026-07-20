@@ -21,11 +21,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const horizon = Math.min(Number(body.horizon_hours ?? 48), 168);
 
-    const { data: sites } = await admin.from("connection_points")
-      .select("id, pv_capacity_kwp, latitude, longitude, pv_tilt_deg, pv_azimuth_deg, pv_calibration")
-      .gt("pv_capacity_kwp", 0).eq("status", "active");
+    const { data: sites } = await admin.from("metering_points")
+      .select("id, pv_capacity_kw, latitude, longitude, pv_tilt_deg, pv_azimuth_deg, pv_calibration")
+      .gt("pv_capacity_kw", 0).eq("status", "active");
     const usable = (sites ?? []).filter((s: any) => s.latitude != null && s.longitude != null);
-    if (!usable.length) return json({ ok: true, sites: 0, message: "No active PV connection points with coordinates." });
+    if (!usable.length) return json({ ok: true, sites: 0, message: "No active PV metering points with coordinates." });
 
     // Group sites by rounded coordinates so nearby sites share one weather call
     const cells = new Map<string, any[]>();
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       const temp: number[] = wx?.hourly?.temperature_2m ?? [];
 
       for (const s of cellSites) {
-        const kwp = Number(s.pv_capacity_kwp);
+        const kwp = Number(s.pv_capacity_kw);
         const tilt = Number(s.pv_tilt_deg ?? 30);
         const cal = Number(s.pv_calibration ?? 1);
         // crude plane-of-array gain for fixed tilt at ~41°N; audit-grade models later
@@ -56,14 +56,14 @@ Deno.serve(async (req) => {
         const rows: any[] = [];
         for (let i = 0; i < Math.min(times.length, horizon); i++) {
           const g = Number(ghi[i] ?? 0);
-          if (g <= 0) { rows.push({ connection_point_id: s.id, ts: times[i] + ":00Z", forecast_kwh: 0, ghi_wm2: 0, temp_c: temp[i] ?? null }); continue; }
+          if (g <= 0) { rows.push({ metering_point_id: s.id, ts: times[i] + ":00Z", forecast_kwh: 0, ghi_wm2: 0, temp_c: temp[i] ?? null }); continue; }
           const cellT = Number(temp[i] ?? 20) + g / 32;
           const tempDerate = 1 - 0.004 * Math.max(cellT - 25, 0);
           const kwh = kwp * (g * tiltGain / 1000) * 0.85 * tempDerate * cal;
-          rows.push({ connection_point_id: s.id, ts: times[i].endsWith("Z") ? times[i] : times[i] + ":00Z", forecast_kwh: Math.max(kwh, 0), ghi_wm2: g, temp_c: temp[i] ?? null });
+          rows.push({ metering_point_id: s.id, ts: times[i].endsWith("Z") ? times[i] : times[i] + ":00Z", forecast_kwh: Math.max(kwh, 0), ghi_wm2: g, temp_c: temp[i] ?? null });
         }
         for (let i = 0; i < rows.length; i += 500) {
-          const { error } = await admin.from("pv_forecasts").upsert(rows.slice(i, i + 500), { onConflict: "connection_point_id,ts" });
+          const { error } = await admin.from("pv_forecasts").upsert(rows.slice(i, i + 500), { onConflict: "metering_point_id,ts" });
           if (error) throw error;
         }
         rowsWritten += rows.length;

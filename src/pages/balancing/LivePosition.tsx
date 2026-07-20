@@ -57,9 +57,9 @@ export default function LivePosition() {
 
       // 2) Actual per hour from own meters (internal, non-flagged), scoped to
       //    the balance group's metering points
-      const { data: cps } = await (supabase.from as any)("connection_points")
-        .select("metering_point_id").eq("balance_group_id", bg).eq("status", "active");
-      const mpIds = ((cps ?? []) as any[]).map(c => c.metering_point_id).filter(Boolean);
+      const { data: cps } = await (supabase.from as any)("metering_points")
+        .select("id").eq("balance_group_id", bg).eq("status", "active");
+      const mpIds = ((cps ?? []) as any[]).map(c => c.id);
       const act: (number | null)[] = Array(24).fill(null);
       if (mpIds.length) {
         const { data: iv } = await supabase.from("consumption_readings")

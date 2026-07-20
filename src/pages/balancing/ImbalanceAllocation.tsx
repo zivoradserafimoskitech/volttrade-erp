@@ -50,7 +50,7 @@ export default function ImbalanceAllocation() {
       const histStart = new Date(start.getTime() - 14 * 86400_000);
 
       const [{ data: cps }, { data: clientRows }, { data: sched }, { data: iv }, { data: hol }, { data: invs }] = await Promise.all([
-        (supabase.from as any)("connection_points").select("metering_point_id, customer_id").eq("balance_group_id", bg).eq("status", "active"),
+        (supabase.from as any)("metering_points").select("id, client_id").eq("balance_group_id", bg).eq("status", "active"),
         supabase.from("clients").select("id, company_name"),
         supabase.from("balance_schedules").select("date, mtu, scheduled_mwh, leg, version").eq("balance_group_id", bg).gte("date", start.toISOString().slice(0, 10)).lte("date", end.toISOString().slice(0, 10)),
         supabase.from("consumption_readings").select("metering_point_id, reading_at, actual_mwh, quality").gte("reading_at", histStart.toISOString()).lte("reading_at", end.toISOString()).limit(200000),
@@ -59,7 +59,7 @@ export default function ImbalanceAllocation() {
       ]);
 
       const clientOf = new Map<string, string>();
-      ((cps ?? []) as any[]).forEach(c => { if (c.metering_point_id && c.customer_id) clientOf.set(c.metering_point_id, c.customer_id); });
+      ((cps ?? []) as any[]).forEach(c => { if (c.client_id) clientOf.set(c.id, c.client_id); });
       const names = new Map<string, string>();
       ((clientRows ?? []) as any[]).forEach(c => names.set(c.id, c.company_name));
       const holidays = new Set<string>(((hol ?? []) as any[]).map(h => String(h.holiday_date)));

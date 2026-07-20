@@ -31,10 +31,10 @@ Deno.serve(async (req) => {
     const holidays = new Set<string>((hol ?? []).map((h: any) => h.holiday_date));
 
     // Profiled/measured classification + client link per metering point
-    const { data: cps } = await admin.from("connection_points")
-      .select("customer_id, metering_point_id, metering_category, slp_category").eq("status", "active");
+    const { data: cps } = await admin.from("metering_points")
+      .select("id, client_id, metering_category, slp_category").eq("status", "active");
     const mpInfo = new Map<string, any>();
-    (cps ?? []).forEach((c: any) => { if (c.metering_point_id) mpInfo.set(c.metering_point_id, c); });
+    (cps ?? []).forEach((c: any) => mpInfo.set(c.id, c));
 
     // Interval energy since history start (internal Kimi data is fine here — forecasting, not settlement)
     const { data: iv } = await admin.from("consumption_readings")
@@ -46,13 +46,13 @@ Deno.serve(async (req) => {
     const clients = new Map<string, Agg>();
     for (const r of (iv ?? []) as any[]) {
       const info = mpInfo.get(r.metering_point_id);
-      if (!info?.customer_id) continue;
+      if (!info?.client_id) continue;
       const ts = new Date(r.reading_at);
       const dk = dayKey(ts, holidays);
       const dISO = ts.toISOString().slice(0, 10);
       const v = Number(r.actual_mwh || 0);
-      if (!clients.has(info.customer_id)) clients.set(info.customer_id, { toDate: 0, byType: { WD: { sum: 0, days: new Set() }, SA: { sum: 0, days: new Set() }, SU: { sum: 0, days: new Set() } }, category: info.slp_category, segment: info.metering_category === "MEASURED" ? "MEASURED" : "PROFILED" });
-      const a = clients.get(info.customer_id)!;
+      if (!clients.has(info.client_id)) clients.set(info.client_id, { toDate: 0, byType: { WD: { sum: 0, days: new Set() }, SA: { sum: 0, days: new Set() }, SU: { sum: 0, days: new Set() } }, category: info.slp_category, segment: info.metering_category === "MEASURED" ? "MEASURED" : "PROFILED" });
+      const a = clients.get(info.client_id)!;
       if (ts >= monthStart) a.toDate += v;
       if (dISO !== now.toISOString().slice(0, 10)) { a.byType[dk].sum += v; a.byType[dk].days.add(dISO); } // exclude today (partial)
     }

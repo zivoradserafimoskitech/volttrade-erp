@@ -45,13 +45,13 @@ export default function ForecastAccuracy() {
 
       const [{ data: snaps }, { data: cps }, { data: iv }] = await Promise.all([
         (supabase.from as any)("volume_forecasts").select("client_id, slp_category, forecast_mwh, created_at").eq("scope", "client").eq("month", monthISO).order("created_at"),
-        (supabase.from as any)("connection_points").select("metering_point_id, customer_id").eq("status", "active"),
+        (supabase.from as any)("metering_points").select("id, client_id").eq("status", "active"),
         supabase.from("consumption_readings").select("metering_point_id, actual_mwh, source, quality").gte("reading_at", start).lte("reading_at", end).limit(200000),
       ]);
       if (!snaps?.length) { toast({ title: "No snapshots for this month", description: "forecast-volumes hasn't run for it.", variant: "destructive" }); setRows([]); return; }
 
       const clientOf = new Map<string, string>();
-      ((cps ?? []) as any[]).forEach(c => { if (c.metering_point_id && c.customer_id) clientOf.set(c.metering_point_id, c.customer_id); });
+      ((cps ?? []) as any[]).forEach(c => { if (c.client_id) clientOf.set(c.id, c.client_id); });
 
       // Realized per client — official first, internal fallback
       const off = new Map<string, number>(); const int_ = new Map<string, number>();

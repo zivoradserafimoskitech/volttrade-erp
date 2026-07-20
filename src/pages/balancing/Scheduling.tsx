@@ -48,19 +48,19 @@ export default function Scheduling() {
 
   // Bridge: daily client forecasts → MTU nomination inputs.
   // Splits the day's total forecast into PROFILED/MEASURED legs using
-  // connection_points.metering_category weighted by connection_power_kw.
+  // metering_points.metering_category weighted by connected_power_kw.
   async function loadFromForecast() {
     const [{ data: fc }, { data: cps }] = await Promise.all([
       supabase.from("forecasts").select("client_id, forecast_mwh").eq("forecast_date", date),
-      (supabase.from as any)("connection_points").select("customer_id, metering_category, connection_power_kw").eq("status", "active"),
+      (supabase.from as any)("metering_points").select("client_id, metering_category, connected_power_kw").eq("status", "active"),
     ]);
     if (!fc?.length) { toast({ title: "No forecasts for this date", description: "Create daily forecasts in Forecasting first.", variant: "destructive" }); return; }
     const total = fc.reduce((s, r: any) => s + Number(r.forecast_mwh || 0), 0);
     let prof = 0, meas = 0;
     for (const r of fc as any[]) {
-      const clientCps = (cps ?? []).filter((c: any) => c.customer_id === r.client_id);
+      const clientCps = (cps ?? []).filter((c: any) => c.client_id === r.client_id);
       if (!clientCps.length) { prof += Number(r.forecast_mwh || 0); continue; } // unclassified → profiled
-      const w = (cat: string) => clientCps.filter((c: any) => c.metering_category === cat).reduce((s: number, c: any) => s + Number(c.connection_power_kw || 1), 0);
+      const w = (cat: string) => clientCps.filter((c: any) => c.metering_category === cat).reduce((s: number, c: any) => s + Number(c.connected_power_kw || 1), 0);
       const wp = w("PROFILED"), wm = w("MEASURED"), ws = wp + wm || 1;
       prof += Number(r.forecast_mwh || 0) * wp / ws;
       meas += Number(r.forecast_mwh || 0) * wm / ws;
