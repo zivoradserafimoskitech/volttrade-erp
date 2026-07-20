@@ -53,7 +53,13 @@ export default function BillingRuns() {
     const endISO = run.period_end + "T23:59:59";
     // Interval consumption is the billing truth (filled by Kimi sync + DSO imports). Flagged rows are excluded from billing.
     const { data: intervalsRaw } = await supabase.from("consumption_readings").select("*").gte("reading_at", startISO).lte("reading_at", endISO);
-    const intervals = (intervalsRaw ?? []).filter((r: any) => (r.quality ?? "measured") !== "flagged");
+    const clean = (intervalsRaw ?? []).filter((r: any) => (r.quality ?? "measured") !== "flagged");
+    // Official (DSO) data is the invoicing truth; own smart meters (PRIVATE_SMART)
+    // are internal — used for hourly shape (indexed/free-hours), volume reconciled
+    // to the official total whenever official data exists.
+    const officialIv = clean.filter((r: any) => r.source === "DSO_INTERVAL" || r.source === "DSO_MONTHLY");
+    const internalIv = clean.filter((r: any) => r.source !== "DSO_INTERVAL" && r.source !== "DSO_MONTHLY");
+    const intervals = officialIv.length > 0 ? officialIv : internalIv;
     // meter_readings holds CUMULATIVE register snapshots — only usable as max−min delta, never summed.
     const { data: registers } = await supabase.from("meter_readings").select("metering_point_id, reading_at, import_kwh").eq("validation_status", "validated").gte("reading_at", startISO).lte("reading_at", endISO);
     // Hourly market prices for indexed tariffs
@@ -70,15 +76,25 @@ export default function BillingRuns() {
       }
       return total;
     };
-    const indexedEnergyEur = (mpIds: string[], marginEurMwh: number) => {
-      let eur = 0, mwh = 0;
-      for (const r of intervals.filter((x: any) => mpIds.includes(x.metering_point_id))) {
+    const indexedEnergyEur = (mpIds: string[], marginEurMwh: number, freeBelow: number | null) => {
+      // Hourly shape: prefer official interval data; else own smart meters,
+      // scaled to the official volume when a DSO total exists for these points.
+      const officialForMp = officialIv.filter((x: any) => mpIds.includes(x.metering_point_id));
+      const internalForMp = internalIv.filter((x: any) => mpIds.includes(x.metering_point_id));
+      const shapeRows = officialForMp.length > 0 ? officialForMp : internalForMp;
+      const officialVolume = officialForMp.reduce((s2: number, r: any) => s2 + Number(r.actual_mwh || 0), 0);
+      const shapeVolume = shapeRows.reduce((s2: number, r: any) => s2 + Number(r.actual_mwh || 0), 0);
+      const scale = officialForMp.length === 0 && officialVolume > 0 && shapeVolume > 0 ? officialVolume / shapeVolume : 1;
+      let eur = 0, mwh = 0, freeMwh = 0;
+      for (const r of shapeRows) {
         const key = new Date(r.reading_at).toISOString().slice(0, 13);
         const p = priceMap.get(key) ?? 0;
-        eur += Number(r.actual_mwh || 0) * (p + marginEurMwh);
-        mwh += Number(r.actual_mwh || 0);
+        const v = Number(r.actual_mwh || 0) * scale;
+        mwh += v;
+        if (freeBelow !== null && p <= freeBelow) { freeMwh += v; continue; } // free hour — billed at 0
+        eur += v * (p + marginEurMwh);
       }
-      return { eur, mwh };
+      return { eur, mwh, freeMwh };
     };
 
     // Regulatory charges applicable to this period (RKE): PPEE %, PPEE price, MEMO fee, FX
@@ -102,12 +118,14 @@ export default function BillingRuns() {
       const energyPrice = comps.find((x: any) => x.type === 'energy')?.value ?? 0;
       const fixed = comps.find((x: any) => x.type === 'fixed_fee')?.value ?? 0;
       const marginComp = comps.find((x: any) => x.type === 'margin')?.value ?? 0;
+      const freeBelowComp = comps.find((x: any) => x.type === 'free_below');
+      const freeBelow: number | null = freeBelowComp != null ? Number(freeBelowComp.value) : null;
       const mpIds = (links ?? []).filter((l: any) => l.contract_id === c.id).map((l: any) => l.metering_point_id);
 
-      let mwh: number; let marketEnergyEur: number; let priceLabel: number;
+      let mwh: number; let marketEnergyEur: number; let priceLabel: number; let freeMwh = 0;
       if ((t as any).model === 'indexed') {
-        const r = indexedEnergyEur(mpIds, Number(marginComp));
-        mwh = r.mwh; marketEnergyEur = r.eur; priceLabel = mwh > 0 ? r.eur / mwh : 0;
+        const r = indexedEnergyEur(mpIds, Number(marginComp), freeBelow);
+        mwh = r.mwh; marketEnergyEur = r.eur; freeMwh = r.freeMwh; priceLabel = mwh > 0 ? r.eur / mwh : 0;
       } else {
         const intervalMwh = mpIntervalMwh(mpIds);
         mwh = intervalMwh > 0 ? intervalMwh : mpRegisterDeltaKwh(mpIds) / 1000;
@@ -138,6 +156,7 @@ export default function BillingRuns() {
         { type: 'energy', label: (t as any).model === 'indexed' ? 'Електрична енергија — индексирана цена' : 'Електрична енергија', mwh: marketMwh, price_eur_mwh: marketMwh > 0 ? energy_amount / marketMwh : priceLabel, amount_eur: energy_amount, vat_eur: vatOf(energy_amount) },
         { type: 'ppee', label: `Обновлива Енергија (ППЕЕ) — ${ppeePct}%`, mwh: ppeeMwh, price_eur_mwh: ppeeMwh > 0 ? ppeeAmount / ppeeMwh : 0, amount_eur: ppeeAmount, vat_eur: vatOf(ppeeAmount) },
         { type: 'market_fee', label: 'Надомест за користење на пазар на електрична енергија', mwh, price_eur_mwh: mwh > 0 ? memoAmount / mwh : 0, amount_eur: memoAmount, vat_eur: vatOf(memoAmount) },
+        ...(freeMwh > 0 ? [{ type: 'free_energy', label: `Бесплатна енергија (пазарна цена ≤ ${freeBelow} /MWh)`, mwh: freeMwh, price_eur_mwh: 0, amount_eur: 0, vat_eur: 0 }] : []),
         ...(Number(fixed) > 0 ? [{ type: 'fixed_fee', label: 'Monthly fixed fee', amount_eur: Number(fixed), vat_eur: vatOf(Number(fixed)) }] : []),
         { type: 'vat', label: `ДДВ ${vatPct}%`, amount_eur: tax },
         { type: 'meta', label: `Цените се изразени во ${cur}${cur !== 'MKD' ? ` (EUR/MKD ${eurMkd})` : ''}`, amount_eur: 0 },

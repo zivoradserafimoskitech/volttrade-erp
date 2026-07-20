@@ -35,9 +35,14 @@ export default function Tariffs() {
   const add = async (form: FormData) => {
     const energyPrice = Number(form.get("energy_price") || 0);
     const fixedFee = Number(form.get("fixed_fee") || 0);
+    const marginV = Number(form.get("margin") || 0);
+    const freeBelowRaw = form.get("free_below");
     const components = [
       { type: 'energy', label: 'Energy (€/MWh)', unit: '€/MWh', value: energyPrice },
       { type: 'fixed_fee', label: 'Monthly fixed fee', unit: '€/month', value: fixedFee },
+      ...(marginV ? [{ type: 'margin', label: 'Supplier margin (€/MWh)', unit: '€/MWh', value: marginV }] : []),
+      // Free-hours product: intervals with market price ≤ this threshold are billed at 0
+      ...(freeBelowRaw !== null && freeBelowRaw !== '' ? [{ type: 'free_below', label: 'Free when market price ≤ (€/MWh)', unit: '€/MWh', value: Number(freeBelowRaw) }] : []),
     ];
     const { error } = await supabase.from("tariffs").insert({
       user_id: user!.id,
@@ -85,6 +90,8 @@ export default function Tariffs() {
               </div>
               <F name="energy_price" label="Energy price (/MWh, in chosen currency)" type="number" step="0.01" required />
               <F name="fixed_fee" label="Monthly fixed fee (in chosen currency)" type="number" step="0.01" defaultValue="0" />
+              <F name="margin" label="Margin /MWh (indexed model)" type="number" step="0.01" defaultValue="0" />
+              <F name="free_below" label="Free hours: price ≤ (/MWh, blank = off)" type="number" step="0.01" />
               <DialogFooter className="col-span-2"><Button type="submit" style={{ background: "var(--gradient-primary)" }}>Save tariff</Button></DialogFooter>
             </form>
           </DialogContent>
