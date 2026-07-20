@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +63,20 @@ export default function MeterReadings() {
 
   const [syncing, setSyncing] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [tab, setTab] = useState<"registers" | "dso">("registers");
+  const [dsoRows, setDsoRows] = useState<any[]>([]);
+  const [mpNames, setMpNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (tab !== "dso") return;
+    (async () => {
+      const [{ data: d }, { data: mps }] = await Promise.all([
+        supabase.from("consumption_readings").select("*").in("source", ["DSO_MONTHLY", "DSO_INTERVAL"]).order("reading_at", { ascending: false }).limit(200),
+        supabase.from("metering_points").select("id, edu_code"),
+      ]);
+      setDsoRows(d ?? []);
+      setMpNames(new Map(((mps ?? []) as any[]).map(m => [m.id, m.edu_code])));
+    })();
+  }, [tab]);
   const runVee = async () => {
     setValidating(true);
     try {
@@ -133,6 +147,38 @@ export default function MeterReadings() {
           </DialogContent>
         </Dialog>
       </>}>
+      <div className="flex items-center gap-2 mb-1">
+        <Button size="sm" variant={tab === "registers" ? "default" : "outline"} onClick={() => setTab("registers")}>Register reads</Button>
+        <Button size="sm" variant={tab === "dso" ? "default" : "outline"} onClick={() => setTab("dso")}>DSO imports (official)</Button>
+      </div>
+      {tab === "dso" ? (
+        <Card className="border-border/60">
+          <CardHeader>
+            <CardTitle>Official DSO/EVN reads</CardTitle>
+            <CardDescription>Interval energy imported via import-dso-reads — the legal basis for billing and settlement. Rejected rows never land here; corrections are logged via overwrite.</CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Metering point (EDU)</TableHead><TableHead>Period</TableHead>
+                <TableHead className="text-right">kWh</TableHead><TableHead>Source</TableHead><TableHead>Quality</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {dsoRows.map((r: any) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{mpNames.get(r.metering_point_id) ?? r.metering_point_id?.slice(0, 8)}</TableCell>
+                    <TableCell className="tabular-nums">{new Date(r.reading_at).toISOString().slice(0, 10)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{(Number(r.actual_mwh) * 1000).toFixed(0)}</TableCell>
+                    <TableCell><Badge variant="secondary" className="text-[10px]">{r.source}</Badge></TableCell>
+                    <TableCell><Badge variant={r.quality === "flagged" ? "destructive" : "outline"} className="text-[10px]">{r.quality ?? "measured"}</Badge></TableCell>
+                  </TableRow>
+                ))}
+                {dsoRows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No DSO imports yet.</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (<>
       <div className="flex items-center gap-2">
         <Label className="text-xs text-muted-foreground">Filter:</Label>
         <Select value={filterMp} onValueChange={setFilterMp}>
@@ -176,6 +222,7 @@ export default function MeterReadings() {
           </Table>
         </CardContent>
       </Card>
+      </>)}
     </ErpLayout>
   );
 }
