@@ -71,6 +71,6 @@ Deno.serve(async (req) => {
     }
     return json({ ok: true, sites: usable.length, weather_calls: cells.size, rows: rowsWritten, horizon_hours: horizon });
   } catch (e) {
-    return json({ ok: false, error: String((e as Error)?.message ?? e) }, 500);
+    return json({ ok: false, error: String((e as Error)?.message ?? e) });
   }
 });

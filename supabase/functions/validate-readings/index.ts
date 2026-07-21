@@ -119,6 +119,6 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, registers_validated: regValidated, registers_flagged: regFlagged, intervals_flagged: ivFlagged, gaps_estimated: estimated, window_hours: windowHours });
   } catch (e) {
-    return json({ ok: false, error: String((e as Error)?.message ?? e) }, 500);
+    return json({ ok: false, error: String((e as Error)?.message ?? e) });
   }
 });

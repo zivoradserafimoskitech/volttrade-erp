@@ -94,6 +94,6 @@ Deno.serve(async (req) => {
     }
     return json({ ok: true, month: monthISO, clients: clients.size, snapshots: rows.length, skipped_no_history: skippedNoHistory });
   } catch (e) {
-    return json({ ok: false, error: String((e as Error)?.message ?? e) }, 500);
+    return json({ ok: false, error: String((e as Error)?.message ?? e) });
   }
 });

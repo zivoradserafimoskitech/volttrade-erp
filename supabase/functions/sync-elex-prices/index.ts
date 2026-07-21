@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       .eq("provider", "elex").gte("called_at", dayStart.toISOString());
     const used = count ?? 0;
     if (used >= DAILY_CAP) {
-      return json({ ok: false, error: `ELEX daily test cap reached (${used}/${DAILY_CAP}). Resets 00:00 UTC.` }, 429);
+      return json({ ok: false, error: `ELEX daily test cap reached (${used}/${DAILY_CAP}). Resets 00:00 UTC.` });
     }
     const logCall = (endpoint: string, status: number) =>
       admin.from("external_api_log").insert({ provider: "elex", endpoint, status });
@@ -87,17 +87,17 @@ Deno.serve(async (req) => {
     const date = body.date ?? new Date().toISOString().slice(0, 10);
     const urlTemplate = Deno.env.get("ELEX_PRICES_URL");
     if (!urlTemplate) {
-      return json({ ok: false, error: "ELEX_PRICES_URL secret not set. Run { probe: true } first to discover the endpoint, then set the secret." }, 400);
+      return json({ ok: false, error: "ELEX_PRICES_URL secret not set. Run { probe: true } first to discover the endpoint, then set the secret." });
     }
     const url = urlTemplate.replace("{date}", date);
     const r = await fetch(url, { headers });
     await logCall(url, r.status);
-    if (!r.ok) return json({ ok: false, error: `ELEX responded ${r.status}`, url }, 502);
+    if (!r.ok) return json({ ok: false, error: `ELEX responded ${r.status}`, url });
     const payload = await r.json();
 
     const itemsPath = Deno.env.get("ELEX_ITEMS_PATH");
     const items: any[] | null = itemsPath ? dig(payload, itemsPath) : findArray(payload);
-    if (!items?.length) return json({ ok: false, error: "No price array found in response — set ELEX_ITEMS_PATH", sample: JSON.stringify(payload).slice(0, 800) }, 422);
+    if (!items?.length) return json({ ok: false, error: "No price array found in response — set ELEX_ITEMS_PATH", sample: JSON.stringify(payload).slice(0, 800) });
 
     const timeField = Deno.env.get("ELEX_TIME_FIELD");
     const priceField = Deno.env.get("ELEX_PRICE_FIELD");
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     const autoTime = timeField ?? Object.keys(first).find(k => /time|hour|date|period|mtu|delivery/i.test(k));
     const autoPrice = priceField ?? Object.keys(first).find(k => /price|eur|mwh|value|amount/i.test(k));
     if (!autoTime || !autoPrice) {
-      return json({ ok: false, error: "Could not auto-map fields — set ELEX_TIME_FIELD / ELEX_PRICE_FIELD", sample_keys: Object.keys(first) }, 422);
+      return json({ ok: false, error: "Could not auto-map fields — set ELEX_TIME_FIELD / ELEX_PRICE_FIELD", sample_keys: Object.keys(first) });
     }
 
     const rows: any[] = [];
@@ -124,12 +124,12 @@ Deno.serve(async (req) => {
       if (!ts) continue;
       rows.push({ delivery_at: ts.toISOString(), price_eur_mwh: +price.toFixed(2), source: "elex" });
     }
-    if (!rows.length) return json({ ok: false, error: "Mapped 0 rows — check field mapping", sample: JSON.stringify(first).slice(0, 400) }, 422);
+    if (!rows.length) return json({ ok: false, error: "Mapped 0 rows — check field mapping", sample: JSON.stringify(first).slice(0, 400) });
 
     const { error } = await admin.from("market_prices").upsert(rows, { onConflict: "delivery_at,source" });
     if (error) throw error;
     return json({ ok: true, mode: "sync", date, rows: rows.length, time_field: autoTime, price_field: autoPrice, calls_used_today: used + 1, cap: DAILY_CAP });
   } catch (e) {
-    return json({ ok: false, error: String((e as Error)?.message ?? e) }, 500);
+    return json({ ok: false, error: String((e as Error)?.message ?? e) });
   }
 });

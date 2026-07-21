@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const provider = String(body.provider ?? "elecz").toLowerCase();
     if (!["elecz", "stekker", "eex"].includes(provider)) {
-      return json({ ok: false, error: "provider must be one of: elecz, stekker, eex" }, 400);
+      return json({ ok: false, error: "provider must be one of: elecz, stekker, eex" });
     }
 
     // ── per-provider daily cap ──
@@ -57,11 +57,11 @@ Deno.serve(async (req) => {
       const zone = String(body.zone ?? Deno.env.get("ELECZ_ZONE") ?? "MK");
       // full ranked hourly set for today+tomorrow
       const r = await logged(`https://elecz.com/signal/cheapest-hours?zone=${encodeURIComponent(zone)}&hours=48`, { headers: { Accept: "application/json" } });
-      if (!r.ok) return json({ ok: false, error: `elecz responded ${r.status}` }, 502);
+      if (!r.ok) return json({ ok: false, error: `elecz responded ${r.status}` });
       const p = await r.json();
       const items: any[] = p?.cheapest_hours ?? p?.ranked_hours ?? findArray(p) ?? [];
       const unit = String(p?.unit ?? items[0]?.unit ?? "c/kWh");
-      if (!/c\/?kwh/i.test(unit)) return json({ ok: false, error: `Unexpected unit "${unit}" for zone ${zone} — expected c/kWh (EUR zones only)`, }, 422);
+      if (!/c\/?kwh/i.test(unit)) return json({ ok: false, error: `Unexpected unit "${unit}" for zone ${zone} — expected c/kWh (EUR zones only)`, });
       for (const it of items) {
         const tRaw = it.hour ?? it.time ?? it.timestamp;
         const priceCt = Number(it.price);
@@ -86,18 +86,18 @@ Deno.serve(async (req) => {
     if (provider === "stekker") {
       const url = Deno.env.get("STEKKER_URL");
       const token = Deno.env.get("STEKKER_TOKEN");
-      if (!url || !token) return json({ ok: false, error: "STEKKER_URL and STEKKER_TOKEN secrets are required (Bearer auth, price_forecast backend)." }, 400);
+      if (!url || !token) return json({ ok: false, error: "STEKKER_URL and STEKKER_TOKEN secrets are required (Bearer auth, price_forecast backend)." });
       const region = String(body.region ?? Deno.env.get("STEKKER_REGION") ?? "");
       const full = region ? `${url}${url.includes("?") ? "&" : "?"}region=${encodeURIComponent(region)}` : url;
       const r = await logged(full, { headers: { Accept: "application/json", Authorization: `Bearer ${token}` } });
-      if (!r.ok) return json({ ok: false, error: `stekker responded ${r.status}` }, 502);
+      if (!r.ok) return json({ ok: false, error: `stekker responded ${r.status}` });
       const p = await r.json();
       const items = findArray(p) ?? [];
-      if (!items.length) return json({ ok: false, error: "No array found in Stekker response", sample: JSON.stringify(p).slice(0, 600) }, 422);
+      if (!items.length) return json({ ok: false, error: "No array found in Stekker response", sample: JSON.stringify(p).slice(0, 600) });
       const first = items[0];
       const tf = Object.keys(first).find(k => /time|date|from|start|hour/i.test(k));
       const pf = Object.keys(first).find(k => /price|eur|value|mwh/i.test(k));
-      if (!tf || !pf) return json({ ok: false, error: "Could not map Stekker fields", sample_keys: Object.keys(first) }, 422);
+      if (!tf || !pf) return json({ ok: false, error: "Could not map Stekker fields", sample_keys: Object.keys(first) });
       for (const it of items) {
         const t = it[tf]; const v = Number(it[pf]);
         if (!t || !isFinite(v) || isNaN(Date.parse(t))) continue;
@@ -110,18 +110,18 @@ Deno.serve(async (req) => {
       const urlT = Deno.env.get("EEX_URL");
       const id = Deno.env.get("EEX_ID");
       const pw = Deno.env.get("EEX_PASSWORD");
-      if (!urlT || !id || !pw) return json({ ok: false, error: "EEX requires a paid DataSource subscription: set EEX_URL, EEX_ID, EEX_PASSWORD secrets." }, 400);
+      if (!urlT || !id || !pw) return json({ ok: false, error: "EEX requires a paid DataSource subscription: set EEX_URL, EEX_ID, EEX_PASSWORD secrets." });
       const date = body.date ?? new Date().toISOString().slice(0, 10);
       const url = urlT.replace("{date}", date);
       const r = await logged(url, { headers: { Accept: "application/json", Authorization: `Basic ${btoa(`${id}:${pw}`)}` } });
-      if (!r.ok) return json({ ok: false, error: `eex responded ${r.status}` }, 502);
+      if (!r.ok) return json({ ok: false, error: `eex responded ${r.status}` });
       const p = await r.json();
       const items = findArray(p) ?? [];
-      if (!items.length) return json({ ok: false, error: "No array found in EEX response", sample: JSON.stringify(p).slice(0, 600) }, 422);
+      if (!items.length) return json({ ok: false, error: "No array found in EEX response", sample: JSON.stringify(p).slice(0, 600) });
       const first = items[0];
       const tf = Object.keys(first).find(k => /time|date|delivery|period/i.test(k));
       const pf = Object.keys(first).find(k => /price|settlement|value/i.test(k));
-      if (!tf || !pf) return json({ ok: false, error: "Could not map EEX fields", sample_keys: Object.keys(first) }, 422);
+      if (!tf || !pf) return json({ ok: false, error: "Could not map EEX fields", sample_keys: Object.keys(first) });
       for (const it of items) {
         const t = it[tf]; const v = Number(it[pf]);
         if (!t || !isFinite(v) || isNaN(Date.parse(t))) continue;
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       meta = { date };
     }
 
-    if (!rows.length) return json({ ok: false, error: "Mapped 0 price rows", meta }, 422);
+    if (!rows.length) return json({ ok: false, error: "Mapped 0 price rows", meta });
     // dedupe within batch (spot may overlap cheapest-hours)
     const seen = new Map<string, any>();
     rows.forEach(r => seen.set(r.delivery_at, r));
@@ -139,6 +139,6 @@ Deno.serve(async (req) => {
     if (error) throw error;
     return json({ ok: true, provider, rows: unique.length, ...meta, calls_used_today: used, cap: DAILY_CAP });
   } catch (e) {
-    return json({ ok: false, error: String((e as Error)?.message ?? e) }, 500);
+    return json({ ok: false, error: String((e as Error)?.message ?? e) });
   }
 });
