@@ -40,6 +40,22 @@ export default function Market() {
   };
 
   const [elexSyncing, setElexSyncing] = useState(false);
+  const [provider, setProvider] = useState("elecz");
+  const [provSyncing, setProvSyncing] = useState(false);
+  const syncProvider = async () => {
+    setProvSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-price-providers", { body: { provider, zone: "MK" } });
+      if (error) throw error;
+      if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "Sync failed");
+      toast.success(`${provider.toUpperCase()}: ${(data as any).rows} prices · ${(data as any).calls_used_today}/${(data as any).cap} calls today`);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? `${provider} sync failed`);
+    } finally {
+      setProvSyncing(false);
+    }
+  };
   const syncElex = async (probe = false) => {
     setElexSyncing(true);
     try {
@@ -96,6 +112,15 @@ export default function Market() {
           </Button>
           <Button size="sm" variant="outline" onClick={() => syncElex(false)} disabled={elexSyncing}>{elexSyncing ? "ELEX…" : "Sync ELEX"}</Button>
           <Button size="sm" variant="ghost" onClick={() => syncElex(true)} disabled={elexSyncing} title="Discover the ELEX API endpoints (no data written)">Probe API</Button>
+          <Select value={provider} onValueChange={setProvider}>
+            <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="elecz">Elecz (MK)</SelectItem>
+              <SelectItem value="stekker">Stekker</SelectItem>
+              <SelectItem value="eex">EEX</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="outline" onClick={syncProvider} disabled={provSyncing}>{provSyncing ? "Syncing…" : "Sync provider"}</Button>
         </div>
       }
     >
