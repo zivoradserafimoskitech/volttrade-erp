@@ -25,3 +25,6 @@ verify_jwt = true
 
 [functions.forecast-volumes]
 verify_jwt = true
+
+[functions.sync-elex-prices]
+verify_jwt = true

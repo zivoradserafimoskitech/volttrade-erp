@@ -39,6 +39,27 @@ export default function Market() {
     }
   };
 
+  const [elexSyncing, setElexSyncing] = useState(false);
+  const syncElex = async (probe = false) => {
+    setElexSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-elex-prices", { body: probe ? { probe: true } : {} });
+      if (error) throw error;
+      if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "ELEX sync failed");
+      if (probe) {
+        console.log("ELEX API discovery:", (data as any).findings);
+        toast.success(`ELEX probe done — ${(data as any).findings?.length ?? 0} endpoints tried (details in console). ${(data as any).calls_used_today}/${(data as any).cap} calls today.`);
+      } else {
+        toast.success(`ELEX: ${(data as any).rows} prices for ${(data as any).date} · ${(data as any).calls_used_today}/${(data as any).cap} calls today`);
+        load();
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "ELEX sync failed");
+    } finally {
+      setElexSyncing(false);
+    }
+  };
+
   const add = async (form: FormData) => {
     const dt = String(form.get("delivery_at"));
     const price = Number(form.get("price"));
@@ -73,6 +94,8 @@ export default function Market() {
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Syncing…" : "Sync now"}
           </Button>
+          <Button size="sm" variant="outline" onClick={() => syncElex(false)} disabled={elexSyncing}>{elexSyncing ? "ELEX…" : "Sync ELEX"}</Button>
+          <Button size="sm" variant="ghost" onClick={() => syncElex(true)} disabled={elexSyncing} title="Discover the ELEX API endpoints (no data written)">Probe API</Button>
         </div>
       }
     >

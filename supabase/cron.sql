@@ -41,3 +41,11 @@ select cron.schedule('forecast-volumes', '0 6 * * *', $$
 $$);
 
 -- Inspect: select * from cron.job;   Remove: select cron.unschedule('<name>');
+
+-- Test phase: ELEX day-ahead (twice daily, well under the 50/day cap)
+select cron.schedule('sync-elex-prices', '15 13,15 * * *', $$
+  select net.http_post(
+    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/sync-elex-prices',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
+    body := '{}'::jsonb);
+$$);
