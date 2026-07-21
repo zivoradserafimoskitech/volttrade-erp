@@ -104,6 +104,10 @@ export default function Market() {
               <SelectItem value="AT">AT (APG)</SelectItem>
               <SelectItem value="RO">RO</SelectItem>
               <SelectItem value="RS">RS</SelectItem>
+              <SelectItem value="BG">BG</SelectItem>
+              <SelectItem value="GR">GR</SelectItem>
+              <SelectItem value="HR">HR</SelectItem>
+              <SelectItem value="SI">SI</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={syncEntsoe} disabled={syncing} style={{ background: "var(--gradient-primary)" }}>

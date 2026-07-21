@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatCard } from "@/components/erp/StatCard";
 import { Activity, Zap, Euro, Leaf, Radio, Wifi, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { buildPriceMap } from "@/lib/prices";
 import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -123,11 +124,11 @@ export default function SmartMeter() {
       const today = new Date().toISOString().slice(0, 10);
       const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
       const [{ data: prices }, { data: iv }] = await Promise.all([
-        supabase.from("market_prices").select("delivery_at, price_eur_mwh").gte("delivery_at", `${today}T00:00:00Z`).lte("delivery_at", `${today}T23:59:59Z`),
+        supabase.from("market_prices").select("delivery_at, price_eur_mwh, source").gte("delivery_at", `${today}T00:00:00Z`).lte("delivery_at", `${today}T23:59:59Z`),
         mp ? supabase.from("consumption_readings").select("reading_at, actual_mwh, quality").eq("metering_point_id", mp).gte("reading_at", weekAgo).limit(20000) : Promise.resolve({ data: [] as any[] }),
       ]);
       if (stop) return;
-      const spot = prices?.length ? (() => { const a = Array(24).fill(null as number | null); (prices as any[]).forEach(r => { a[new Date(r.delivery_at).getUTCHours()] = Number(r.price_eur_mwh); }); return a.map((v, h) => v ?? spotPrice(h)); })() : null;
+      const spot = prices?.length ? (() => { const pm = buildPriceMap(prices as any); const a = Array(24).fill(null as number | null); for (const [k, v] of pm) { const d = new Date(k + ":00:00Z"); if (d.toISOString().slice(0, 10) === today) a[d.getUTCHours()] = v; } return a.map((v, h) => v ?? spotPrice(h)); })() : null;
       setRealSpot(spot);
       const rows = ((iv ?? []) as any[]).filter(r => (r.quality ?? "measured") !== "flagged");
       if (rows.length) {

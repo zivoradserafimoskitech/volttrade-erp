@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { buildPriceMap } from "@/lib/prices";
 import { useAuth } from "@/lib/auth";
 import { Plus, Play, FileCheck2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -63,9 +64,8 @@ export default function BillingRuns() {
     // meter_readings holds CUMULATIVE register snapshots — only usable as max−min delta, never summed.
     const { data: registers } = await supabase.from("meter_readings").select("metering_point_id, reading_at, import_kwh").eq("validation_status", "validated").gte("reading_at", startISO).lte("reading_at", endISO);
     // Hourly market prices for indexed tariffs
-    const { data: prices } = await supabase.from("market_prices").select("delivery_at, price_eur_mwh").gte("delivery_at", startISO).lte("delivery_at", endISO);
-    const priceMap = new Map<string, number>();
-    (prices ?? []).forEach((p: any) => priceMap.set(new Date(p.delivery_at).toISOString().slice(0, 13), Number(p.price_eur_mwh)));
+    const { data: prices } = await supabase.from("market_prices").select("delivery_at, price_eur_mwh, source").gte("delivery_at", startISO).lte("delivery_at", endISO);
+    const priceMap = buildPriceMap((prices ?? []) as any);
 
     const mpIntervalMwh = (mpIds: string[]) => intervals.filter((r: any) => mpIds.includes(r.metering_point_id)).reduce((s: number, r: any) => s + Number(r.actual_mwh || 0), 0);
     const mpRegisterDeltaKwh = (mpIds: string[]) => {

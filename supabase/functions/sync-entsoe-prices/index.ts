@@ -14,6 +14,10 @@ const ZONES: Record<string, string> = {
   AT: "10YAT-APG------L",
   RO: "10YRO-TEL------P",
   RS: "10YCS-SERBIATSOV",
+  BG: "10YCA-BULGARIA-R",
+  GR: "10YGR-HTSO-----Y",
+  HR: "10YHR-HEP------M",
+  SI: "10YSI-ELES-----O",
 };
 
 function ymdHm(d: Date) {
@@ -133,16 +137,13 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // De-dupe: delete existing rows in window for this zone-agnostic price set, then insert.
-    // (market_prices has no zone column — we treat the table as single-zone HU baseline.)
+    // Zone-tagged source so multiple zones/providers coexist:
+    // source = 'entsoe-mk', 'entsoe-hu', ... Upsert per (delivery_at, source) —
+    // no more blind window deletes that wiped other providers' rows.
     const startIso = prices[0].delivery_at;
     const endIso = prices[prices.length - 1].delivery_at;
-    await supabase.from("market_prices")
-      .delete()
-      .gte("delivery_at", startIso)
-      .lte("delivery_at", endIso);
-
-    const { error } = await supabase.from("market_prices").insert(prices);
+    const tagged = prices.map((r: any) => ({ ...r, source: `entsoe-${zone.toLowerCase()}` }));
+    const { error } = await supabase.from("market_prices").upsert(tagged, { onConflict: "delivery_at,source" });
     if (error) {
       return new Response(
         JSON.stringify({ error: error.message }),
