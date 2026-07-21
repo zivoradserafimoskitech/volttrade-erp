@@ -9,13 +9,15 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatCard } from "@/components/erp/StatCard";
-import { Activity, Zap, Euro, Leaf, Radio, Database, Wifi } from "lucide-react";
+import { Activity, Zap, Euro, Leaf, Radio, Wifi, Save } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   AreaChart, Area, PieChart, Pie, Cell, RadialBarChart, RadialBar
 } from "recharts";
 
-type Source = "demo" | "realtime" | "influx";
+type Source = "demo" | "live";
 
 // ---------- helpers ----------
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -83,6 +85,17 @@ export default function SmartMeter() {
   const [series, setSeries] = useState<{ t: string; kw: number; price: number; carbon: number }[]>([]);
   const startRef = useRef(Date.now());
 
+  // live mode: metering point + real hourly arrays
+  const [mps, setMps] = useState<{ id: string; edu_code: string | null }[]>([]);
+  const [mp, setMp] = useState<string>("");
+  const [realSpot, setRealSpot] = useState<number[] | null>(null);   // €/MWh per hour, today
+  const [realLoad, setRealLoad] = useState<number[] | null>(null);   // kW per hour (7-day same-hour avg)
+  useEffect(() => {
+    supabase.from("metering_points").select("id, edu_code").not("kimi_meter_id", "is", null).then(({ data }) => {
+      setMps((data ?? []) as any); if (data?.[0]) setMp(data[0].id);
+    });
+  }, []);
+
   // demo tick
   useEffect(() => {
     if (source !== "demo") return;
@@ -102,13 +115,44 @@ export default function SmartMeter() {
     return () => clearInterval(id);
   }, [source]);
 
-  // realtime / influx placeholders
+  // live mode: today's prices + selected point's consumption, refresh 5 min
   useEffect(() => {
-    if (source === "demo") { setConnected(false); return; }
-    // TODO: wire Supabase Realtime channel on `consumption_readings`
-    //       or call edge function `sync-influx-forecasts` for InfluxDB pull.
-    setConnected(false);
-  }, [source]);
+    if (source !== "live") { setConnected(false); setRealSpot(null); setRealLoad(null); return; }
+    let stop = false;
+    const load = async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+      const [{ data: prices }, { data: iv }] = await Promise.all([
+        supabase.from("market_prices").select("delivery_at, price_eur_mwh").gte("delivery_at", `${today}T00:00:00Z`).lte("delivery_at", `${today}T23:59:59Z`),
+        mp ? supabase.from("consumption_readings").select("reading_at, actual_mwh, quality").eq("metering_point_id", mp).gte("reading_at", weekAgo).limit(20000) : Promise.resolve({ data: [] as any[] }),
+      ]);
+      if (stop) return;
+      const spot = prices?.length ? (() => { const a = Array(24).fill(null as number | null); (prices as any[]).forEach(r => { a[new Date(r.delivery_at).getUTCHours()] = Number(r.price_eur_mwh); }); return a.map((v, h) => v ?? spotPrice(h)); })() : null;
+      setRealSpot(spot);
+      const rows = ((iv ?? []) as any[]).filter(r => (r.quality ?? "measured") !== "flagged");
+      if (rows.length) {
+        const sum = Array(24).fill(0), n = Array(24).fill(0);
+        const todaySeries: { t: string; kw: number; price: number; carbon: number }[] = [];
+        let tKwh = 0; let lastKw = 0;
+        rows.sort((a, b) => a.reading_at.localeCompare(b.reading_at));
+        for (const r of rows) {
+          const d = new Date(r.reading_at); const h = d.getUTCHours();
+          const kw = Number(r.actual_mwh || 0) * 1000; // MWh/h → avg kW
+          sum[h] += kw; n[h] += 1;
+          if (r.reading_at.slice(0, 10) === today) {
+            tKwh += kw; lastKw = kw;
+            todaySeries.push({ t: `${String(h).padStart(2, "0")}:00`, kw: +kw.toFixed(2), price: +(((spot?.[h] ?? spotPrice(h)) / 10)).toFixed(2), carbon: carbonIntensity(h) });
+          }
+        }
+        setRealLoad(sum.map((v, h) => (n[h] ? v / n[h] : 0)));
+        setSeries(todaySeries); setTodayKwh(tKwh); setLivePowerKw(lastKw);
+        setConnected(true);
+      } else { setRealLoad(null); setConnected(!!spot); }
+    };
+    load();
+    const id = setInterval(load, 5 * 60_000);
+    return () => { stop = true; clearInterval(id); };
+  }, [source, mp]);
 
   const nowHour = new Date().getHours();
   const nowPriceCt = agilePriceCt(nowHour + new Date().getMinutes() / 60);
@@ -124,12 +168,17 @@ export default function SmartMeter() {
             <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="demo">Demo (simulated)</SelectItem>
-              <SelectItem value="realtime">Realtime DB</SelectItem>
-              <SelectItem value="influx">InfluxDB</SelectItem>
+              <SelectItem value="live">Live (Kimi + market prices)</SelectItem>
             </SelectContent>
           </Select>
+          {source === "live" && (
+            <Select value={mp} onValueChange={setMp}>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Metering point" /></SelectTrigger>
+              <SelectContent>{mps.map(m => <SelectItem key={m.id} value={m.id}>{m.edu_code ?? m.id.slice(0, 8)}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
           <Badge variant={source === "demo" ? "secondary" : connected ? "default" : "outline"} className="gap-1">
-            {source === "demo" ? <Radio className="h-3 w-3" /> : source === "influx" ? <Database className="h-3 w-3" /> : <Wifi className="h-3 w-3" />}
+            {source === "demo" ? <Radio className="h-3 w-3" /> : <Wifi className="h-3 w-3" />}
             {source === "demo" ? "DEMO" : connected ? "LIVE" : "DISCONNECTED"}
           </Badge>
         </div>
@@ -192,7 +241,7 @@ export default function SmartMeter() {
         </TabsContent>
 
         {/* TARIFF */}
-        <TabsContent value="tariff"><TariffSimulator /></TabsContent>
+        <TabsContent value="tariff"><TariffSimulator realSpot={realSpot} realLoad={realLoad} mpLabel={mps.find(m => m.id === mp)?.edu_code ?? null} /></TabsContent>
 
         {/* ANALYTICS */}
         <TabsContent value="analytics"><UsageAnalytics /></TabsContent>
@@ -202,18 +251,23 @@ export default function SmartMeter() {
 }
 
 // ---------- TARIFF SIMULATOR ----------
-function TariffSimulator() {
+function TariffSimulator({ realSpot, realLoad, mpLabel }: { realSpot: number[] | null; realLoad: number[] | null; mpLabel: string | null }) {
   const [margin, setMargin] = useState(2.5);
   const [vatPct, setVatPct] = useState(5);
   const [capCt, setCapCt] = useState(35);
   const [floorCt, setFloorCt] = useState(0);
   const [enableCap, setEnableCap] = useState(true);
+  const [freeBelow, setFreeBelow] = useState(0);      // €/MWh spot threshold
+  const [enableFree, setEnableFree] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const usingReal = !!(realSpot || realLoad);
 
   const data = useMemo(() => HOURS.map(h => {
-    const spot = spotPrice(h);
+    const spot = realSpot ? realSpot[h] : spotPrice(h);
     let agile = (spot / 10 + margin) * (1 + vatPct / 100);
     if (enableCap) agile = Math.min(capCt, Math.max(floorCt, agile));
-    const load = baseLoadKw(h);
+    if (enableFree && spot <= freeBelow) agile = 0; // free hour product
+    const load = realLoad ? realLoad[h] : baseLoadKw(h);
     return {
       hour: `${String(h).padStart(2, "0")}:00`,
       spot: +spot.toFixed(2),
@@ -221,7 +275,25 @@ function TariffSimulator() {
       load: +load.toFixed(2),
       cost: +(agile * load).toFixed(2),
     };
-  }), [margin, vatPct, capCt, floorCt, enableCap]);
+  }), [margin, vatPct, capCt, floorCt, enableCap, enableFree, freeBelow, realSpot, realLoad]);
+
+  async function createTariff() {
+    setSaving(true);
+    try {
+      const name = `Agile ${margin.toFixed(1)}ct${enableFree ? ` free≤${freeBelow}` : ""} (${new Date().toISOString().slice(0, 10)})`;
+      const components = [
+        { type: "energy", label: "Energy (€/MWh)", unit: "€/MWh", value: 0 },
+        { type: "fixed_fee", label: "Monthly fixed fee", unit: "€/month", value: 0 },
+        { type: "margin", label: "Supplier margin (€/MWh)", unit: "€/MWh", value: +(margin * 10).toFixed(2) },
+        ...(enableFree ? [{ type: "free_below", label: "Free when market price ≤ (€/MWh)", unit: "€/MWh", value: freeBelow }] : []),
+      ];
+      const { error } = await supabase.from("tariffs").insert({ name, model: "indexed", currency: "EUR", components } as any);
+      if (error) throw error;
+      toast.success(`Tariff "${name}" created`, { description: "Indexed hourly + margin" + (enableFree ? " + free hours." : ".") + " Note: cap/floor are simulator-only for now — not applied by the billing engine." });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to create tariff");
+    } finally { setSaving(false); }
+  }
 
   const totalKwh = data.reduce((s, d) => s + d.load, 0);
   const totalCost = data.reduce((s, d) => s + d.cost, 0) / 100; // €
@@ -232,7 +304,7 @@ function TariffSimulator() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-1 border-border/60">
-          <CardHeader><CardTitle>Tariff configuration</CardTitle><CardDescription>24 hourly bands · wholesale + margin</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Tariff configuration</CardTitle><CardDescription>{usingReal ? `Real data: ${realSpot ? "ENTSO-E prices" : "model prices"} · ${realLoad ? `curve of ${mpLabel ?? "point"}` : "model curve"}` : "Simulated prices & curve — switch source to Live"}</CardDescription></CardHeader>
           <CardContent className="space-y-5">
             <SliderRow label={`Supplier margin: ${margin.toFixed(2)} ct/kWh`} value={margin} min={0} max={10} step={0.1} onChange={setMargin} />
             <SliderRow label={`VAT / levies: ${vatPct}%`} value={vatPct} min={0} max={27} step={1} onChange={setVatPct} />
@@ -246,6 +318,14 @@ function TariffSimulator() {
                 <SliderRow label={`Price floor: ${floorCt} ct/kWh`} value={floorCt} min={0} max={20} step={1} onChange={setFloorCt} />
               </>
             )}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="free-sw">Free hours (spot ≤ threshold)</Label>
+              <Switch id="free-sw" checked={enableFree} onCheckedChange={setEnableFree} />
+            </div>
+            {enableFree && <SliderRow label={`Free when spot ≤ ${freeBelow} €/MWh`} value={freeBelow} min={-20} max={30} step={1} onChange={setFreeBelow} />}
+            <Button className="w-full" onClick={createTariff} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />{saving ? "Creating…" : "Create tariff from this"}
+            </Button>
 
             <div className="pt-3 border-t border-border/60 grid grid-cols-2 gap-3 text-sm">
               <KV k="Daily kWh" v={`${totalKwh.toFixed(1)} kWh`} />
