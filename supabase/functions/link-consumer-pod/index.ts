@@ -87,6 +87,9 @@ Deno.serve(async (req) => {
   }
 });
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+function json(body: unknown, _status = 200) {
+  // Always 200: errors are carried in body.error so the client shows the real
+  // message (e.g. "No supply point matches that code") instead of the generic
+  // "Edge Function returned a non-2xx status code" wrapper.
+  return new Response(JSON.stringify(body), { status: 200, headers: { ...cors, "Content-Type": "application/json" } });
 }
