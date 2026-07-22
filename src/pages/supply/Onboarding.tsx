@@ -56,7 +56,7 @@ function Inner() {
   const load = async () => {
     const [l, t] = await Promise.all([
       supabase.from("leads").select("*").order("created_at", { ascending: false }),
-      supabase.from("tariffs").select("id,code,name,energy_price_eur_mwh").order("code"),
+      supabase.from("tariffs").select("id,code,name,components,currency").order("code"),
     ]);
     setLeads(l.data ?? []);
     setTariffs(t.data ?? []);
@@ -102,7 +102,9 @@ function Inner() {
   const addQuote = async (form: FormData) => {
     if (!picked) return;
     const tariff_id = String(form.get("tariff_id")) || null;
-    const base = tariffs.find(x => x.id === tariff_id)?.energy_price_eur_mwh ?? 0;
+    const pickTariff = tariffs.find(x => x.id === tariff_id);
+    const energyComp = Array.isArray(pickTariff?.components) ? pickTariff!.components.find((c: any) => c.type === "energy") : null;
+    const base = Number(energyComp?.value ?? 0);
     const margin = Number(form.get("margin_eur_mwh") || 0);
     const vol = Number(form.get("annual_volume_mwh") || picked.est_annual_mwh || 0);
     const annual_cost_eur = (Number(base) + margin) * vol;
@@ -244,7 +246,11 @@ function Inner() {
                   <form onSubmit={e => { e.preventDefault(); addQuote(new FormData(e.currentTarget)); (e.currentTarget as HTMLFormElement).reset(); }} className="grid grid-cols-2 gap-2 border border-border/60 rounded-md p-3">
                     <div className="space-y-2 col-span-2"><Label>Tariff</Label>
                       <Select name="tariff_id"><SelectTrigger><SelectValue placeholder="Select tariff" /></SelectTrigger>
-                        <SelectContent>{tariffs.map(t => <SelectItem key={t.id} value={t.id}>{t.code} — €{t.energy_price_eur_mwh}/MWh</SelectItem>)}</SelectContent></Select>
+                        <SelectContent>{tariffs.map(t => {
+                          const ec = Array.isArray(t.components) ? t.components.find((c: any) => c.type === "energy") : null;
+                          const price = Number(ec?.value ?? 0);
+                          return <SelectItem key={t.id} value={t.id}>{t.code} — {price ? `${t.currency ?? "€"} ${price}/MWh` : t.name}</SelectItem>;
+                        })}</SelectContent></Select>
                     </div>
                     <F name="term_months" label="Term (months)" type="number" defaultValue="12" />
                     <F name="margin_eur_mwh" label="Margin €/MWh" type="number" step="0.01" defaultValue="5" />

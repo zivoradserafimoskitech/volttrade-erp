@@ -31,8 +31,15 @@ export default function GatewayDetail() {
 
   async function load() {
     if (!id) return;
-    const { data: mpRow } = await supabase.from("metering_points").select("id, edu_code, kimi_meter_id, category, site_name, address").eq("id", id).maybeSingle();
-    setMp(mpRow as any);
+    const { data: mpRow } = await supabase.from("metering_points").select("id, edu_code, kimi_meter_id, metering_category, address").eq("id", id).maybeSingle();
+    setMp(mpRow ? ({
+      id: (mpRow as any).id,
+      edu_code: (mpRow as any).edu_code,
+      kimi_meter_id: (mpRow as any).kimi_meter_id,
+      category: (mpRow as any).metering_category ?? null,
+      site_name: (mpRow as any).address ?? null,
+      address: (mpRow as any).address ?? null,
+    } as MP) : null);
     const from = subHours(new Date(), WIN[win]).toISOString();
     const [r, c] = await Promise.all([
       supabase.from("consumption_readings").select("reading_at, import_kwh, export_kwh").eq("metering_point_id", id).gte("reading_at", from).order("reading_at"),

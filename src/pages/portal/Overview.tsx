@@ -38,10 +38,19 @@ export default function PortalOverview() {
     const [{ data: c }, { data: inv }, { data: mps }, { data: ppas }] = await Promise.all([
       supabase.from("supply_contracts").select("*").eq("client_id", cl.id).eq("status", "active").limit(1).maybeSingle(),
       supabase.from("invoices").select("*").eq("client_id", cl.id).in("status", ["draft", "issued", "overdue"]).order("due_date", { ascending: true }).limit(1).maybeSingle(),
-      supabase.from("metering_points").select("id, ean, address, has_pv, pv_capacity_kw, contracted_power_kw").eq("client_id", cl.id),
+      supabase.from("metering_points").select("id, edu_code, address, has_pv, pv_capacity_kw, connected_power_kw").eq("client_id", cl.id),
       supabase.from("ppa_agreements").select("id").eq("client_id", cl.id),
     ]);
-    setContract(c); setInvoice(inv); setEdus(mps ?? []); setPpaCount((ppas ?? []).length);
+    setContract(c); setInvoice(inv);
+    const edusNorm = (mps ?? []).map((m: any) => ({
+      id: m.id,
+      ean: m.edu_code,
+      address: m.address,
+      has_pv: m.has_pv,
+      pv_capacity_kw: m.pv_capacity_kw,
+      contracted_power_kw: m.connected_power_kw,
+    }));
+    setEdus(edusNorm); setPpaCount((ppas ?? []).length);
     // Balance = outstanding invoice total - payments made + rewards credit
     const [{ data: openInv }, { data: pays }, { data: rl }] = await Promise.all([
       supabase.from("invoices").select("total_eur").eq("client_id", cl.id).in("status", ["issued","overdue","draft"]),
@@ -53,7 +62,7 @@ export default function PortalOverview() {
     const rewardsTotal = (rl ?? []).reduce((s: number, x: any) => s + Number(x.amount_eur || 0), 0);
     setBalance(owed - paid - rewardsTotal);
     setRewards(rewardsTotal);
-    const ids = (mps ?? []).map((m: any) => m.id);
+    const ids = edusNorm.map((m: any) => m.id);
     if (ids.length) {
       const { data: rd } = await supabase.from("meter_readings").select("reading_at, import_kwh, export_kwh").in("metering_point_id", ids);
       const map: Record<string, number> = {};

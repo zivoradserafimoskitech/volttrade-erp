@@ -134,39 +134,54 @@ export default function BillingRuns() {
       }
       if (mwh <= 0 && Number(fixed) <= 0) { skipped++; continue; }
 
-      // MK supplier structure: delivered energy splits into market share and
-      // PPEE share (renewable obligation at regulated price); MEMO market fee
-      // applies to the full volume. Amounts in tariff currency.
-      const cur = ((t as any).currency || 'EUR') as string;
-      const mkdTo = (mkd: number) => cur === 'MKD' ? mkd : mkd / eurMkd;
-      const ppeeMwh = mwh * ppeePct / 100;
-      const marketMwh = mwh - ppeeMwh;
-      const energy_amount = marketEnergyEur * (marketMwh / (mwh || 1));
-      const ppeeAmount = mkdTo(ppeeMwh * 1000 * ppeePriceMkdKwh);
-      const memoAmount = mkdTo(mwh * memoFeeMkdMwh);
+      // Regulatory PPEE/MEMO structure applies only to Macedonian supply
+      // (RKE regulation). Other jurisdictions bill straight energy + fixed fee.
       const country = (clients ?? []).find((x: any) => x.id === c.client_id)?.country_code;
+      const isMK = country === 'MK';
+      const cur = ((t as any).currency || 'EUR') as string;
       const vatPct = (countries ?? []).find((x: any) => x.code === country)?.vat_percent ?? 0;
       const vatOf = (v: number) => v * Number(vatPct) / 100;
-      const subtotal = energy_amount + ppeeAmount + memoAmount + Number(fixed);
+
+      let components: any[];
+      let subtotal: number;
+
+      if (isMK) {
+        const mkdTo = (mkd: number) => cur === 'MKD' ? mkd : mkd / eurMkd;
+        const ppeeMwh = mwh * ppeePct / 100;
+        const marketMwh = mwh - ppeeMwh;
+        const energy_amount = marketEnergyEur * (marketMwh / (mwh || 1));
+        const ppeeAmount = mkdTo(ppeeMwh * 1000 * ppeePriceMkdKwh);
+        const memoAmount = mkdTo(mwh * memoFeeMkdMwh);
+        subtotal = energy_amount + ppeeAmount + memoAmount + Number(fixed);
+        components = [
+          { type: 'energy', label: (t as any).model === 'indexed' ? 'Електрична енергија — индексирана цена' : 'Електрична енергија', mwh: marketMwh, price_eur_mwh: marketMwh > 0 ? energy_amount / marketMwh : priceLabel, amount_eur: energy_amount, vat_eur: vatOf(energy_amount) },
+          { type: 'ppee', label: `Обновлива Енергија (ППЕЕ) — ${ppeePct}%`, mwh: ppeeMwh, price_eur_mwh: ppeeMwh > 0 ? ppeeAmount / ppeeMwh : 0, amount_eur: ppeeAmount, vat_eur: vatOf(ppeeAmount) },
+          { type: 'market_fee', label: 'Надомест за користење на пазар на електрична енергија', mwh, price_eur_mwh: mwh > 0 ? memoAmount / mwh : 0, amount_eur: memoAmount, vat_eur: vatOf(memoAmount) },
+          ...(freeMwh > 0 ? [{ type: 'free_energy', label: `Бесплатна енергија (пазарна цена ≤ ${freeBelow} /MWh)`, mwh: freeMwh, price_eur_mwh: 0, amount_eur: 0, vat_eur: 0 }] : []),
+          ...(Number(fixed) > 0 ? [{ type: 'fixed_fee', label: 'Monthly fixed fee', amount_eur: Number(fixed), vat_eur: vatOf(Number(fixed)) }] : []),
+          { type: 'vat', label: `ДДВ ${vatPct}%`, amount_eur: vatOf(subtotal) },
+          { type: 'meta', label: `Цените се изразени во ${cur}${cur !== 'MKD' ? ` (EUR/MKD ${eurMkd})` : ''}`, amount_eur: 0 },
+        ];
+      } else {
+        const energy_amount = marketEnergyEur;
+        subtotal = energy_amount + Number(fixed);
+        components = [
+          { type: 'energy', label: (t as any).model === 'indexed' ? 'Energy — indexed price' : 'Energy', mwh, price_eur_mwh: mwh > 0 ? energy_amount / mwh : priceLabel, amount_eur: energy_amount, vat_eur: vatOf(energy_amount) },
+          ...(freeMwh > 0 ? [{ type: 'free_energy', label: `Free energy (spot ≤ ${freeBelow} /MWh)`, mwh: freeMwh, price_eur_mwh: 0, amount_eur: 0, vat_eur: 0 }] : []),
+          ...(Number(fixed) > 0 ? [{ type: 'fixed_fee', label: 'Monthly fixed fee', amount_eur: Number(fixed), vat_eur: vatOf(Number(fixed)) }] : []),
+          { type: 'vat', label: `VAT ${vatPct}%`, amount_eur: vatOf(subtotal) },
+        ];
+      }
       const tax = vatOf(subtotal);
       const total = subtotal + tax;
       const { data: seqNum } = await (supabase.rpc as any)("next_invoice_number");
       const invoice_number = (seqNum as unknown as string) || `INV-${run.period_start.slice(0,7)}-${c.contract_number}`;
-      const components = [
-        { type: 'energy', label: (t as any).model === 'indexed' ? 'Електрична енергија — индексирана цена' : 'Електрична енергија', mwh: marketMwh, price_eur_mwh: marketMwh > 0 ? energy_amount / marketMwh : priceLabel, amount_eur: energy_amount, vat_eur: vatOf(energy_amount) },
-        { type: 'ppee', label: `Обновлива Енергија (ППЕЕ) — ${ppeePct}%`, mwh: ppeeMwh, price_eur_mwh: ppeeMwh > 0 ? ppeeAmount / ppeeMwh : 0, amount_eur: ppeeAmount, vat_eur: vatOf(ppeeAmount) },
-        { type: 'market_fee', label: 'Надомест за користење на пазар на електрична енергија', mwh, price_eur_mwh: mwh > 0 ? memoAmount / mwh : 0, amount_eur: memoAmount, vat_eur: vatOf(memoAmount) },
-        ...(freeMwh > 0 ? [{ type: 'free_energy', label: `Бесплатна енергија (пазарна цена ≤ ${freeBelow} /MWh)`, mwh: freeMwh, price_eur_mwh: 0, amount_eur: 0, vat_eur: 0 }] : []),
-        ...(Number(fixed) > 0 ? [{ type: 'fixed_fee', label: 'Monthly fixed fee', amount_eur: Number(fixed), vat_eur: vatOf(Number(fixed)) }] : []),
-        { type: 'vat', label: `ДДВ ${vatPct}%`, amount_eur: tax },
-        { type: 'meta', label: `Цените се изразени во ${cur}${cur !== 'MKD' ? ` (EUR/MKD ${eurMkd})` : ''}`, amount_eur: 0 },
-      ];
       const due = new Date(run.period_end); due.setDate(due.getDate() + (c.payment_terms_days ?? 14));
       const { error } = await supabase.from("invoices").insert({
         user_id: user!.id, client_id: c.client_id, billing_run_id: run.id,
         invoice_number, period_start: run.period_start, period_end: run.period_end,
-        total_mwh: mwh, energy_amount_eur: energy_amount, margin_amount_eur: 0,
-        total_eur: total, tax_amount_eur: tax, currency: 'EUR',
+        total_mwh: mwh, energy_amount_eur: marketEnergyEur, margin_amount_eur: 0,
+        total_eur: total, tax_amount_eur: tax, currency: cur,
         components, due_date: due.toISOString().slice(0,10),
         status: 'draft', doc_type: 'invoice',
       } as any);
