@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { RefreshCw, Radio, ExternalLink, Activity, Wifi, WifiOff } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-type MP = { id: string; edu_code: string; kimi_meter_id: number | null; category: string | null; site_name: string | null };
+type MP = { id: string; edu_code: string; kimi_meter_id: number | null; category: string | null; site_name: string | null; address: string | null };
 type Latest = { metering_point_id: string; reading_at: string; import_kwh: number; export_kwh: number };
 
 export default function Gateways() {
@@ -26,10 +26,17 @@ export default function Gateways() {
     setLoading(true);
     const { data: mpRows } = await supabase
       .from("metering_points")
-      .select("id, edu_code, kimi_meter_id, category, site_name")
+      .select("id, edu_code, kimi_meter_id, metering_category, address")
       .not("kimi_meter_id", "is", null)
       .order("edu_code");
-    const list = (mpRows ?? []) as any as MP[];
+    const list = ((mpRows ?? []) as any[]).map((r) => ({
+      id: r.id,
+      edu_code: r.edu_code,
+      kimi_meter_id: r.kimi_meter_id,
+      category: r.metering_category ?? null,
+      site_name: r.address ?? null,
+      address: r.address ?? null,
+    })) as MP[];
     setMps(list);
 
     if (list.length > 0) {
