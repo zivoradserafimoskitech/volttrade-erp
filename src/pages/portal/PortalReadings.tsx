@@ -25,7 +25,7 @@ export default function PortalReadings() {
     setMps(m ?? []);
     const ids = (m ?? []).map(x => x.id);
     if (ids.length) {
-      const { data: r } = await supabase.from("meter_readings").select("*").in("metering_point_id", ids).order("reading_date", { ascending: false }).limit(20);
+      const { data: r } = await supabase.from("meter_readings").select("*").in("metering_point_id", ids).order("reading_at", { ascending: false }).limit(20);
       setRows(r ?? []);
     }
   };
@@ -37,8 +37,10 @@ export default function PortalReadings() {
     const reading_value = Number(form.get("reading_value"));
     if (reading_value < 0) return toast.error("Negative value not allowed");
     if (new Date(reading_date) > new Date()) return toast.error("Date cannot be in the future");
+    const reading_at = new Date(reading_date + "T00:00:00").toISOString();
     const { error } = await supabase.from("meter_readings").insert({
-      metering_point_id: mpId, reading_date, reading_value, kwh_used: 0, source: "customer", is_estimated: false,
+      metering_point_id: mpId, reading_at, import_kwh: reading_value, export_kwh: 0,
+      source: "customer", validation_status: "pending",
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Reading submitted"); load();
@@ -64,8 +66,8 @@ export default function PortalReadings() {
             {rows.map(r => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs">{mps.find(m => m.id === r.metering_point_id)?.edu_code ?? "—"}</TableCell>
-                <TableCell className="text-xs">{r.reading_date}</TableCell>
-                <TableCell className="text-right">{fmtNum(r.reading_value)}</TableCell>
+                <TableCell className="text-xs">{r.reading_at ? new Date(r.reading_at).toISOString().slice(0,10) : "—"}</TableCell>
+                <TableCell className="text-right">{fmtNum(r.import_kwh)}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{r.source ?? "—"}</TableCell>
               </TableRow>
             ))}
