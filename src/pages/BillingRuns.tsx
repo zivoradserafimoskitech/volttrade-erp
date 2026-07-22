@@ -180,8 +180,8 @@ export default function BillingRuns() {
       const { error } = await supabase.from("invoices").insert({
         user_id: user!.id, client_id: c.client_id, billing_run_id: run.id,
         invoice_number, period_start: run.period_start, period_end: run.period_end,
-        total_mwh: mwh, energy_amount_eur: energy_amount, margin_amount_eur: 0,
-        total_eur: total, tax_amount_eur: tax, currency: 'EUR',
+        total_mwh: mwh, energy_amount_eur: marketEnergyEur, margin_amount_eur: 0,
+        total_eur: total, tax_amount_eur: tax, currency: cur,
         components, due_date: due.toISOString().slice(0,10),
         status: 'draft', doc_type: 'invoice',
       } as any);
