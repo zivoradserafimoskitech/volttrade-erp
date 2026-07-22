@@ -154,7 +154,18 @@ function Inner() {
       } as any);
     }
     await supabase.from("leads").update({ stage: "activated", converted_client_id: client.id }).eq("id", picked.id);
-    toast.success("Activated"); setPicked(null); load();
+    // Send portal registration invite (email with sign-up link) now that a
+    // contract exists — this is the "register" step of the Octopus-style flow.
+    if (picked.contact_email) {
+      const { error: invErr } = await supabase.functions.invoke("admin-invite-consumer", {
+        body: { client_id: client.id, email: picked.contact_email, redirect_to: `${window.location.origin}/portal` },
+      });
+      if (invErr) toast.warning("Activated, but registration invite failed — send it manually from the client page.");
+      else toast.success("Activated & registration invite sent");
+    } else {
+      toast.success("Activated (no email on file — send registration invite manually)");
+    }
+    setPicked(null); load();
   };
 
   const kpis = useMemo(() => {
