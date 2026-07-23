@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/erp/StatCard";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { buildEssMessage, tradeQuantities, classifyTrade, downloadXml, type EssSeries } from "@/lib/essSchedule";
+import { buildEssMessage, tradeQuantities, classifyTrade, downloadXml, scheduleWindow, type EssSeries } from "@/lib/essSchedule";
 import { toast } from "@/hooks/use-toast";
 import { shape24h, SlpCategory, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
-import { CalendarClock, Lock, Send, Activity, Download, FileCode } from "lucide-react";
+import { CalendarClock, Lock, Send, Activity, Download, FileCode, Sun } from "lucide-react";
 
 export default function Scheduling() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -37,6 +37,67 @@ export default function Scheduling() {
     return true;
   }
   useEffect(() => { loadPvForecast(); }, [date]);
+
+  // ── ESS export: PPS (production schedule) per metering point ──
+  const [plants, setPlants] = useState<{ id: string; eic_code: string; edu_code: string | null; producer_party_eic: string | null }[]>([]);
+  const [plant, setPlant] = useState<string>("");
+  useEffect(() => {
+    (supabase.from as any)("metering_points")
+      .select("id, eic_code, edu_code, producer_party_eic")
+      .not("eic_code", "is", null).eq("status", "active")
+      .then(({ data }: any) => { setPlants(data ?? []); if (data?.[0] && !plant) setPlant(data[0].id); });
+  }, []);
+
+  async function exportPps() {
+    const mp = plants.find(p => p.id === plant);
+    if (!mp) { toast({ title: "No production point selected", description: "Add an EIC (Z-code) to a metering point first.", variant: "destructive" }); return; }
+    const { data: settings } = await (supabase.from as any)("ess_settings").select("*").limit(1).maybeSingle();
+    if (!settings?.sender_eic || settings.sender_eic === "CHANGE_ME_SENDER_EIC") {
+      toast({ title: "Set your party EIC first", description: "ess_settings.sender_eic must be your BRP EIC.", variant: "destructive" });
+      return;
+    }
+    const home = settings.default_area_eic || "10YMK-MEPSO----8";
+    const win = scheduleWindow(date);
+
+    // Hourly PV forecast → MW per quarter-hour (kWh in an hour = mean kW that hour)
+    const { data: fc } = await (supabase.from as any)("pv_forecasts")
+      .select("ts, forecast_kwh").eq("metering_point_id", mp.id)
+      .gte("ts", win.start.toISOString()).lt("ts", win.end.toISOString());
+    const byHour = new Map<number, number>();
+    for (const r of ((fc ?? []) as any[])) byHour.set(new Date(r.ts).getTime(), Number(r.forecast_kwh || 0) / 1000);
+    const quantities = Array.from({ length: win.positions }, (_, i) => {
+      const t = win.start.getTime() + i * 900000;
+      const hourStart = Math.floor(t / 3600000) * 3600000;
+      return byHour.get(hourStart) ?? 0;
+    });
+    if (!quantities.some(q => q > 0)) {
+      toast({ title: "No production forecast for this date", description: "Run Sync PV first, or the plant has no forecast rows.", variant: "destructive" });
+      return;
+    }
+
+    const stamp = date.replace(/-/g, "");
+    const xml = buildEssMessage({
+      messageId: `${stamp}_PPS_${mp.eic_code}`,
+      messageVersion: version,
+      dateISO: date,
+      settings,
+      series: [{
+        seriesId: `${(mp.edu_code || "PROD").replace(/\s+/g, "_")}_PRODUCTION`,
+        version,
+        businessType: "A01",
+        objectAggregation: "A02",
+        inArea: home,
+        outArea: null,
+        inParty: mp.producer_party_eic || settings.sender_eic,
+        outParty: null,
+        meteringPoint: mp.eic_code,
+        quantities,
+      }],
+    });
+    downloadXml(`${stamp}_PPS_${mp.eic_code}_${String(version).padStart(3, "0")}.xml`, xml);
+    const mwh = quantities.reduce((a, b) => a + b, 0) / 4;
+    toast({ title: `PPS exported — ${mp.eic_code}`, description: `${mwh.toFixed(1)} MWh, peak ${Math.max(...quantities).toFixed(1)} MW` });
+  }
 
   // ── ESS export: TPS from Trade Blotter + consumption leg from this nomination ──
   async function exportTps() {
@@ -191,6 +252,15 @@ export default function Scheduling() {
       actions={<>
         <Button size="sm" variant="outline" onClick={loadFromForecast}><Download className="h-4 w-4 mr-1" />Load from forecast</Button>
         <Button size="sm" variant="outline" onClick={exportTps}><FileCode className="h-4 w-4 mr-1" />Export TPS</Button>
+        {plants.length > 0 && (
+          <>
+            <Select value={plant} onValueChange={setPlant}>
+              <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Plant" /></SelectTrigger>
+              <SelectContent>{plants.map(p => <SelectItem key={p.id} value={p.id}>{p.eic_code}</SelectItem>)}</SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={exportPps}><Sun className="h-4 w-4 mr-1" />Export PPS</Button>
+          </>
+        )}
         <Button size="sm" variant="outline" onClick={syncPv}><Activity className="h-4 w-4 mr-1" />Sync PV{pvHourly ? " ✓" : ""}</Button>
         <Button size="sm" variant="outline" onClick={publish}><Lock className="h-4 w-4 mr-1" />Publish v{version}</Button>
         <Button size="sm" onClick={submitToTso}><Send className="h-4 w-4 mr-1" />Submit to TSO</Button>
