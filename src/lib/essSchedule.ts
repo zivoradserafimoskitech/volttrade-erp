@@ -42,11 +42,18 @@ const esc = (s: string) =>
 const el = (name: string, v: string | number, extra = "") =>
   `    <${name} v="${esc(String(v))}"${extra} />`;
 
-/** Number formatting: trim trailing zeros, keep up to 3 decimals (ESS tolerates 0 as "0"). */
-export function fmtQty(n: number): string {
-  const r = Math.round(n * 1000) / 1000;
-  return Number.isInteger(r) ? String(r) : String(r);
+/**
+ * Quantity formatting per Правила за пазар на електрична енергија, чл. 3(2)(3):
+ * active power in MW with three decimals, EXCEPT cross-border physical
+ * schedule nominations, which must be whole numbers.
+ */
+export function fmtQty(n: number, integerOnly = false): string {
+  if (integerOnly) return String(Math.round(n));
+  return String(Math.round(n * 1000) / 1000);
 }
+
+/** Cross-border series (BusinessType A03) must carry integer MW values. */
+export const isCrossBorder = (businessType: string) => businessType === "A03";
 
 /**
  * Schedule day window in UTC for a local calendar date (Europe/Skopje).
@@ -117,7 +124,7 @@ export function buildEssMessage(opts: {
     for (let i = 0; i < win.positions; i++) {
       lines.push(`      <Interval>`);
       lines.push(`        <Pos v="${i + 1}" />`);
-      lines.push(`        <Qty v="${fmtQty(s.quantities[i] ?? 0)}" />`);
+      lines.push(`        <Qty v="${fmtQty(s.quantities[i] ?? 0, isCrossBorder(s.businessType))}" />`);
       lines.push(`      </Interval>`);
     }
     lines.push(`    </Period>`);

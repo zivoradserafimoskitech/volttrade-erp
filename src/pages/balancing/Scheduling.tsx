@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useMemo, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { buildEssMessage, tradeQuantities, classifyTrade, downloadXml, scheduleWindow, type EssSeries } from "@/lib/essSchedule";
 import { toast } from "@/hooks/use-toast";
 import { shape24h, SlpCategory, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
-import { CalendarClock, Lock, Send, Activity, Download, FileCode, Sun } from "lucide-react";
+import { CalendarClock, Lock, Send, Activity, Download, FileCode, Sun, Percent } from "lucide-react";
 
 export default function Scheduling() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -37,6 +39,22 @@ export default function Scheduling() {
     return true;
   }
   useEffect(() => { loadPvForecast(); }, [date]);
+
+  // ── ППЕЕ coefficients (published by ОПЕЕ one day ahead) ──
+  const [ppeeOpen, setPpeeOpen] = useState(false);
+  const [ppeeText, setPpeeText] = useState("");
+  async function savePpee() {
+    const nums = ppeeText.split(/[\s,;]+/).map(x => x.replace(",", ".")).filter(Boolean).map(Number).filter(n => isFinite(n));
+    if (nums.length !== 24) {
+      toast({ title: `Expected 24 values, got ${nums.length}`, description: "Paste the hourly ППЕЕ share (%) for the day, hours 1–24.", variant: "destructive" });
+      return;
+    }
+    const rows = nums.map((v, i) => ({ delivery_date: date, hour: i + 1, coefficient_pct: v, is_final: true, source: "OPEE" }));
+    const { error } = await (supabase.from as any)("ppee_coefficients").upsert(rows, { onConflict: "delivery_date,hour" });
+    if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
+    toast({ title: `ППЕЕ coefficients saved for ${date}`, description: `Average ${(nums.reduce((a, b) => a + b, 0) / 24).toFixed(2)}%` });
+    setPpeeOpen(false); setPpeeText("");
+  }
 
   // ── ESS export: PPS (production schedule) per metering point ──
   const [plants, setPlants] = useState<{ id: string; eic_code: string; edu_code: string | null; producer_party_eic: string | null }[]>([]);
@@ -151,6 +169,33 @@ export default function Scheduling() {
       });
     }
 
+    // 3) ППЕЕ purchase from ОПЕЕ — Правила за пазар, Прилог 1 т.4:
+    //    TPS_ППЕЕПТ = p[%] × TPS_снабдувач, per hour, rounded to 3 decimals.
+    const { data: coef } = await (supabase.from as any)("ppee_coefficients")
+      .select("hour, coefficient_pct").eq("delivery_date", date).order("hour");
+    if (coef?.length && consumption.some(v => v > 0)) {
+      const byHour = new Map<number, number>(((coef ?? []) as any[]).map(c => [Number(c.hour), Number(c.coefficient_pct)]));
+      const ppee = consumption.map((mw, i) => {
+        const hour = Math.floor(i / 4) + 1;               // Pos 1–4 → hour 1
+        return mw * (byHour.get(hour) ?? 0) / 100;
+      });
+      if (ppee.some(v => v > 0)) {
+        series.push({
+          seriesId: settings.ppee_series_id || "PPEE_BUY",
+          version,
+          businessType: "A02",
+          objectAggregation: "A03",
+          inArea: home,
+          outArea: home,
+          inParty: settings.sender_eic,
+          outParty: settings.opee_eic || null,
+          quantities: ppee,
+        });
+      }
+    } else if (consumption.some(v => v > 0)) {
+      toast({ title: "ППЕЕ series skipped", description: `No ОПЕЕ coefficients stored for ${date} — add them to include the ППЕЕ purchase.` });
+    }
+
     if (!series.length) {
       toast({ title: "Nothing to export", description: "No schedulable trades for this date and no nominated load.", variant: "destructive" });
       return;
@@ -251,6 +296,7 @@ export default function Scheduling() {
     <ErpLayout title="Scheduling & Nomination" subtitle="Profiled (SLP) + Measured + PV legs · NOP per MTU"
       actions={<>
         <Button size="sm" variant="outline" onClick={loadFromForecast}><Download className="h-4 w-4 mr-1" />Load from forecast</Button>
+        <Button size="sm" variant="outline" onClick={() => setPpeeOpen(true)}><Percent className="h-4 w-4 mr-1" />ППЕЕ %</Button>
         <Button size="sm" variant="outline" onClick={exportTps}><FileCode className="h-4 w-4 mr-1" />Export TPS</Button>
         {plants.length > 0 && (
           <>
@@ -306,6 +352,23 @@ export default function Scheduling() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+      <Dialog open={ppeeOpen} onOpenChange={setPpeeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ППЕЕ коефициенти — {date}</DialogTitle>
+            <DialogDescription>
+              Конечната часовна прогноза за учество на ППЕЕ ја објавува ОПЕЕ еден ден однапред
+              (opee.mepso.com.mk). Залепете 24 вредности во проценти, час 1–24.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea rows={5} value={ppeeText} onChange={e => setPpeeText(e.target.value)}
+            placeholder="14.92 15.3 16.1 …" />
+          <p className="text-xs text-muted-foreground">
+            Номинацијата се пресметува како ППЕЕ = коефициент × номинирана потрошувачка (Прилог 1, т.4).
+          </p>
+          <Button onClick={savePpee}>Зачувај</Button>
+        </DialogContent>
+      </Dialog>
     </ErpLayout>
   );
 }
