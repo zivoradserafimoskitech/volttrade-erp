@@ -106,6 +106,26 @@ export default function BillingRuns() {
       return rows.length ? Number(rows[0].value) : fallback;
     };
     const ppeePct = reg("PPEE_PERCENT", 12.96);
+    // МЕМО објавува ново процентуално учество и просечни цени за СЕКОЈ месец
+    // (Прилог 1, т.5 — до 5-от работен ден). Вредноста е и различна за секој
+    // снабдувач, зависно од обликот на неговата потрошувачка. Ако важечкиот
+    // ред не е за месецот на фактурата, предупреди пред да се фактурира.
+    const regRow = (code: string) => ((regs ?? []) as any[])
+      .filter(r => r.code === code)
+      .sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1))[0];
+    const stale = ["PPEE_PERCENT", "PPEE_PRICE"].filter(c => {
+      const row = regRow(c);
+      return !row || String(row.valid_from).slice(0, 7) !== String(run.period_start).slice(0, 7);
+    });
+    if (stale.length) {
+      const proceed = window.confirm(
+        `Внимание: ${stale.join(" и ")} не е внесен за ${String(run.period_start).slice(0, 7)}.\n\n` +
+        `МЕМО го објавува процентуалното учество по снабдувач и просечните цени за секој месец ` +
+        `(до 5-от работен ден, memo.mk). Ќе се пресмета со последната позната вредност ` +
+        `(ППЕЕ ${ppeePct}%), што може да даде погрешна фактура.\n\nДа продолжам?`
+      );
+      if (!proceed) { toast.info("Прекинато — внесете ги месечните ППЕЕ вредности прво"); return; }
+    }
     const ppeePriceMkdKwh = reg("PPEE_PRICE", 5.5993826);
     const memoFeeMkdMwh = reg("MEMO_FEE", 14.1);
     const eurMkd = reg("EUR_MKD", 61.695);
