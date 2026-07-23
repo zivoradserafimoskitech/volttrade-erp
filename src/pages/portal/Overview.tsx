@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import {
   Zap, Receipt, Leaf, TrendingDown, TrendingUp, Flame, Sun, Gauge, ArrowRight,
-  MapPin, Handshake, Sparkles, Car, Gift, Wallet,
+  MapPin, Handshake, Sparkles, Car, Gift, Wallet, Activity,
 } from "lucide-react";
 
 const EMBER = "#FF6B2C";
@@ -104,163 +104,159 @@ export default function PortalOverview() {
     </PortalLayout>
   );
 
+  const greeting = (() => { const h = new Date().getHours(); return h < 12 ? "Добро утро" : h < 18 ? "Добар ден" : "Добра вечер"; })();
+  const firstName = (client?.contact_name || client?.company_name || "").split(" ")[0];
+  const due = invoice?.due_date ? new Date(invoice.due_date).toLocaleDateString("mk-MK") : null;
+  const overdue = invoice?.due_date ? new Date(invoice.due_date) < new Date() : false;
+
+  const tiles = [
+    { to: "/portal/hourly", label: "Потрошувачка", icon: Activity },
+    { to: "/portal/invoices", label: "Сметки", icon: Receipt },
+    { to: "/portal/tariffs", label: "Тарифа", icon: Zap },
+    { to: "/portal/edus", label: "Мерни места", icon: MapPin },
+    { to: "/portal/savings", label: "Заштеди", icon: Sparkles },
+    { to: "/portal/readings", label: "Внеси отчит", icon: Gauge },
+  ];
+
   return (
-    <PortalLayout title={`Hello, ${client.company_name}`}>
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-border p-5 md:p-7"
-           style={{ background: "radial-gradient(120% 120% at 0% 0%, rgba(255,107,44,0.25) 0%, rgba(255,107,44,0) 55%), linear-gradient(135deg, #1A140F 0%, #100C09 100%)" }}>
-        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full blur-3xl opacity-40" style={{ background: EMBER }} />
-        <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-5">
-          <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest" style={{ color: EMBER_SOFT }}>
-              <Flame className="h-3.5 w-3.5" /> Your energy today
-            </div>
-            <div className="mt-2 text-3xl md:text-4xl font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              {fmtNum(totals.last)} <span className="text-base font-normal text-muted-foreground">kWh last month</span>
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-sm">
-              {ember ? <TrendingDown className="h-4 w-4 text-emerald-400" /> : <TrendingUp className="h-4 w-4" style={{ color: EMBER }} />}
-              <span className={ember ? "text-emerald-400" : ""} style={!ember ? { color: EMBER } : {}}>
-                {totals.delta > 0 ? "+" : ""}{totals.delta.toFixed(1)}% vs previous month
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="secondary"><Link to="/portal/readings"><Gauge className="h-4 w-4 mr-2" />Submit reading</Link></Button>
-            <Button asChild size="sm" style={{ background: EMBER, color: "#1A140F" }}><Link to="/portal/invoices"><Receipt className="h-4 w-4 mr-2" />View invoices</Link></Button>
-          </div>
-        </div>
+    <PortalLayout title="">
+      {/* Greeting */}
+      <div>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
+          {greeting}{firstName ? `, ${firstName}` : ""}
+        </h1>
+        {contract?.tariff_id && <p className="text-sm text-muted-foreground mt-1">Тарифа · договор {contract.contract_number}</p>}
       </div>
 
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={Wallet} label="Account balance"
-             value={`${balance < 0 ? "+" : ""}€${fmtNum(Math.abs(balance))}`}
-             sub={balance > 0 ? "You owe" : balance < 0 ? "In credit" : "Settled"}
-             accent={balance > 0} />
-        <Kpi icon={Receipt} label="Next invoice" value={invoice ? `€${fmtNum(invoice.total_eur)}` : "—"} sub={invoice?.due_date ? `Due ${invoice.due_date}` : "No open invoice"} />
-        <Kpi icon={Zap} label="Last 12m" value={`${fmtNum(totals.total / 1000)} MWh`} sub={`Avg ${fmtNum(totals.avg)} kWh/mo`} />
-        <Kpi icon={Gift} label="Rewards" value={`€${fmtNum(rewards)}`} sub="Credits earned" />
+      {/* Bill hero card (A1-style) */}
+      <Card className="border-border/60 overflow-hidden">
+        <CardContent className="p-5 md:p-6">
+          {invoice ? (
+            <>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="text-sm text-muted-foreground">
+                    Вашата сметка {invoice.period_start ? `за ${new Date(invoice.period_start).toLocaleDateString("mk-MK", { month: "long" })}` : ""} е издадена
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {due && <>Рок на плаќање до {due}</>}
+                    {overdue && <Badge variant="destructive" className="ml-2 text-[10px]">Достасана</Badge>}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl md:text-4xl font-bold" style={{ color: EMBER }}>
+                    € {fmtNum(Number(invoice.total_eur || 0), 2)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">вкупен отворен долг</div>
+                </div>
+              </div>
+              <Button asChild className="w-full mt-4 h-12 text-base font-semibold" style={{ background: EMBER, color: "#1a1510" }}>
+                <Link to="/portal/invoices">Плати сега <ArrowRight className="h-4 w-4 ml-2" /></Link>
+              </Button>
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <div className="font-medium">Немате отворени сметки</div>
+              <div className="text-sm text-muted-foreground mt-1">Сите ваши фактури се платени.</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quick tiles */}
+      <div className="grid grid-cols-3 gap-3">
+        {tiles.map(({ to, label, icon: Icon }) => (
+          <Link key={to} to={to}
+            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-border/60 bg-card p-4 hover:bg-secondary/50 transition-colors">
+            <Icon className="h-6 w-6" style={{ color: EMBER }} />
+            <span className="text-[11px] md:text-xs text-center leading-tight">{label}</span>
+          </Link>
+        ))}
       </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm flex items-center gap-2"><Flame className="h-4 w-4" style={{ color: EMBER }} /> Monthly consumption</CardTitle>
-            <Badge variant="secondary" className="text-[10px]">kWh</Badge>
+      {/* Consumption chart */}
+      <Card className="border-border/60">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Преглед на потрошувачка</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {series.length ? (
+            <>
+              <div className="flex items-baseline gap-3 mb-3">
+                <span className="text-2xl font-semibold">{fmtNum(totals.last, 0)} kWh</span>
+                {totals.prev > 0 && (
+                  <span className={`text-sm flex items-center gap-1 ${totals.delta > 0 ? "text-destructive" : "text-emerald-500"}`}>
+                    {totals.delta > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {Math.abs(totals.delta).toFixed(0)}% од претходен месец
+                  </span>
+                )}
+              </div>
+              <ResponsiveContainer width="100%" height={190}>
+                <AreaChart data={series}>
+                  <defs>
+                    <linearGradient id="ember" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={EMBER} stopOpacity={0.45} />
+                      <stop offset="100%" stopColor={EMBER} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 10 }} />
+                  <Area dataKey="kwh" name="kWh" stroke={EMBER} strokeWidth={2} fill="url(#ember)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground py-8 text-center">
+              Сè уште нема податоци за потрошувачка. Ќе се појават по првиот отчит.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Supply points summary */}
+      {edus.length > 0 && (
+        <Card className="border-border/60">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Мои мерни места</CardTitle>
+            <Link to="/portal/edus" className="text-xs" style={{ color: EMBER }}>Сите</Link>
           </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ left: -10, right: 8, top: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="ember" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={EMBER} stopOpacity={0.55} />
-                    <stop offset="100%" stopColor={EMBER} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.12} />
-                <XAxis dataKey="month" fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip contentStyle={{ background: "#1A140F", border: "1px solid #3A3128", borderRadius: 8, fontSize: 12 }} />
-                <Area type="monotone" dataKey="kwh" stroke={EMBER} strokeWidth={2} fill="url(#ember)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <CardContent className="space-y-2">
+            {edus.slice(0, 3).map((e) => (
+              <div key={e.id} className="flex items-center justify-between rounded-xl bg-secondary/40 px-3 py-2.5">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{e.ean ?? "—"}</div>
+                  <div className="text-xs text-muted-foreground truncate">{e.address ?? "—"}</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {e.has_pv && <Badge variant="secondary" className="text-[10px]"><Sun className="h-3 w-3 mr-1" />PV</Badge>}
+                  {e.contracted_power_kw && <span className="text-xs text-muted-foreground">{e.contracted_power_kw} kW</span>}
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
+      )}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2"><Gauge className="h-4 w-4" style={{ color: EMBER }} /> Today (estimated)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={today} margin={{ left: -10, right: 8, top: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.12} />
-                <XAxis dataKey="h" fontSize={9} interval={3} stroke="hsl(var(--muted-foreground))" />
-                <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip contentStyle={{ background: "#1A140F", border: "1px solid #3A3128", borderRadius: 8, fontSize: 12 }} />
-                <Bar dataKey="kw" fill={EMBER} radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+      {/* Rewards / PPA strip */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="border-border/60">
+          <CardContent className="p-4">
+            <Gift className="h-5 w-5 mb-2" style={{ color: EMBER }} />
+            <div className="text-lg font-semibold">€ {fmtNum(rewards, 2)}</div>
+            <div className="text-xs text-muted-foreground">Награди</div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Sites + Quick actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm flex items-center gap-2"><MapPin className="h-4 w-4" style={{ color: EMBER }} /> Your supply points</CardTitle>
-            <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
-              <Link to="/portal/edus">View all <ArrowRight className="h-3 w-3 ml-1" /></Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            {edus.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground text-center">No supply points linked yet.</div>
-            ) : (
-              <ul className="divide-y divide-border">
-                {edus.slice(0, 5).map((e) => (
-                  <li key={e.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{e.address || e.ean}</div>
-                      <div className="text-xs text-muted-foreground truncate">EAN {e.ean} · {e.contracted_power_kw ?? "—"} kW</div>
-                    </div>
-                    {e.has_pv && (
-                      <Badge className="text-[10px]" style={{ background: "rgba(255,107,44,0.15)", color: EMBER, border: `1px solid ${EMBER}40` }}>
-                        <Sun className="h-3 w-3 mr-1" /> {fmtNum(e.pv_capacity_kw || 0)} kWp PV
-                      </Badge>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Quick actions</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 gap-2">
-            <ActionLink to="/portal/tariffs" icon={Zap} label="Tariffs & live prices" />
-            <ActionLink to="/portal/savings" icon={Sparkles} label="Saving Sessions" />
-            <ActionLink to="/portal/ev" icon={Car} label="EV smart charging" />
-            <ActionLink to="/portal/refer" icon={Gift} label="Refer a friend · €50" />
-            <ActionLink to="/portal/invoices" icon={Receipt} label="Pay an invoice" />
-            <ActionLink to="/portal/readings" icon={Gauge} label="Submit meter reading" />
+        <Card className="border-border/60">
+          <CardContent className="p-4">
+            <Handshake className="h-5 w-5 mb-2" style={{ color: EMBER }} />
+            <div className="text-lg font-semibold">{ppaCount}</div>
+            <div className="text-xs text-muted-foreground">PPA договори</div>
           </CardContent>
         </Card>
       </div>
     </PortalLayout>
-  );
-}
-
-function Kpi({ icon: Icon, label, value, sub, accent }: { icon: any; label: string; value: string; sub?: string; accent?: boolean }) {
-  return (
-    <Card className="overflow-hidden relative">
-      {accent && <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: EMBER }} />}
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="h-7 w-7 rounded-md grid place-items-center" style={{ background: "rgba(255,107,44,0.12)", color: EMBER }}>
-            <Icon className="h-3.5 w-3.5" />
-          </div>
-        </div>
-        <div className="text-2xl font-semibold mt-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{value}</div>
-        {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ActionLink({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
-  return (
-    <Link to={to} className="group flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 hover:bg-secondary transition-colors">
-      <span className="flex items-center gap-2 text-sm">
-        <Icon className="h-4 w-4" style={{ color: EMBER }} />
-        {label}
-      </span>
-      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-    </Link>
   );
 }

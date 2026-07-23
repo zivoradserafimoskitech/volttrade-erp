@@ -1,14 +1,19 @@
 {
-  "name": "Vatra — Energy",
+  "name": "Vatra — Моја енергија",
   "short_name": "Vatra",
-  "description": "Your hearth for electricity: live usage, day-ahead prices, packs and investments.",
-  "start_url": "/vatra",
+  "description": "Вашите сметки, потрошувачка и тарифи на едно место.",
+  "start_url": "/portal",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#18140F",
   "theme_color": "#18140F",
   "icons": [
-    { "src": "/vatra-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "/vatra-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

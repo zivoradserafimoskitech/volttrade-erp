@@ -1,27 +1,33 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell } from "lucide-react";
+import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell, Grid3x3 } from "lucide-react";
 
-const items = [
-  { to: "/portal", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/portal/edus", label: "My supply points", icon: MapPin },
-  { to: "/portal/hourly", label: "Hourly readings", icon: Activity },
-  { to: "/portal/tariffs", label: "Tariffs", icon: Zap },
-  { to: "/portal/savings", label: "Savings", icon: Sparkles },
-  { to: "/portal/ev", label: "EV charging", icon: Car },
-  { to: "/portal/refer", label: "Refer", icon: Gift },
-  { to: "/portal/invoices", label: "Invoices", icon: Receipt },
-  { to: "/portal/ppa", label: "My PPAs", icon: Handshake },
-  { to: "/portal/readings", label: "Submit reading", icon: Gauge },
-  { to: "/portal/notifications", label: "Notifications", icon: Bell },
-  { to: "/portal/profile", label: "Profile", icon: User },
+// Primary tabs — bottom bar on mobile (A1-style), sidebar on desktop.
+const primary = [
+  { to: "/portal", label: "Дома", icon: LayoutDashboard, end: true as boolean | undefined },
+  { to: "/portal/invoices", label: "Сметки", icon: Receipt },
+  { to: "/portal/hourly", label: "Потрошувачка", icon: Activity },
+  { to: "/portal/profile", label: "Профил", icon: User },
 ];
+// Secondary — "Повеќе" sheet on mobile, listed in sidebar on desktop.
+const secondary = [
+  { to: "/portal/edus", label: "Мои мерни места", icon: MapPin },
+  { to: "/portal/tariffs", label: "Тарифи", icon: Zap },
+  { to: "/portal/savings", label: "Заштеди", icon: Sparkles },
+  { to: "/portal/ev", label: "ЕВ полнење", icon: Car },
+  { to: "/portal/refer", label: "Препорачај", icon: Gift },
+  { to: "/portal/ppa", label: "Мои PPA", icon: Handshake },
+  { to: "/portal/readings", label: "Внеси отчит", icon: Gauge },
+  { to: "/portal/notifications", label: "Известувања", icon: Bell },
+];
+const items: { to: string; label: string; icon: any; end?: boolean }[] = [...primary, ...secondary];
 
 export function PortalLayout({ children, title }: { children: ReactNode; title: string }) {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [moreOpen, setMoreOpen] = useState(false);
   if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/auth" replace />;
   const previewMode = (() => { try { return sessionStorage.getItem('viewAsCustomer') === '1'; } catch { return false; } })();
@@ -58,29 +64,84 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
           </Button>
         </div>
       )}
-      <header className="h-16 border-b border-border px-4 md:px-8 flex items-center justify-between bg-card/40 backdrop-blur">
-        <div>
-          <div className="font-semibold tracking-tight text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            vatra<span style={{ color: "#FF6B2C" }}>.</span>
+      {/* ── Header ── */}
+      <header className="h-14 md:h-16 border-b border-border px-4 md:px-6 flex items-center justify-between bg-card/60 backdrop-blur sticky top-0 z-30">
+        <div className="flex items-center gap-3">
+          <div>
+            <div className="font-semibold tracking-tight text-lg leading-none" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              vatra<span style={{ color: "#FF6B2C" }}>.</span>
+            </div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Your energy</div>
           </div>
-          <div className="text-sm uppercase tracking-widest text-muted-foreground">Your energy</div>
         </div>
-        <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate("/auth"); }}><LogOut className="h-4 w-4 mr-2" />Sign out</Button>
+        <div className="flex items-center gap-1">
+          <NavLink to="/portal/notifications" className="p-2 rounded-lg hover:bg-secondary" aria-label="Известувања">
+            <Bell className="h-5 w-5" />
+          </NavLink>
+          <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate("/auth"); }} className="hidden md:inline-flex">
+            <LogOut className="h-4 w-4 mr-2" />Одјава
+          </Button>
+        </div>
       </header>
-      <nav className="border-b border-border bg-card/20 px-4 md:px-8 overflow-x-auto">
-        <div className="flex gap-1">
+
+      <div className="flex-1 flex w-full max-w-6xl mx-auto w-full">
+        {/* ── Desktop sidebar ── */}
+        <aside className="hidden md:flex flex-col w-56 shrink-0 border-r border-border py-4 gap-0.5">
           {items.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-3 text-sm border-b-2 whitespace-nowrap ${isActive ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-              <Icon className="h-4 w-4" />{label}
+            <NavLink key={to} to={to} end={(end as boolean) ?? false} className={({ isActive }) =>
+              `flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-sm transition-colors ${isActive ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+              <Icon className="h-4 w-4 shrink-0" />{label}
             </NavLink>
           ))}
+          <button onClick={async () => { await signOut(); navigate("/auth"); }}
+            className="flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground mt-auto">
+            <LogOut className="h-4 w-4" />Одјава
+          </button>
+        </aside>
+
+        {/* ── Content ── */}
+        <main className="flex-1 min-w-0 p-4 md:p-6 pb-24 md:pb-6 space-y-4">
+          {title && <h1 className="text-xl md:text-2xl font-semibold tracking-tight">{title}</h1>}
+          {children}
+        </main>
+      </div>
+
+      {/* ── Mobile bottom navigation (A1-style) ── */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+        <div className="grid grid-cols-5">
+          {primary.map(({ to, label, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={(end as boolean) ?? false} className={({ isActive }) =>
+              `flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+              <Icon className="h-5 w-5" />{label}
+            </NavLink>
+          ))}
+          <button onClick={() => setMoreOpen(true)}
+            className={`flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] ${moreOpen ? "text-primary" : "text-muted-foreground"}`}>
+            <Grid3x3 className="h-5 w-5" />Повеќе
+          </button>
         </div>
       </nav>
-      <main className="flex-1 p-4 md:p-8 max-w-5xl w-full mx-auto space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {children}
-      </main>
+
+      {/* ── "More" sheet (mobile) ── */}
+      {moreOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/60 flex items-end" onClick={() => setMoreOpen(false)}>
+          <div className="w-full bg-card rounded-t-2xl border-t border-border p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4" />
+            <div className="grid grid-cols-3 gap-2">
+              {secondary.map(({ to, label, icon: Icon }) => (
+                <NavLink key={to} to={to} onClick={() => setMoreOpen(false)}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl bg-secondary/60 text-center">
+                  <Icon className="h-5 w-5 text-primary" />
+                  <span className="text-[11px] leading-tight">{label}</span>
+                </NavLink>
+              ))}
+            </div>
+            <Button variant="ghost" className="w-full mt-3" onClick={async () => { await signOut(); navigate("/auth"); }}>
+              <LogOut className="h-4 w-4 mr-2" />Одјава
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
