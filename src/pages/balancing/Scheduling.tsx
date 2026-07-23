@@ -43,17 +43,79 @@ export default function Scheduling() {
   // ── ППЕЕ coefficients (published by ОПЕЕ one day ahead) ──
   const [ppeeOpen, setPpeeOpen] = useState(false);
   const [ppeeText, setPpeeText] = useState("");
+  const [ppeePreview, setPpeePreview] = useState<number[] | null>(null);
+
+  /**
+   * Parse a MEMO "Конечна прогноза" workbook (memo.mk → ППЕЕПТ → Конечни
+   * часовни прогнози). Layout: Датум | Час | Планирано производство |
+   * Планирана потрошувачка | Учество во % од конзумот | … | Учество по MWh.
+   * Tolerant of column shifts: locates the hour column and the share column
+   * by header text, falling back to production/consumption ratio.
+   */
+  async function importPpeeFile(file: File) {
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+
+      const norm = (v: any) => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+      const num = (v: any) => {
+        if (typeof v === "number") return v;
+        const n = Number(String(v ?? "").replace(/\s/g, "").replace(",", "."));
+        return isFinite(n) ? n : NaN;
+      };
+
+      let hourCol = -1, shareCol = -1, prodCol = -1, consCol = -1;
+      for (const r of rows) {
+        if (!Array.isArray(r)) continue;
+        const hi = r.findIndex(c => norm(c) === "час");
+        if (hi === -1) continue;
+        hourCol = hi;
+        r.forEach((c, i) => {
+          const t = norm(c);
+          if (shareCol === -1 && t.includes("учество") && t.includes("%")) shareCol = i;
+          if (prodCol === -1 && t.includes("производство")) prodCol = i;
+          if (consCol === -1 && t.includes("потрошувачка")) consCol = i;
+        });
+        break;
+      }
+      if (hourCol === -1) throw new Error("Не е препознаена колоната „Час“ во датотеката.");
+
+      const byHour = new Map<number, number>();
+      for (const r of rows) {
+        if (!Array.isArray(r)) continue;
+        const h = num(r[hourCol]);
+        if (!Number.isInteger(h) || h < 1 || h > 24) continue;
+        let pct = shareCol !== -1 ? num(r[shareCol]) : NaN;
+        if (!isFinite(pct) && prodCol !== -1 && consCol !== -1) {
+          const p = num(r[prodCol]), c = num(r[consCol]);
+          if (isFinite(p) && isFinite(c) && c > 0) pct = (p / c) * 100;
+        }
+        if (isFinite(pct)) byHour.set(h, pct);
+      }
+      if (byHour.size < 23) throw new Error(`Прочитани се само ${byHour.size} часа — проверете дали е вистинската датотека.`);
+
+      const vals = Array.from({ length: 24 }, (_, i) => byHour.get(i + 1) ?? 0);
+      setPpeePreview(vals);
+      setPpeeText(vals.map(v => v.toFixed(2)).join(" "));
+      toast({ title: `Прочитани ${byHour.size} часа`, description: `Просек ${(vals.reduce((a, b) => a + b, 0) / 24).toFixed(2)}% · проверете и зачувајте.` });
+    } catch (e: any) {
+      toast({ title: "Не успеа читањето", description: e?.message ?? "Непозната грешка", variant: "destructive" });
+    }
+  }
+
   async function savePpee() {
     const nums = ppeeText.split(/[\s,;]+/).map(x => x.replace(",", ".")).filter(Boolean).map(Number).filter(n => isFinite(n));
     if (nums.length !== 24) {
-      toast({ title: `Expected 24 values, got ${nums.length}`, description: "Paste the hourly ППЕЕ share (%) for the day, hours 1–24.", variant: "destructive" });
+      toast({ title: `Очекувани се 24 вредности, добиени ${nums.length}`, description: "Внесете го часовното ППЕЕ учество (%) за денот, часови 1–24.", variant: "destructive" });
       return;
     }
-    const rows = nums.map((v, i) => ({ delivery_date: date, hour: i + 1, coefficient_pct: v, is_final: true, source: "OPEE" }));
+    const rows = nums.map((v, i) => ({ delivery_date: date, hour: i + 1, coefficient_pct: v, is_final: true, source: "MEMO" }));
     const { error } = await (supabase.from as any)("ppee_coefficients").upsert(rows, { onConflict: "delivery_date,hour" });
-    if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
-    toast({ title: `ППЕЕ coefficients saved for ${date}`, description: `Average ${(nums.reduce((a, b) => a + b, 0) / 24).toFixed(2)}%` });
-    setPpeeOpen(false); setPpeeText("");
+    if (error) { toast({ title: "Неуспешно зачувување", description: error.message, variant: "destructive" }); return; }
+    toast({ title: `ППЕЕ коефициенти зачувани за ${date}`, description: `Просек ${(nums.reduce((a, b) => a + b, 0) / 24).toFixed(2)}%` });
+    setPpeeOpen(false); setPpeeText(""); setPpeePreview(null);
   }
 
   // ── ESS export: PPS (production schedule) per metering point ──
@@ -361,11 +423,31 @@ export default function Scheduling() {
               (opee.mepso.com.mk). Залепете 24 вредности во проценти, час 1–24.
             </DialogDescription>
           </DialogHeader>
-          <Textarea rows={5} value={ppeeText} onChange={e => setPpeeText(e.target.value)}
-            placeholder="14.92 15.3 16.1 …" />
-          <p className="text-xs text-muted-foreground">
-            Номинацијата се пресметува како ППЕЕ = коефициент × номинирана потрошувачка (Прилог 1, т.4).
-          </p>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Внеси од МЕМО датотека (.xlsx)</Label>
+              <Input type="file" accept=".xlsx,.xls" className="mt-1"
+                onChange={e => { const f = e.target.files?.[0]; if (f) importPpeeFile(f); }} />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                memo.mk → ППЕЕПТ → Конечни часовни прогнози → преземи ја датотеката за денот.
+              </p>
+            </div>
+            <div>
+              <Label className="text-xs">…или залепи 24 вредности (%)</Label>
+              <Textarea rows={3} className="mt-1" value={ppeeText} onChange={e => { setPpeeText(e.target.value); setPpeePreview(null); }}
+                placeholder="16.6 19.2 20.9 21.8 …" />
+            </div>
+            {ppeePreview && (
+              <div className="grid grid-cols-6 gap-1">
+                {ppeePreview.map((v, i) => (
+                  <div key={i} className="rounded border border-border/60 px-1 py-1 text-center text-[10px]">
+                    <div className="text-muted-foreground">{i + 1}h</div>
+                    <div className="tabular-nums">{v.toFixed(1)}%</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <Button onClick={savePpee}>Зачувај</Button>
         </DialogContent>
       </Dialog>
