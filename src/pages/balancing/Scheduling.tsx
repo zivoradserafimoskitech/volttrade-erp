@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/erp/StatCard";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { buildEssMessage, tradeQuantities, classifyTrade, downloadXml, type EssSeries } from "@/lib/essSchedule";
 import { toast } from "@/hooks/use-toast";
 import { shape24h, SlpCategory, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
-import { CalendarClock, Lock, Send, Activity, Download } from "lucide-react";
+import { CalendarClock, Lock, Send, Activity, Download, FileCode } from "lucide-react";
 
 export default function Scheduling() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -36,6 +37,74 @@ export default function Scheduling() {
     return true;
   }
   useEffect(() => { loadPvForecast(); }, [date]);
+
+  // ── ESS export: TPS from Trade Blotter + consumption leg from this nomination ──
+  async function exportTps() {
+    const [{ data: settings }, { data: trades }, { data: cps }] = await Promise.all([
+      (supabase.from as any)("ess_settings").select("*").limit(1).maybeSingle(),
+      (supabase.from as any)("trades").select("*, counterparties(eic_code, short_name, legal_name)")
+        .eq("schedulable", true).lte("delivery_start", `${date}T23:59:59Z`).gte("delivery_end", `${date}T00:00:00Z`),
+      (supabase.from as any)("counterparties").select("id, eic_code").limit(1),
+    ]);
+    if (!settings?.sender_eic || settings.sender_eic === "CHANGE_ME_SENDER_EIC") {
+      toast({ title: "Set your party EIC first", description: "Admin → ESS settings: sender_eic must be your BRP EIC code.", variant: "destructive" });
+      return;
+    }
+    const home = settings.default_area_eic || "10YMK-MEPSO----8";
+    const series: EssSeries[] = [];
+
+    // 1) One time series per schedulable trade
+    for (const t of ((trades ?? []) as any[])) {
+      const c = classifyTrade(t, home);
+      const cpEic = t.counterparties?.eic_code || null;
+      const buying = String(t.side).toLowerCase().startsWith("b");
+      series.push({
+        seriesId: t.ess_series_id || t.trade_number,
+        version,
+        businessType: c.businessType,
+        objectAggregation: c.objectAggregation,
+        inArea: c.inArea,
+        outArea: c.outArea,
+        inParty: buying ? settings.sender_eic : cpEic,
+        outParty: buying ? cpEic : settings.sender_eic,
+        capacityContractType: c.capacityContractType,
+        capacityAgreementId: t.capacity_agreement_id || null,
+        quantities: tradeQuantities(t, date),
+      });
+    }
+
+    // 2) Consumption leg — the nominated portfolio load (profiled + measured),
+    //    i.e. exactly what this page publishes to balance_schedules.
+    const consumption = rows.map(r => Number(r.profiled || 0) + Number(r.measured || 0)).map(v => v * 4); // MWh/MTU → MW
+    if (consumption.some(v => v > 0)) {
+      series.push({
+        seriesId: "PORTFOLIO_CONSUMPTION",
+        version,
+        businessType: "A04",
+        objectAggregation: "A03",
+        inArea: null,
+        outArea: home,
+        inParty: null,
+        outParty: settings.sender_eic,
+        quantities: consumption,
+      });
+    }
+
+    if (!series.length) {
+      toast({ title: "Nothing to export", description: "No schedulable trades for this date and no nominated load.", variant: "destructive" });
+      return;
+    }
+    const stamp = date.replace(/-/g, "");
+    const xml = buildEssMessage({
+      messageId: `${stamp}_TPS_${settings.sender_eic}`,
+      messageVersion: version,
+      dateISO: date,
+      settings,
+      series,
+    });
+    downloadXml(`${stamp}_TPS_${settings.sender_eic}_${String(version).padStart(3, "0")}.xml`, xml);
+    toast({ title: `TPS exported — ${series.length} time series`, description: `${(trades ?? []).length} trades + consumption leg, v${version}` });
+  }
 
   async function syncPv() {
     const { data, error } = await supabase.functions.invoke("sync-pv-forecast", { body: { horizon_hours: 48 } });
@@ -121,6 +190,7 @@ export default function Scheduling() {
     <ErpLayout title="Scheduling & Nomination" subtitle="Profiled (SLP) + Measured + PV legs · NOP per MTU"
       actions={<>
         <Button size="sm" variant="outline" onClick={loadFromForecast}><Download className="h-4 w-4 mr-1" />Load from forecast</Button>
+        <Button size="sm" variant="outline" onClick={exportTps}><FileCode className="h-4 w-4 mr-1" />Export TPS</Button>
         <Button size="sm" variant="outline" onClick={syncPv}><Activity className="h-4 w-4 mr-1" />Sync PV{pvHourly ? " ✓" : ""}</Button>
         <Button size="sm" variant="outline" onClick={publish}><Lock className="h-4 w-4 mr-1" />Publish v{version}</Button>
         <Button size="sm" onClick={submitToTso}><Send className="h-4 w-4 mr-1" />Submit to TSO</Button>

@@ -39,6 +39,7 @@ const STATUS_TONE: Record<string,string> = {
 export default function Trading() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Trade[]>([]);
+  const [areas, setAreas] = useState<{ eic: string; name: string }[]>([]);
   const [cps, setCps] = useState<Cp[]>([]);
   const [tcs, setTcs] = useState<Tc[]>([]);
   const [open, setOpen] = useState(false);
@@ -49,6 +50,8 @@ export default function Trading() {
     const { data } = await supabase.from("trades").select("*").order("delivery_start", { ascending: false }).limit(200);
     const { data: c } = await supabase.from("counterparties").select("id,legal_name").order("legal_name");
     const { data: t } = await supabase.from("trading_contracts").select("id,contract_number,counterparty_id");
+    const { data: ar } = await (supabase.from as any)("eic_areas").select("eic,name").order("is_default", { ascending: false });
+    setAreas((ar ?? []) as any);
     setRows((data as any) ?? []); setCps((c as any) ?? []); setTcs((t as any) ?? []);
   };
   useEffect(() => { load(); }, [user]);
@@ -70,6 +73,12 @@ export default function Trading() {
       trader: form.get("trader") || null,
       status: String(form.get("status") || "draft"),
       notes: form.get("notes") || null,
+      // ── ESS scheduling (feeds the TPS export in Scheduling & Nomination) ──
+      schedulable: form.get("schedulable") !== "no",
+      ess_series_id: form.get("ess_series_id") || null,
+      in_area_eic: form.get("in_area_eic") || null,
+      out_area_eic: form.get("out_area_eic") || null,
+      capacity_agreement_id: form.get("capacity_agreement_id") || null,
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Trade booked"); setOpen(false); load();
@@ -208,6 +217,37 @@ export default function Trading() {
                 <Select name="status" defaultValue="draft"><SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
+              </div>
+              <div className="col-span-2 border-t border-border/60 pt-3 mt-1">
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Scheduling (ESS / TPS)</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Include in schedule</Label>
+                    <Select name="schedulable" defaultValue="yes"><SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2"><Label>Series ID</Label><Input name="ess_series_id" placeholder="AXPO_BUY_YEAR_GR" /></div>
+                  <div className="space-y-2">
+                    <Label>In area</Label>
+                    <Select name="in_area_eic" defaultValue="10YMK-MEPSO----8"><SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{areas.map(a => <SelectItem key={a.eic} value={a.eic}>{a.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Out area</Label>
+                    <Select name="out_area_eic" defaultValue="10YMK-MEPSO----8"><SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{areas.map(a => <SelectItem key={a.eic} value={a.eic}>{a.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Capacity agreement ID <span className="text-muted-foreground">(cross-border only)</span></Label>
+                    <Input name="capacity_agreement_id" placeholder="GRMK20260101Y62807-…" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Same in/out area = internal trade (A02). Different areas = cross-border (A03) and needs a capacity agreement ID.
+                </p>
               </div>
               <div className="col-span-2"><Button type="submit" className="w-full" style={{ background: "var(--gradient-primary)" }}>Book trade</Button></div>
             </form>
