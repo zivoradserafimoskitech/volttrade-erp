@@ -22,6 +22,7 @@ import Ppa from "./pages/Ppa";
 import MeterReadings from "./pages/MeterReadings";
 import Reconciliation from "./pages/Reconciliation";
 import BillingRuns from "./pages/BillingRuns";
+import Compliance from "./pages/Compliance";
 import Payments from "./pages/Payments";
 import UsersAdmin from "./pages/admin/UsersAdmin";
 import Settings from "./pages/admin/Settings";
@@ -98,6 +99,7 @@ const App = () => (
             <Route path="/readings" element={<MeterReadings />} />
             <Route path="/reconciliation" element={<Reconciliation />} />
             <Route path="/billing" element={<BillingRuns />} />
+            <Route path="/compliance" element={<Compliance />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/market" element={<Market />} />
             <Route path="/trading" element={<Trading />} />
