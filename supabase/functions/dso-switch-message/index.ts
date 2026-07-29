@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } });
     const { data: u } = await userClient.auth.getUser();
     if (!u?.user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    const { data: allowed } = await userClient.rpc('has_any_role', { _user_id: u.user.id, _roles: ['admin', 'operations', 'supply_manager', 'management'] });
+    const { data: allowed } = await supabaseAdmin_ROLECHECK.rpc('has_any_role', { _user_id: u.user.id, _roles: ['admin', 'operations', 'supply_manager', 'management'] });
     if (!allowed) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     const body = await req.json();

@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       if (!userData?.user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const { data: allowed } = await userClient.rpc("has_any_role", { _user_id: userData.user.id, _roles: ["admin", "operations", "management"] });
+      const { data: allowed } = await supabaseAdmin_ROLECHECK.rpc("has_any_role", { _user_id: userData.user.id, _roles: ["admin", "operations", "management"] });
       if (!allowed) {
         return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
