@@ -37,7 +37,9 @@ export default function PortalReadings() {
     const reading_value = Number(form.get("reading_value"));
     if (reading_value < 0) return toast.error("Negative value not allowed");
     if (new Date(reading_date) > new Date()) return toast.error("Date cannot be in the future");
-    const reading_at = new Date(reading_date + "T00:00:00").toISOString();
+    // Store at noon UTC on the chosen calendar day so the date is preserved
+    // across time zones (avoids UTC+ zones rolling back to the previous day).
+    const reading_at = new Date(reading_date + "T12:00:00Z").toISOString();
     const { error } = await supabase.from("meter_readings").insert({
       metering_point_id: mpId, reading_at, import_kwh: reading_value, export_kwh: 0,
       source: "customer", validation_status: "pending",
