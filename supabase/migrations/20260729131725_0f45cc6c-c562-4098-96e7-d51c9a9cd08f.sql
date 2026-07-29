@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.clients_block_portal_sensitive_update() FROM PUBLIC, anon, authenticated;
