@@ -19,13 +19,13 @@ export default function AuthPage() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
 
-  useEffect(() => { if (user) navigate("/", { replace: true }); }, [user, navigate]);
+  useEffect(() => { if (user) navigate("/dashboard", { replace: true }); }, [user, navigate]);
 
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) toast.error(error.message); else { toast.success("Welcome back"); navigate("/"); }
+    if (error) toast.error(error.message); else { toast.success("Welcome back"); navigate("/dashboard"); }
   };
   const sendReset = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true);

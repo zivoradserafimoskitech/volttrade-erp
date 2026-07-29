@@ -26,7 +26,7 @@ export default function TwoFactor() {
     if (!user) { navigate("/auth", { replace: true }); return; }
     (async () => {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal?.currentLevel === "aal2") { navigate("/", { replace: true }); return; }
+      if (aal?.currentLevel === "aal2") { navigate("/dashboard", { replace: true }); return; }
       const { data: list } = await supabase.auth.mfa.listFactors();
       const verified = list?.totp?.find((f: any) => f.status === "verified");
       if (verified) {
@@ -62,7 +62,7 @@ export default function TwoFactor() {
     if (error) return toast.error(error.message);
     toast.success("Two-factor authentication enabled");
     await refreshAal();
-    navigate("/", { replace: true });
+    navigate("/dashboard", { replace: true });
   };
 
   const challenge = async (e: React.FormEvent) => {
@@ -73,7 +73,7 @@ export default function TwoFactor() {
     setBusy(false);
     if (error) return toast.error(error.message);
     await refreshAal();
-    navigate("/", { replace: true });
+    navigate("/dashboard", { replace: true });
   };
 
   return (
