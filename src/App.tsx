@@ -90,7 +90,8 @@ const App = () => (
             <Route path="/vatra/signup" element={<VatraSignup />} />
             <Route path="/site" element={<ExternalRedirect to="/vatra-site.html" />} />
             <Route path="/how" element={<ExternalRedirect to="/vatra-how.html" />} />
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<ExternalRedirect to="/vatra-site.html" />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/supply-points" element={<SupplyPoints />} />
             <Route path="/tariffs" element={<Tariffs />} />

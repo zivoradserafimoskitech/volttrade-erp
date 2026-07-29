@@ -33,7 +33,7 @@ export default function ResetPassword() {
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Password updated — you're signed in.");
-    navigate("/", { replace: true });
+    navigate("/dashboard", { replace: true });
   };
 
   return (
