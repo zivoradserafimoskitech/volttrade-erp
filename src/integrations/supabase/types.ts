@@ -818,6 +818,30 @@ export type Database = {
           },
         ]
       }
+      external_api_log: {
+        Row: {
+          called_at: string
+          endpoint: string | null
+          id: string
+          provider: string
+          status: number | null
+        }
+        Insert: {
+          called_at?: string
+          endpoint?: string | null
+          id?: string
+          provider: string
+          status?: number | null
+        }
+        Update: {
+          called_at?: string
+          endpoint?: string | null
+          id?: string
+          provider?: string
+          status?: number | null
+        }
+        Relationships: []
+      }
       forecasts: {
         Row: {
           budget_eur: number | null
@@ -1137,18 +1161,21 @@ export type Database = {
           delivery_at: string
           id: string
           price_eur_mwh: number
+          source: string
         }
         Insert: {
           created_at?: string
           delivery_at: string
           id?: string
           price_eur_mwh: number
+          source?: string
         }
         Update: {
           created_at?: string
           delivery_at?: string
           id?: string
           price_eur_mwh?: number
+          source?: string
         }
         Relationships: []
       }
