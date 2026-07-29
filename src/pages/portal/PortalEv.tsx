@@ -109,8 +109,8 @@ export default function PortalEv() {
     const { error } = await supabase.from("ev_charge_plans").insert({
       vehicle_id: vehicle.id, client_id: clientId,
       plan_for_date: new Date().toISOString().slice(0, 10),
-      schedule: plan.schedule as any, est_kwh: plan.estKwh, est_cost_eur: plan.estCostEur,
-      avg_price_eur_mwh: plan.avgPriceEurMwh,
+      schedule: plan.schedule as any, est_kwh: 0, est_cost_eur: 0,
+      avg_price_eur_mwh: null,
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Charge plan saved");
