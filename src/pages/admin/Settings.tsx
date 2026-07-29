@@ -7,10 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 
 export default function Settings() {
+  const { roles, aal } = useAuth();
+  const isStaff = roles.length > 0;
+  const mfaOn = aal.currentLevel === "aal2";
   const [rows, setRows] = useState<any[]>([]);
   const [form, setForm] = useState({ code: "", name: "", currency: "EUR", vat_percent: 0, tso_code: "" });
   const load = async () => { const { data } = await supabase.from("countries").select("*").order("code"); setRows(data ?? []); };
@@ -25,6 +30,22 @@ export default function Settings() {
 
   return (
     <ErpLayout title="Settings" subtitle="System configuration: countries, VAT, TSO codes">
+      {isStaff && (
+        <Card className="border-border/60">
+          <CardHeader><CardTitle className="flex items-center gap-2">
+            {mfaOn ? <ShieldCheck className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
+            Two-factor authentication
+          </CardTitle></CardHeader>
+          <CardContent className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              {mfaOn ? "TOTP is active on your staff account." : "TOTP is not verified for this session. Enrol or verify to reach full access."}
+            </p>
+            <Button asChild variant={mfaOn ? "outline" : "default"} size="sm">
+              <Link to="/2fa">{mfaOn ? "Manage 2FA" : "Enable 2FA"}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       <RoleGate roles={['admin']}>
         <Card className="border-border/60">
           <CardHeader><CardTitle>Add country</CardTitle></CardHeader>
