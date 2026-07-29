@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
   if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
   // Admin-only: seeding demo data can pollute production; require the admin role.
+  const supabaseAdmin_ROLECHECK = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: isAdmin } = await supabaseAdmin_ROLECHECK.rpc("has_role", { _user_id: user.id, _role: "admin" });
   if (!isAdmin) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
 

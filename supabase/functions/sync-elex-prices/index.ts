@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
     const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
     const { data: u } = await userClient.auth.getUser();
     if (!u?.user) return json({ ok: false, error: "Unauthorized" }, 401);
+    const supabaseAdmin_ROLECHECK = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: allowed } = await supabaseAdmin_ROLECHECK.rpc("has_any_role", { _user_id: u.user.id, _roles: ["admin", "operations", "trader"] });
     if (!allowed) return json({ ok: false, error: "Forbidden" }, 403);
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
