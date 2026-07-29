@@ -1,16 +1,14 @@
 import { ReactNode } from "react";
-import { Navigate, useLocation, Link } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Sidebar } from "./Sidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Menu } from "lucide-react";
 
 export function ErpLayout({ children, title, subtitle, actions }: { children: ReactNode; title: string; subtitle?: string; actions?: ReactNode }) {
-  const { user, loading, needsMfa, roles, aal } = useAuth();
+  const { user, loading, needsMfa } = useAuth();
   const location = useLocation();
-  const isStaff = roles.length > 0;
-  const mfaOn = aal.currentLevel === "aal2";
   if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/auth" replace />;
   if (needsMfa && location.pathname !== "/2fa") return <Navigate to="/2fa" replace />;
@@ -37,14 +35,6 @@ export function ErpLayout({ children, title, subtitle, actions }: { children: Re
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isStaff && (
-              <Button asChild variant={mfaOn ? "ghost" : "outline"} size="sm" className="gap-1.5">
-                <Link to="/2fa" aria-label="Two-factor authentication">
-                  {mfaOn ? <ShieldCheck className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
-                  <span className="hidden sm:inline">{mfaOn ? "2FA on" : "Enable 2FA"}</span>
-                </Link>
-              </Button>
-            )}
             {actions}
           </div>
         </header>
