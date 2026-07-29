@@ -46,7 +46,7 @@ export default function PortalRefer() {
     if (!clientId || !form.email) return toast.error("Enter your friend's email");
     const { error } = await supabase.from("referrals").insert({
       referrer_client_id: clientId, code, referred_email: form.email, referred_name: form.name || null,
-      status: "pending", credit_eur: 50,
+      status: "pending", credit_eur: 0,
     } as any);
     if (error) return toast.error(error.message);
     setForm({ name: "", email: "" });
