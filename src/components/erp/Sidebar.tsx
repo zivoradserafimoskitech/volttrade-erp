@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 type Item = { to: string; label: string; icon: any; end?: boolean; roles?: AppRole[] };
 const groups: { title: string; items: Item[] }[] = [
   { title: "Management", items: [
-    { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true },
   ]},
   { title: "Supply", items: [
     { to: "/clients", label: "Customers", icon: Users },
