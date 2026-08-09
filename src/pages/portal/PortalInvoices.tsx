@@ -14,7 +14,7 @@ export default function PortalInvoices() {
     if (!user) return;
     const { data: cl } = await supabase.from("clients").select("id").eq("portal_user_id", user.id).maybeSingle();
     if (!cl) return;
-    const { data } = await supabase.from("invoices").select("*").eq("client_id", cl.id).order("issue_date", { ascending: false });
+    const { data } = await supabase.from("invoices").select("*").eq("client_id", cl.id).order("period_end", { ascending: false });
     setRows(data ?? []);
   })(); }, [user]);
   return (
@@ -26,7 +26,7 @@ export default function PortalInvoices() {
             {rows.map(i => (
               <TableRow key={i.id}>
                 <TableCell className="font-mono text-xs">{i.invoice_number}</TableCell>
-                <TableCell className="text-xs">{i.issue_date}</TableCell>
+                <TableCell className="text-xs">{i.period_end ?? (i.created_at ? String(i.created_at).slice(0, 10) : "")}</TableCell>
                 <TableCell className="text-xs">{i.due_date}</TableCell>
                 <TableCell className="text-right">€{fmtNum(i.total_eur)}</TableCell>
                 <TableCell><Badge variant={i.status === "paid" ? "default" : "secondary"}>{i.status}</Badge></TableCell>
