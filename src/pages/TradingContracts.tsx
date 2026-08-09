@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { requireUid } from "@/lib/authUid";
 import { toast } from "sonner";
 import { Plus, Trash2, FileSignature } from "lucide-react";
 
@@ -33,8 +34,10 @@ export default function TradingContracts() {
   useEffect(() => { load(); }, [user]);
 
   const add = async (form: FormData) => {
+    let uid: string;
+    try { uid = await requireUid(); } catch (e: any) { return toast.error(e.message); }
     const { error } = await supabase.from("trading_contracts").insert({
-      user_id: user!.id,
+      user_id: uid,
       counterparty_id: String(form.get("counterparty_id")),
       contract_number: String(form.get("contract_number")),
       contract_type: String(form.get("contract_type")),

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { requireUid } from "@/lib/authUid";
 import { toast } from "sonner";
 import { fmtEur } from "@/lib/format";
 import { Plus, Trash2, Building2 } from "lucide-react";
@@ -41,8 +42,10 @@ export default function Counterparties() {
   useEffect(() => { load(); }, [user]);
 
   const add = async (form: FormData) => {
+    let uid: string;
+    try { uid = await requireUid(); } catch (e: any) { return toast.error(e.message); }
     const { error } = await supabase.from("counterparties").insert({
-      user_id: user!.id,
+      user_id: uid,
       legal_name: String(form.get("legal_name")),
       short_name: form.get("short_name") || null,
       country_code: form.get("country_code") || null,

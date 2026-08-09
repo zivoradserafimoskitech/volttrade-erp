@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { requireUid } from "@/lib/authUid";
 import { toast } from "sonner";
 import { fmtEur, fmtNum } from "@/lib/format";
 import { Plus, Trash2, ArrowDownCircle, ArrowUpCircle, Activity, Download, FileSpreadsheet, FileText } from "lucide-react";
@@ -59,8 +60,10 @@ export default function Trading() {
   const add = async (form: FormData) => {
     const dStart = String(form.get("delivery_start"));
     const dEnd = String(form.get("delivery_end"));
+    let uid: string;
+    try { uid = await requireUid(); } catch (e: any) { return toast.error(e.message); }
     const { error } = await supabase.from("trades").insert({
-      user_id: user!.id,
+      user_id: uid,
       trade_number: String(form.get("trade_number")),
       counterparty_id: form.get("counterparty_id") || null,
       trading_contract_id: form.get("trading_contract_id") || null,
