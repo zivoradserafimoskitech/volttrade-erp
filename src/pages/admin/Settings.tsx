@@ -57,16 +57,22 @@ export default function Settings() {
             {mfaOn ? <ShieldCheck className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
             Two-factor authentication
           </CardTitle></CardHeader>
-          <CardContent className="flex items-center justify-between gap-4">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
               {mfaOn ? "TOTP is active on your staff account." : "TOTP is not verified for this session. Enrol or verify to reach full access."}
             </p>
-            <Button asChild variant={mfaOn ? "outline" : "default"} size="sm">
-              <Link to="/2fa">{mfaOn ? "Manage 2FA" : "Enable 2FA"}</Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
+                <RotateCcw className="h-4 w-4 mr-2" /> Reset 2FA
+              </Button>
+              <Button asChild variant={mfaOn ? "outline" : "default"} size="sm">
+                <Link to="/2fa">{mfaOn ? "Manage 2FA" : "Enable 2FA"}</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
+
       <RoleGate roles={['admin']}>
         <Card className="border-border/60">
           <CardHeader><CardTitle>Add country</CardTitle></CardHeader>
