@@ -200,9 +200,9 @@ export function detectInvoiceLang(country?: string | null): InvoiceLang {
 function header(doc: jsPDF, theme: typeof THEMES[string], t: Dict) {
   const W = doc.internal.pageSize.getWidth();
   doc.setFillColor(...theme.primary); doc.rect(0, 0, W, 70, "F");
-  doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+  doc.setTextColor(255); doc.setFont(F, "bold"); doc.setFontSize(20);
   doc.text("VoltTrade", 40, 38);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(t.tariff_taglines[theme.tariffKey], 40, 54);
+  doc.setFont(F, "normal"); doc.setFontSize(9); doc.text(t.tariff_taglines[theme.tariffKey], 40, 54);
   doc.setFontSize(8); doc.setTextColor(220, 230, 245);
   doc.text(t.vat_iban, W - 40, 38, { align: "right" });
   doc.text(t.contact, W - 40, 52, { align: "right" });
@@ -211,16 +211,16 @@ function header(doc: jsPDF, theme: typeof THEMES[string], t: Dict) {
 function customerBlock(doc: jsPDF, theme: typeof THEMES[string], client: InvoiceClient, inv: InvoiceData, t: Dict) {
   const W = doc.internal.pageSize.getWidth();
   const y = 100;
-  doc.setTextColor(60); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(t.customer, 40, y);
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.setTextColor(60); doc.setFont(F, "bold"); doc.setFontSize(9); doc.text(t.customer, 40, y);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(10);
   doc.text(client.company_name, 40, y + 14);
   doc.setFontSize(9); doc.setTextColor(80);
   doc.text(`${t.customer_no}: ${client.id.slice(0, 8).toUpperCase()}`, 40, y + 28);
   const metaX = W - 260;
   doc.setFillColor(...theme.tint); doc.rect(metaX, y - 12, 220, 70, "F");
-  doc.setTextColor(...theme.primary); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  doc.setTextColor(...theme.primary); doc.setFont(F, "bold"); doc.setFontSize(11);
   doc.text(t.tariff_labels[theme.tariffKey], metaX + 12, y + 4);
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(9);
   doc.text(`${t.invoice_no}    ${inv.invoice_number}`, metaX + 12, y + 20);
   doc.text(`${t.issued} ${format(new Date(), "dd.MM.yyyy")}`, metaX + 12, y + 34);
   doc.text(`${t.period} ${format(new Date(inv.period_start), "dd.MM.yyyy")} – ${format(new Date(inv.period_end), "dd.MM.yyyy")}`, metaX + 12, y + 48);
@@ -247,12 +247,12 @@ function summaryTable(doc: jsPDF, y: number, theme: typeof THEMES[string], rows:
 function paymentBand(doc: jsPDF, y: number, theme: typeof THEMES[string], inv: InvoiceData, gross: number, t: Dict, currency: string) {
   const W = doc.internal.pageSize.getWidth();
   doc.setFillColor(...theme.tint); doc.rect(40, y, W - 80, 60, "F");
-  doc.setTextColor(...theme.primary); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+  doc.setTextColor(...theme.primary); doc.setFont(F, "bold"); doc.setFontSize(10);
   doc.text(t.payment_instructions, 52, y + 18);
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(9);
   doc.text(t.pay_via, 52, y + 34);
   doc.text(`• ${t.reference}: ${inv.invoice_number}`, 52, y + 48);
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...theme.primary);
+  doc.setFont(F, "bold"); doc.setFontSize(9); doc.setTextColor(...theme.primary);
   doc.text(`${t.due}: ${format(new Date(new Date(inv.period_end).getTime() + 20 * 86400 * 1000), "dd.MM.yyyy")}`, W - 52, y + 18, { align: "right" });
   doc.setFontSize(14); doc.text(`${gross.toFixed(2)} ${currency}`, W - 52, y + 40, { align: "right" });
   return y + 80;
@@ -353,7 +353,7 @@ export function renderInvoicePdf(args: {
 
   header(doc, theme, t);
   let y = customerBlock(doc, theme, client, inv, t);
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...theme.primary);
+  doc.setFont(F, "bold"); doc.setFontSize(11); doc.setTextColor(...theme.primary);
   doc.text(`${t.invoice_for_period} ${format(new Date(inv.period_start), "dd.MM.yyyy")} – ${format(new Date(inv.period_end), "dd.MM.yyyy")}`, 40, y);
   y = summaryTable(doc, y, theme, charges, gross, t, currency);
   y = paymentBand(doc, y, theme, inv, gross, t, currency);
@@ -363,11 +363,11 @@ export function renderInvoicePdf(args: {
 
   doc.addPage();
   doc.setFillColor(...theme.primary); doc.rect(0, 0, W, 40, "F");
-  doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+  doc.setTextColor(255); doc.setFont(F, "bold"); doc.setFontSize(12);
   doc.text(t.detailed_info(inv.invoice_number), 40, 26);
 
   let y2 = 70;
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(9);
   doc.text(`${t.customer}: ${client.company_name}`, 40, y2);
   doc.text(`${t.tariff}: ${tariff.toUpperCase()}`, 40, y2 + 14);
   doc.text(`${t.metering_points}: ${meters.length}`, 40, y2 + 28);
@@ -381,9 +381,9 @@ export function renderInvoicePdf(args: {
     const rs = byMeter[m.id] ?? [];
     const total = rs.reduce((s, r) => s + Number(r.actual_mwh ?? 0), 0);
     const exp = rs.reduce((s, r) => s + Number(r.export_mwh ?? 0), 0);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...theme.primary);
+    doc.setFont(F, "bold"); doc.setFontSize(10); doc.setTextColor(...theme.primary);
     doc.text(`EDU ${m.edu_code}`, 40, y2);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(80);
+    doc.setFont(F, "normal"); doc.setFontSize(8); doc.setTextColor(80);
     if (m.address) doc.text(m.address, 40, y2 + 12);
     y2 += 18;
 
