@@ -17,34 +17,52 @@ Deno.serve(async (req) => {
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(url, service, { auth: { persistSession: false } });
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const { data: me, error: uErr } = await admin.auth.getUser(token);
-    if (uErr || !me.user) return json({ error: "Invalid session" }, 401);
+    // Identify the caller with an anon client carrying their token (never sign in on the admin client).
+    const authClient = createClient(url, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: me, error: uErr } = await authClient.auth.getUser(token);
+    if (uErr || !me.user?.email) {
+      return json({ error: "Your session has expired. Please sign in again and retry." }, 401);
+    }
 
     const body = await req.json().catch(() => ({}));
     const password = String(body.password ?? "");
     if (!password) return json({ error: "Current password is required" }, 400);
 
-    // Re-authenticate with password to prove identity.
-    const { error: signInErr } = await admin.auth.signInWithPassword({
-      email: me.user.email!,
+    // Re-authenticate with password on a throwaway anon client to prove identity.
+    const pwClient = createClient(url, anonKey, { auth: { persistSession: false } });
+    const { error: signInErr } = await pwClient.auth.signInWithPassword({
+      email: me.user.email,
       password,
     });
     if (signInErr) return json({ error: "Incorrect password" }, 403);
 
-    // List and delete all MFA factors for this user via GoTrue admin API.
+    // Opaque secret keys must be sent as apikey only; legacy JWT keys also accept Bearer.
+    const adminHeaders: Record<string, string> = service.startsWith("sb_secret_")
+      ? { apikey: service }
+      : { apikey: service, Authorization: `Bearer ${service}` };
+
     const listRes = await fetch(`${url}/auth/v1/admin/users/${me.user.id}/factors`, {
-      headers: { "Authorization": `Bearer ${service}`, "apikey": service },
+      headers: adminHeaders,
     });
-    if (!listRes.ok) return json({ error: "Could not list MFA factors" }, 500);
-    const factors = (await listRes.json()) as any[] ?? [];
+    if (!listRes.ok) {
+      const detail = await listRes.text();
+      console.error("list factors failed", listRes.status, detail);
+      return json({ error: `Could not list MFA factors (${listRes.status})` }, 500);
+    }
+    const payload = await listRes.json();
+    const factors: any[] = Array.isArray(payload) ? payload : (payload?.factors ?? []);
 
     for (const factor of factors) {
-      await fetch(`${url}/auth/v1/admin/users/${me.user.id}/factors/${factor.id}`, {
+      const delRes = await fetch(`${url}/auth/v1/admin/users/${me.user.id}/factors/${factor.id}`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${service}`, "apikey": service },
+        headers: adminHeaders,
       });
+      if (!delRes.ok) console.error("delete factor failed", factor.id, await delRes.text());
     }
 
     return json({ ok: true, removed: factors.length });
