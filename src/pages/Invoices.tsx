@@ -52,12 +52,12 @@ export default function Invoices() {
       });
       if (error) throw error;
       const res = data as { processed: number; skipped: number; results?: { invoice: string; status: string; detail?: string }[] };
-      const labels: Record<NoticeKind, string> = { invoice: "фактури", reminder: "потсетувања", dunning: "опомени" };
-      if (res.processed > 0) toast.success(`Испратени ${res.processed} ${labels[kind]}${res.skipped ? ` · прескокнати ${res.skipped}` : ""}`);
-      else toast.warning(res.skipped ? `Ништо не е испратено — прескокнати ${res.skipped}. ${res.results?.[0]?.detail ?? ""}` : "Нема ништо за испраќање.");
+      const labels: Record<NoticeKind, string> = { invoice: "invoices", reminder: "reminders", dunning: "final notices" };
+      if (res.processed > 0) toast.success(`Sent ${res.processed} ${labels[kind]}${res.skipped ? ` · skipped ${res.skipped}` : ""}`);
+      else toast.warning(res.skipped ? `Nothing sent — ${res.skipped} skipped. ${res.results?.[0]?.detail ?? ""}` : "Nothing to send.");
       await load();
     } catch (e: any) {
-      toast.error(e?.message ?? "Испраќањето не успеа");
+      toast.error(e?.message ?? "Sending failed");
     } finally {
       setBusy(null);
     }
@@ -112,7 +112,7 @@ export default function Invoices() {
       }>
       <Card className="border-border/60">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Испраќање до крајните клиенти</CardTitle>
+          <CardTitle className="text-base">Send to end customers</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-2">
           <Button
@@ -120,19 +120,19 @@ export default function Invoices() {
             onClick={() => sendNotices("invoice")}
             style={{ background: "var(--gradient-primary)" }}>
             {busy === "invoice" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-            Испрати ги сите непратени ({unsent.length})
+            Send all unsent ({unsent.length})
           </Button>
           <Button variant="secondary" disabled={busy !== null || overdue.length === 0} onClick={() => sendNotices("reminder")}>
             {busy === "reminder" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BellRing className="h-4 w-4 mr-2" />}
-            Потсетување за плаќање ({overdue.length})
+            Payment reminder ({overdue.length})
           </Button>
           <Button variant="outline" className="border-destructive/50 text-destructive hover:text-destructive"
             disabled={busy !== null || overdue.length === 0} onClick={() => sendNotices("dunning")}>
             {busy === "dunning" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
-            Опомена ({overdue.length})
+            Final notice ({overdue.length})
           </Button>
           <span className="text-xs text-muted-foreground">
-            Известувањата се доставуваат во порталот на клиентот (Vatra) на македонски, албански или англиски — според земјата на клиентот или избраниот јазик погоре.
+            Notices are delivered in the customer portal (Vatra) in Macedonian, Albanian or English — based on the customer country or the language selected above.
           </span>
         </CardContent>
       </Card>
@@ -151,7 +151,7 @@ export default function Invoices() {
               <TableHead>Number</TableHead><TableHead>Client</TableHead><TableHead>Period</TableHead>
               <TableHead className="text-right">Volume</TableHead><TableHead className="text-right">Energy</TableHead>
               <TableHead className="text-right">Margin</TableHead><TableHead className="text-right">Total</TableHead>
-              <TableHead>Status</TableHead><TableHead>Испратено</TableHead><TableHead></TableHead>
+              <TableHead>Status</TableHead><TableHead>Sent</TableHead><TableHead></TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {invoices.map(inv => (
@@ -169,17 +169,17 @@ export default function Invoices() {
                       {inv.sent_at
                         ? <Badge variant="secondary">Фактура {format(new Date(inv.sent_at), "dd.MM.yy")}</Badge>
                         : <Badge variant="outline" className="text-muted-foreground">Непратена</Badge>}
-                      {Number(inv.reminder_count ?? 0) > 0 && <Badge variant="secondary">Потсетување ×{inv.reminder_count}</Badge>}
-                      {Number(inv.dunning_level ?? 0) > 0 && <Badge variant="destructive">Опомена {inv.dunning_level}. степен</Badge>}
+                      {Number(inv.reminder_count ?? 0) > 0 && <Badge variant="secondary">Reminder ×{inv.reminder_count}</Badge>}
+                      {Number(inv.dunning_level ?? 0) > 0 && <Badge variant="destructive">Notice level {inv.dunning_level}</Badge>}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" title="Испрати фактура" disabled={busy !== null}
+                      <Button size="icon" variant="ghost" title="Send invoice" disabled={busy !== null}
                         onClick={() => sendNotices("invoice", [inv.id], `inv-${inv.id}`)}><Send className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" title="Потсетување за плаќање" disabled={busy !== null}
+                      <Button size="icon" variant="ghost" title="Payment reminder" disabled={busy !== null}
                         onClick={() => sendNotices("reminder", [inv.id], `rem-${inv.id}`)}><BellRing className="h-4 w-4 text-amber-500" /></Button>
-                      <Button size="icon" variant="ghost" title="Опомена" disabled={busy !== null}
+                      <Button size="icon" variant="ghost" title="Final notice" disabled={busy !== null}
                         onClick={() => sendNotices("dunning", [inv.id], `dun-${inv.id}`)}><AlertTriangle className="h-4 w-4 text-destructive" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => exportPdf(inv)}><FileDown className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={async () => { await supabase.from("invoices").delete().eq("id", inv.id); load(); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
