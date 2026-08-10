@@ -24,29 +24,28 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
-    const { data: me, error: uErr } = await authClient.auth.getUser(token);
-    if (uErr || !me.user?.email) {
-      return json({ error: "Your session has expired. Please sign in again and retry." }, 401);
-    }
+    const { data: me } = await authClient.auth.getUser(token);
 
     const body = await req.json().catch(() => ({}));
     const password = String(body.password ?? "");
+    const email = String(me.user?.email ?? body.email ?? "").trim().toLowerCase();
+    if (!email) {
+      return json({ error: "Your session has expired. Enter your account email and password to reset 2FA." }, 401);
+    }
     if (!password) return json({ error: "Current password is required" }, 400);
 
-    // Re-authenticate with password on a throwaway anon client to prove identity.
+    // Password is the proof of identity — works even when the access token is stale.
     const pwClient = createClient(url, anonKey, { auth: { persistSession: false } });
-    const { error: signInErr } = await pwClient.auth.signInWithPassword({
-      email: me.user.email,
-      password,
-    });
-    if (signInErr) return json({ error: "Incorrect password" }, 403);
+    const { data: pwData, error: signInErr } = await pwClient.auth.signInWithPassword({ email, password });
+    if (signInErr || !pwData.user) return json({ error: "Incorrect email or password" }, 403);
+    const userId = me.user?.id ?? pwData.user.id;
 
     // Opaque secret keys must be sent as apikey only; legacy JWT keys also accept Bearer.
     const adminHeaders: Record<string, string> = service.startsWith("sb_secret_")
       ? { apikey: service }
       : { apikey: service, Authorization: `Bearer ${service}` };
 
-    const listRes = await fetch(`${url}/auth/v1/admin/users/${me.user.id}/factors`, {
+    const listRes = await fetch(`${url}/auth/v1/admin/users/${userId}/factors`, {
       headers: adminHeaders,
     });
     if (!listRes.ok) {
@@ -58,7 +57,7 @@ Deno.serve(async (req) => {
     const factors: any[] = Array.isArray(payload) ? payload : (payload?.factors ?? []);
 
     for (const factor of factors) {
-      const delRes = await fetch(`${url}/auth/v1/admin/users/${me.user.id}/factors/${factor.id}`, {
+      const delRes = await fetch(`${url}/auth/v1/admin/users/${userId}/factors/${factor.id}`, {
         method: "DELETE",
         headers: adminHeaders,
       });

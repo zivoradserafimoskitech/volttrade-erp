@@ -22,6 +22,7 @@ export default function Settings() {
   const [form, setForm] = useState({ code: "", name: "", currency: "EUR", vat_percent: 0, tso_code: "" });
   const [resetOpen, setResetOpen] = useState(false);
   const [resetPw, setResetPw] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [resetting, setResetting] = useState(false);
   const load = async () => { const { data } = await supabase.from("countries").select("*").order("code"); setRows(data ?? []); };
   useEffect(() => { load(); }, []);
@@ -29,7 +30,11 @@ export default function Settings() {
   const resetMfa = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetting(true);
-    const { data, error } = await supabase.functions.invoke("reset-own-mfa", { body: { password: resetPw } });
+    // Refresh first: a stale access token is the usual cause of "session has expired".
+    await supabase.auth.refreshSession().catch(() => null);
+    const { data, error } = await supabase.functions.invoke("reset-own-mfa", {
+      body: { password: resetPw, email: resetEmail || undefined },
+    });
     setResetting(false);
     if (error || (data as any)?.error) {
       let msg = (data as any)?.error ?? error?.message ?? "Reset failed";
@@ -44,6 +49,7 @@ export default function Settings() {
     toast.success(`2FA reset — ${(data as any)?.removed ?? 0} factor(s) removed. Sign out and back in to enrol a new authenticator.`);
     setResetOpen(false);
     setResetPw("");
+    setResetEmail("");
     refreshAal();
   };
 
@@ -122,6 +128,11 @@ export default function Settings() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={resetMfa} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Account email</Label>
+              <Input id="reset-email" type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} placeholder="you@company.com" />
+              <p className="text-xs text-muted-foreground">Only needed if your session has expired.</p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="reset-pw">Current password</Label>
               <Input id="reset-pw" type="password" required value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="••••••••" />
