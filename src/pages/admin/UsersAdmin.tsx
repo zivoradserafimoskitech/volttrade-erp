@@ -107,7 +107,12 @@ export default function UsersAdmin() {
                     <TableCell className="font-mono text-xs">{r.user_id}</TableCell>
                     <TableCell><Badge>{r.role}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
-                    <TableCell className="text-right"><Button size="icon" variant="ghost" onClick={() => del(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" title="Reset 2FA" onClick={() => openReset(r.user_id)}><RotateCcw className="h-4 w-4 text-muted-foreground" /></Button>
+                        <Button size="icon" variant="ghost" onClick={() => del(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">No role assignments yet.</TableCell></TableRow>}
@@ -115,6 +120,22 @@ export default function UsersAdmin() {
             </Table>
           </CardContent>
         </Card>
+
+        <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset user 2FA</DialogTitle>
+              <DialogDescription>
+                This removes all TOTP factors for user <code className="font-mono text-xs">{resetUserId}</code>. They will be prompted to enrol a new authenticator on next sign-in.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={resetMfa} className="space-y-4">
+              <Button type="submit" disabled={resetting} className="w-full" style={{ background: "var(--gradient-primary)" }}>
+                {resetting ? "Resetting…" : "Confirm reset"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </RoleGate>
     </ErpLayout>
   );
