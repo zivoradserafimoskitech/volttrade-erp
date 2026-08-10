@@ -123,36 +123,45 @@ export default function Market() {
       subtitle="Hourly day-ahead prices (€/MWh) — ENTSO-E Transparency"
       actions={
         <div className="flex items-center gap-2">
-          <Select value={zone} onValueChange={setZone}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+          <div className="hidden sm:block text-xs text-muted-foreground">Price source</div>
+          <Select value={source} onValueChange={setSource}>
+            <SelectTrigger className="w-[230px]"><SelectValue placeholder="Choose a price source" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="HU">HU (MAVIR)</SelectItem>
-              <SelectItem value="MK">MK (MEPSO)</SelectItem>
-              <SelectItem value="DE_LU">DE-LU</SelectItem>
-              <SelectItem value="AT">AT (APG)</SelectItem>
-              <SelectItem value="RO">RO</SelectItem>
-              <SelectItem value="RS">RS</SelectItem>
-              <SelectItem value="BG">BG</SelectItem>
-              <SelectItem value="GR">GR</SelectItem>
-              <SelectItem value="HR">HR</SelectItem>
-              <SelectItem value="SI">SI</SelectItem>
+              {["ENTSO-E Transparency", "Exchanges & providers"].map(group => (
+                <SelectGroup key={group}>
+                  <SelectLabel>{group}</SelectLabel>
+                  {SOURCES.filter(s => s.group === group).map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
             </SelectContent>
           </Select>
-          <Button onClick={syncEntsoe} disabled={syncing} style={{ background: "var(--gradient-primary)" }}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing…" : "Sync now"}
+          <Button onClick={runSync} disabled={busy} style={{ background: "var(--gradient-primary)" }}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${busy ? "animate-spin" : ""}`} />
+            {busy ? "Fetching…" : "Fetch prices"}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => syncElex(false)} disabled={elexSyncing}>{elexSyncing ? "ELEX…" : "Sync ELEX"}</Button>
-          <Button size="sm" variant="ghost" onClick={() => syncElex(true)} disabled={elexSyncing} title="Discover the ELEX API endpoints (no data written)">Probe API</Button>
-          <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="elecz">Elecz (MK)</SelectItem>
-              <SelectItem value="stekker">Stekker</SelectItem>
-              <SelectItem value="eex">EEX</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button size="sm" variant="outline" onClick={syncProvider} disabled={provSyncing}>{provSyncing ? "Syncing…" : "Sync provider"}</Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="What does this do?"><HelpCircle className="h-4 w-4" /></Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 text-sm space-y-3">
+              <div>
+                <p className="font-medium">Fetching day-ahead prices</p>
+                <p className="text-muted-foreground mt-1">
+                  Pick where the hourly €/MWh prices should come from, then press <span className="font-medium text-foreground">Fetch prices</span>.
+                  New hours are added and existing hours are updated — nothing is duplicated.
+                </p>
+              </div>
+              <ul className="text-muted-foreground space-y-1">
+                <li><span className="text-foreground">ENTSO-E</span> — official European transparency platform, one bidding zone at a time.</li>
+                <li><span className="text-foreground">ELEX / providers</span> — regional exchanges and commercial feeds (daily call limits apply).</li>
+              </ul>
+              <Button variant="outline" size="sm" className="w-full" disabled={elexSyncing} onClick={() => syncElex(true)}>
+                Test ELEX connection (no data written)
+              </Button>
+            </PopoverContent>
+          </Popover>
         </div>
       }
     >
