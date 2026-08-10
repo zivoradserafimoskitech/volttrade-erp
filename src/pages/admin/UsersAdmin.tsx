@@ -25,6 +25,10 @@ export default function UsersAdmin() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<AppRole>('trader');
   const [inviting, setInviting] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetUserId, setResetUserId] = useState("");
+  const [resetting, setResetting] = useState(false);
+
 
   const load = async () => { const { data } = await supabase.from("user_roles").select("*").order("created_at", { ascending: false }); setRows(data ?? []); };
   useEffect(() => { load(); }, []);
