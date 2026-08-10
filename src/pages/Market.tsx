@@ -44,13 +44,13 @@ export default function Market() {
   };
   useEffect(() => { load(); }, []);
 
-  const syncEntsoe = async () => {
+  const syncEntsoeZone = async (z: string) => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-entsoe-prices", { body: { zone, days: 2 } });
+      const { data, error } = await supabase.functions.invoke("sync-entsoe-prices", { body: { zone: z, days: 2 } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success(`Synced ${(data as any)?.inserted ?? 0} prices from ENTSO-E (${zone})`);
+      toast.success(`Synced ${(data as any)?.inserted ?? 0} prices from ENTSO-E (${z})`);
       load();
     } catch (e: any) {
       toast.error(e?.message ?? "Sync failed");
@@ -62,7 +62,7 @@ export default function Market() {
   const [elexSyncing, setElexSyncing] = useState(false);
   const [provider, setProvider] = useState("elecz");
   const [provSyncing, setProvSyncing] = useState(false);
-  const syncProvider = async () => {
+  const syncProviderNamed = async (provider: string) => {
     setProvSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-price-providers", { body: { provider, zone: "MK" } });
