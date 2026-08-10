@@ -1,6 +1,10 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+import { ensureUnicodeFont, PDF_FONT } from "@/lib/pdfFont";
+
+/** Active PDF font family — Roboto (Unicode) with a helvetica fallback. */
+let F: string = PDF_FONT;
 
 export type InvoiceData = {
   invoice_number: string;
@@ -112,43 +116,43 @@ const DICTS: Record<InvoiceLang, Dict> = {
     extra_prosumer: (p, c) => `Export volume credited at ${p} ${c}/MWh (90% of import reference).`,
   },
   mk: {
-    brand_tagline: "Snabduvanje i trguvanje so energija",
-    vat_iban: "DDV: MK 1234567890   |   IBAN: MK07 2000 0000 0000 0000",
+    brand_tagline: "Снабдување и тргување со енергија",
+    vat_iban: "ДДВ: MK 1234567890   |   IBAN: MK07 2000 0000 0000 0000",
     contact: "info@volttrade.example   |   www.volttrade.example",
-    customer: "KORISNIK", customer_no: "Broj na korisnik",
-    invoice_no: "Br.", issued: "Izdadena", period: "Period",
-    invoice_for_period: "Faktura za period",
-    description: "Opis", amount: (c) => `Iznos (${c})`,
-    total_to_pay: "VKUPNO ZA PLAKJANJE (so DDV)",
-    payment_instructions: "Upatstva za plakjanje",
-    pay_via: "• Platete preku elektronsko bankarstvo ili vo bilo koja filijala.",
-    reference: "Referenca", due: "Rok",
-    page_x_of_y: (i, n) => `Strana ${i} od ${n}`,
-    tariff: "Tarifa", status: "Status",
-    detailed_info: (n) => `Faktura ${n} — Detalni informacii`,
-    metering_points: "Merni mesta",
-    meter: "Brojač", quantity_mwh: "Količina (MWh)",
-    unit_price: (c) => `Edinečna cena ${c}/MWh`,
-    amount_col: (c) => `Iznos ${c}`,
-    import_mwh: "Uvoz MWh", export_mwh: "Izvoz MWh", net_mwh: "Neto MWh",
-    peak_mwh: "Vrv MWh", mid_mwh: "Sreden MWh", offpeak_mwh: "Vongraf MWh", total_mwh: "Vkupno MWh",
-    hourly_ref: "Časovno (HUPX)",
-    energy_supply_fixed: (m, r, c) => `Snabduvanje so energija — ${m} MWh × ${r} ${c}/MWh (fiksno)`,
-    trading_margin: (m, r, c) => `Trgovska marža — ${m} MWh × ${r} ${c}/MWh`,
-    energy_hourly: (m, w, c) => `Energija — ${m} MWh × HUPX časovno (prosek ${w} ${c}/MWh)`,
-    supplier_margin_line: (m, r, c) => `Marža na snabduvač — ${m} MWh × ${r} ${c}/MWh`,
-    peak_band: (m) => `Vrven pojas (17:00–21:00) — ${m} MWh`,
-    mid_band: (m) => `Sreden pojas (07:00–17:00) — ${m} MWh`,
-    offpeak_band: (m) => `Vongraf (21:00–07:00) — ${m} MWh`,
-    supplier_margin_rate: (r, c) => `Marža na snabduvač — ${r} ${c}/MWh`,
-    energy_imported: (m) => `Uvezena energija — ${m} MWh`,
-    energy_exported: (m, p, c) => `Izvezena energija (kredit) — ${m} MWh × ${p} ${c}/MWh`,
-    net_supplier_margin: "Neto marža na snabduvač",
-    vat_line: (p) => `DDV ${p}%`,
-    tariff_labels: { fixed: "FAKTURA SO FIKSNA CENA", hourly: "FAKTURA INDEKSIRANA NA SPOT", agile: "FAKTURA AGILE / TOU", prosumer: "PROSUMER NETO-MERENJE" },
-    tariff_taglines: { fixed: "Fiksna €/MWh tarifa", hourly: "Časovni day-ahead ceni", agile: "Pojasi spored vreme na koristenje", prosumer: "Reconciliacija uvoz / izvoz" },
-    extra_agile: "ToU pojasite se primeneti spored agile-tarifniot raspored (HUPX-povrzan, ograničen).",
-    extra_prosumer: (p, c) => `Izvozniot volumen se kreditira po ${p} ${c}/MWh (90% od uvoznata referenca).`,
+    customer: "КОРИСНИК", customer_no: "Број на корисник",
+    invoice_no: "Бр.", issued: "Издадена", period: "Период",
+    invoice_for_period: "Фактура за период",
+    description: "Опис", amount: (c) => `Износ (${c})`,
+    total_to_pay: "ВКУПНО ЗА ПЛАЌАЊЕ (со ДДВ)",
+    payment_instructions: "Упатство за плаќање",
+    pay_via: "• Платете преку електронско банкарство или во која било филијала.",
+    reference: "Повикување на број", due: "Рок на плаќање",
+    page_x_of_y: (i, n) => `Страна ${i} од ${n}`,
+    tariff: "Тарифа", status: "Статус",
+    detailed_info: (n) => `Фактура ${n} — Детални информации`,
+    metering_points: "Мерни места",
+    meter: "Броило", quantity_mwh: "Количина (MWh)",
+    unit_price: (c) => `Единечна цена ${c}/MWh`,
+    amount_col: (c) => `Износ ${c}`,
+    import_mwh: "Преземена MWh", export_mwh: "Предадена MWh", net_mwh: "Нето MWh",
+    peak_mwh: "Висока MWh", mid_mwh: "Средна MWh", offpeak_mwh: "Ниска MWh", total_mwh: "Вкупно MWh",
+    hourly_ref: "Часовна (HUPX)",
+    energy_supply_fixed: (m, r, c) => `Снабдување со електрична енергија — ${m} MWh × ${r} ${c}/MWh (фиксна цена)`,
+    trading_margin: (m, r, c) => `Трговска маржа — ${m} MWh × ${r} ${c}/MWh`,
+    energy_hourly: (m, w, c) => `Електрична енергија — ${m} MWh × HUPX часовна (просек ${w} ${c}/MWh)`,
+    supplier_margin_line: (m, r, c) => `Маржа на снабдувачот — ${m} MWh × ${r} ${c}/MWh`,
+    peak_band: (m) => `Висока тарифа (17:00–21:00) — ${m} MWh`,
+    mid_band: (m) => `Средна тарифа (07:00–17:00) — ${m} MWh`,
+    offpeak_band: (m) => `Ниска тарифа (21:00–07:00) — ${m} MWh`,
+    supplier_margin_rate: (r, c) => `Маржа на снабдувачот — ${r} ${c}/MWh`,
+    energy_imported: (m) => `Преземена енергија — ${m} MWh`,
+    energy_exported: (m, p, c) => `Предадена енергија (одобрение) — ${m} MWh × ${p} ${c}/MWh`,
+    net_supplier_margin: "Нето маржа на снабдувачот",
+    vat_line: (p) => `ДДВ ${p}%`,
+    tariff_labels: { fixed: "ФАКТУРА СО ФИКСНА ЦЕНА", hourly: "ФАКТУРА ВРЗАНА ЗА СПОТ", agile: "ФАКТУРА AGILE / ТАРИФНИ ПОЈАСИ", prosumer: "ПРОСУМЕР — НЕТО МЕРЕЊЕ" },
+    tariff_taglines: { fixed: "Фиксна €/MWh тарифа", hourly: "Часовни ден-однапред цени", agile: "Тарифни појаси според време на користење", prosumer: "Порамнување преземена / предадена" },
+    extra_agile: "Тарифните појаси се применети според agile распоредот (врзан за HUPX, со горна граница).",
+    extra_prosumer: (p, c) => `Предадената количина се одобрува по ${p} ${c}/MWh (90% од референтната цена за преземена енергија).`,
   },
   sq: {
     brand_tagline: "Furnizim dhe tregtim i energjisë",
@@ -200,9 +204,9 @@ export function detectInvoiceLang(country?: string | null): InvoiceLang {
 function header(doc: jsPDF, theme: typeof THEMES[string], t: Dict) {
   const W = doc.internal.pageSize.getWidth();
   doc.setFillColor(...theme.primary); doc.rect(0, 0, W, 70, "F");
-  doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+  doc.setTextColor(255); doc.setFont(F, "bold"); doc.setFontSize(20);
   doc.text("VoltTrade", 40, 38);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(t.tariff_taglines[theme.tariffKey], 40, 54);
+  doc.setFont(F, "normal"); doc.setFontSize(9); doc.text(t.tariff_taglines[theme.tariffKey], 40, 54);
   doc.setFontSize(8); doc.setTextColor(220, 230, 245);
   doc.text(t.vat_iban, W - 40, 38, { align: "right" });
   doc.text(t.contact, W - 40, 52, { align: "right" });
@@ -211,16 +215,16 @@ function header(doc: jsPDF, theme: typeof THEMES[string], t: Dict) {
 function customerBlock(doc: jsPDF, theme: typeof THEMES[string], client: InvoiceClient, inv: InvoiceData, t: Dict) {
   const W = doc.internal.pageSize.getWidth();
   const y = 100;
-  doc.setTextColor(60); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(t.customer, 40, y);
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.setTextColor(60); doc.setFont(F, "bold"); doc.setFontSize(9); doc.text(t.customer, 40, y);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(10);
   doc.text(client.company_name, 40, y + 14);
   doc.setFontSize(9); doc.setTextColor(80);
   doc.text(`${t.customer_no}: ${client.id.slice(0, 8).toUpperCase()}`, 40, y + 28);
   const metaX = W - 260;
   doc.setFillColor(...theme.tint); doc.rect(metaX, y - 12, 220, 70, "F");
-  doc.setTextColor(...theme.primary); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  doc.setTextColor(...theme.primary); doc.setFont(F, "bold"); doc.setFontSize(11);
   doc.text(t.tariff_labels[theme.tariffKey], metaX + 12, y + 4);
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(9);
   doc.text(`${t.invoice_no}    ${inv.invoice_number}`, metaX + 12, y + 20);
   doc.text(`${t.issued} ${format(new Date(), "dd.MM.yyyy")}`, metaX + 12, y + 34);
   doc.text(`${t.period} ${format(new Date(inv.period_start), "dd.MM.yyyy")} – ${format(new Date(inv.period_end), "dd.MM.yyyy")}`, metaX + 12, y + 48);
@@ -236,7 +240,7 @@ function summaryTable(doc: jsPDF, y: number, theme: typeof THEMES[string], rows:
       { content: t.total_to_pay, styles: { fontStyle: "bold", fillColor: theme.primary, textColor: 255 } },
       { content: gross.toFixed(2), styles: { fontStyle: "bold", fillColor: theme.primary, textColor: 255 } },
     ]],
-    styles: { fontSize: 10, cellPadding: 6 },
+    styles: { font: F, fontSize: 10, cellPadding: 6 },
     headStyles: { fillColor: theme.tint, textColor: theme.primary, fontStyle: "bold" },
     columnStyles: { 1: { halign: "right" } },
     margin: { left: 40, right: 40 },
@@ -247,12 +251,12 @@ function summaryTable(doc: jsPDF, y: number, theme: typeof THEMES[string], rows:
 function paymentBand(doc: jsPDF, y: number, theme: typeof THEMES[string], inv: InvoiceData, gross: number, t: Dict, currency: string) {
   const W = doc.internal.pageSize.getWidth();
   doc.setFillColor(...theme.tint); doc.rect(40, y, W - 80, 60, "F");
-  doc.setTextColor(...theme.primary); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+  doc.setTextColor(...theme.primary); doc.setFont(F, "bold"); doc.setFontSize(10);
   doc.text(t.payment_instructions, 52, y + 18);
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(9);
   doc.text(t.pay_via, 52, y + 34);
   doc.text(`• ${t.reference}: ${inv.invoice_number}`, 52, y + 48);
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...theme.primary);
+  doc.setFont(F, "bold"); doc.setFontSize(9); doc.setTextColor(...theme.primary);
   doc.text(`${t.due}: ${format(new Date(new Date(inv.period_end).getTime() + 20 * 86400 * 1000), "dd.MM.yyyy")}`, W - 52, y + 18, { align: "right" });
   doc.setFontSize(14); doc.text(`${gross.toFixed(2)} ${currency}`, W - 52, y + 40, { align: "right" });
   return y + 80;
@@ -300,14 +304,16 @@ function chargesProsumer(_c: InvoiceClient, inv: InvoiceData, exportMwh: number,
   ];
 }
 
-export function renderInvoicePdf(args: {
+export async function renderInvoicePdf(args: {
   inv: InvoiceData;
   client: InvoiceClient;
   meters: InvoiceMeter[];
   readings: InvoiceReading[];
   lang?: InvoiceLang;
   currency?: string;
-}) {
+  /** "save" downloads the file (default); "blob" returns it for attaching/emailing. */
+  output?: "save" | "blob";
+}): Promise<Blob | void> {
   const { inv, client, meters, readings } = args;
   const lang: InvoiceLang = args.lang ?? detectInvoiceLang(client.country_code);
   const t = DICTS[lang];
@@ -348,12 +354,13 @@ export function renderInvoicePdf(args: {
   charges = [...charges, storedVatLine ?? [t.vat_line((VAT * 100).toFixed(0)), vat]];
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
+  F = await ensureUnicodeFont(doc);
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
 
   header(doc, theme, t);
   let y = customerBlock(doc, theme, client, inv, t);
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...theme.primary);
+  doc.setFont(F, "bold"); doc.setFontSize(11); doc.setTextColor(...theme.primary);
   doc.text(`${t.invoice_for_period} ${format(new Date(inv.period_start), "dd.MM.yyyy")} – ${format(new Date(inv.period_end), "dd.MM.yyyy")}`, 40, y);
   y = summaryTable(doc, y, theme, charges, gross, t, currency);
   y = paymentBand(doc, y, theme, inv, gross, t, currency);
@@ -363,11 +370,11 @@ export function renderInvoicePdf(args: {
 
   doc.addPage();
   doc.setFillColor(...theme.primary); doc.rect(0, 0, W, 40, "F");
-  doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+  doc.setTextColor(255); doc.setFont(F, "bold"); doc.setFontSize(12);
   doc.text(t.detailed_info(inv.invoice_number), 40, 26);
 
   let y2 = 70;
-  doc.setTextColor(0); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.setTextColor(0); doc.setFont(F, "normal"); doc.setFontSize(9);
   doc.text(`${t.customer}: ${client.company_name}`, 40, y2);
   doc.text(`${t.tariff}: ${tariff.toUpperCase()}`, 40, y2 + 14);
   doc.text(`${t.metering_points}: ${meters.length}`, 40, y2 + 28);
@@ -381,9 +388,9 @@ export function renderInvoicePdf(args: {
     const rs = byMeter[m.id] ?? [];
     const total = rs.reduce((s, r) => s + Number(r.actual_mwh ?? 0), 0);
     const exp = rs.reduce((s, r) => s + Number(r.export_mwh ?? 0), 0);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...theme.primary);
+    doc.setFont(F, "bold"); doc.setFontSize(10); doc.setTextColor(...theme.primary);
     doc.text(`EDU ${m.edu_code}`, 40, y2);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(80);
+    doc.setFont(F, "normal"); doc.setFontSize(8); doc.setTextColor(80);
     if (m.address) doc.text(m.address, 40, y2 + 12);
     y2 += 18;
 
@@ -406,7 +413,7 @@ export function renderInvoicePdf(args: {
 
     autoTable(doc, {
       startY: y2, head, body,
-      styles: { fontSize: 8, cellPadding: 4 },
+      styles: { font: F, fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: theme.tint, textColor: theme.primary },
       margin: { left: 40, right: 40 },
     });
@@ -415,5 +422,6 @@ export function renderInvoicePdf(args: {
   });
 
   footerPages(doc, t);
+  if (args.output === "blob") return doc.output("blob");
   doc.save(`${inv.invoice_number}.pdf`);
 }

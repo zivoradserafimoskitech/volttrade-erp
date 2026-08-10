@@ -893,6 +893,66 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_dispatches: {
+        Row: {
+          channel: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          dunning_level: number
+          error: string | null
+          id: string
+          invoice_id: string
+          kind: string
+          language: string
+          recipient: string | null
+          status: string
+        }
+        Insert: {
+          channel?: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          dunning_level?: number
+          error?: string | null
+          id?: string
+          invoice_id: string
+          kind: string
+          language?: string
+          recipient?: string | null
+          status?: string
+        }
+        Update: {
+          channel?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          dunning_level?: number
+          error?: string | null
+          id?: string
+          invoice_id?: string
+          kind?: string
+          language?: string
+          recipient?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_dispatches_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           billing_run_id: string | null
@@ -902,13 +962,20 @@ export type Database = {
           currency: string
           doc_type: string
           due_date: string | null
+          dunning_level: number
           energy_amount_eur: number
           id: string
           invoice_number: string
+          last_dunning_at: string | null
+          last_reminder_at: string | null
           margin_amount_eur: number
+          notice_language: string | null
           paid_amount_eur: number
           period_end: string
           period_start: string
+          reminder_count: number
+          sent_at: string | null
+          sent_count: number
           status: string
           tax_amount_eur: number
           total_eur: number
@@ -923,13 +990,20 @@ export type Database = {
           currency?: string
           doc_type?: string
           due_date?: string | null
+          dunning_level?: number
           energy_amount_eur?: number
           id?: string
           invoice_number: string
+          last_dunning_at?: string | null
+          last_reminder_at?: string | null
           margin_amount_eur?: number
+          notice_language?: string | null
           paid_amount_eur?: number
           period_end: string
           period_start: string
+          reminder_count?: number
+          sent_at?: string | null
+          sent_count?: number
           status?: string
           tax_amount_eur?: number
           total_eur?: number
@@ -944,13 +1018,20 @@ export type Database = {
           currency?: string
           doc_type?: string
           due_date?: string | null
+          dunning_level?: number
           energy_amount_eur?: number
           id?: string
           invoice_number?: string
+          last_dunning_at?: string | null
+          last_reminder_at?: string | null
           margin_amount_eur?: number
+          notice_language?: string | null
           paid_amount_eur?: number
           period_end?: string
           period_start?: string
+          reminder_count?: number
+          sent_at?: string | null
+          sent_count?: number
           status?: string
           tax_amount_eur?: number
           total_eur?: number

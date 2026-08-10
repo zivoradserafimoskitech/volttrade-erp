@@ -8,22 +8,29 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { fmtEur, fmtMwh, fmtNum } from "@/lib/format";
-import { FileDown, FileSpreadsheet, Trash2 } from "lucide-react";
+import { fmtEur, fmtMwh } from "@/lib/format";
+import { FileDown, FileSpreadsheet, Trash2, Send, BellRing, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { renderInvoicePdf, detectInvoiceLang, type InvoiceLang } from "@/lib/invoiceTemplates";
 
 type Client = { id: string; company_name: string; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; country_code: string | null };
-type Invoice = { id: string; invoice_number: string; period_start: string; period_end: string; total_mwh: number; energy_amount_eur: number; margin_amount_eur: number; total_eur: number; status: string; client_id: string };
+type Invoice = {
+  id: string; invoice_number: string; period_start: string; period_end: string; total_mwh: number;
+  energy_amount_eur: number; margin_amount_eur: number; total_eur: number; paid_amount_eur: number | null;
+  due_date: string | null; status: string; client_id: string;
+  sent_at: string | null; sent_count: number | null;
+  last_reminder_at: string | null; reminder_count: number | null;
+  dunning_level: number | null; last_dunning_at: string | null;
+};
+type NoticeKind = "invoice" | "reminder" | "dunning";
 
 export default function Invoices() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [lang, setLang] = useState<InvoiceLang | "auto">("auto");
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = async () => {
     const { data: cs } = await supabase.from("clients").select("id, company_name, contract_type, fixed_price_eur_mwh, margin_eur_mwh, country_code");
@@ -31,6 +38,30 @@ export default function Invoices() {
     setClients((cs as any) ?? []); setInvoices((inv as any) ?? []);
   };
   useEffect(() => { load(); }, [user]);
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const unsent = invoices.filter(i => !i.sent_at && i.status !== "draft");
+  const overdue = invoices.filter(i => i.status !== "paid" && i.due_date && i.due_date < todayISO
+    && Number(i.total_eur ?? 0) - Number(i.paid_amount_eur ?? 0) > 0.009);
+
+  const sendNotices = async (kind: NoticeKind, invoiceIds?: string[], busyKey: string = kind) => {
+    setBusy(busyKey);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-invoice-notices", {
+        body: { kind, language: lang, invoice_ids: invoiceIds ?? null },
+      });
+      if (error) throw error;
+      const res = data as { processed: number; skipped: number; results?: { invoice: string; status: string; detail?: string }[] };
+      const labels: Record<NoticeKind, string> = { invoice: "фактури", reminder: "потсетувања", dunning: "опомени" };
+      if (res.processed > 0) toast.success(`Испратени ${res.processed} ${labels[kind]}${res.skipped ? ` · прескокнати ${res.skipped}` : ""}`);
+      else toast.warning(res.skipped ? `Ништо не е испратено — прескокнати ${res.skipped}. ${res.results?.[0]?.detail ?? ""}` : "Нема ништо за испраќање.");
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Испраќањето не успеа");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const exportPdf = async (inv: Invoice) => {
     const client = clients.find(c => c.id === inv.client_id);
@@ -43,7 +74,7 @@ export default function Invoices() {
       ? await supabase.from("consumption_readings").select("reading_at, actual_mwh, metering_point_id")
           .in("metering_point_id", meterIds).gte("reading_at", startISO).lte("reading_at", endISO)
       : { data: [] as any[] };
-    renderInvoicePdf({
+    await renderInvoicePdf({
       inv, client,
       meters: (meters ?? []) as any,
       readings: (readings ?? []) as any,
@@ -80,6 +111,33 @@ export default function Invoices() {
         </div>
       }>
       <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Испраќање до крајните клиенти</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-2">
+          <Button
+            disabled={busy !== null || unsent.length === 0}
+            onClick={() => sendNotices("invoice")}
+            style={{ background: "var(--gradient-primary)" }}>
+            {busy === "invoice" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+            Испрати ги сите непратени ({unsent.length})
+          </Button>
+          <Button variant="secondary" disabled={busy !== null || overdue.length === 0} onClick={() => sendNotices("reminder")}>
+            {busy === "reminder" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BellRing className="h-4 w-4 mr-2" />}
+            Потсетување за плаќање ({overdue.length})
+          </Button>
+          <Button variant="outline" className="border-destructive/50 text-destructive hover:text-destructive"
+            disabled={busy !== null || overdue.length === 0} onClick={() => sendNotices("dunning")}>
+            {busy === "dunning" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <AlertTriangle className="h-4 w-4 mr-2" />}
+            Опомена ({overdue.length})
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Известувањата се доставуваат во порталот на клиентот (Vatra) на македонски, албански или англиски — според земјата на клиентот или избраниот јазик погоре.
+          </span>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60">
         <CardContent className="py-3 text-sm text-muted-foreground">
           Invoices are generated by <a href="/billing" className="text-primary underline">Supply Billing Runs</a> (contracts × tariffs × validated consumption). This page is the invoice register: status, PDF and Excel export.
         </CardContent>
@@ -93,7 +151,7 @@ export default function Invoices() {
               <TableHead>Number</TableHead><TableHead>Client</TableHead><TableHead>Period</TableHead>
               <TableHead className="text-right">Volume</TableHead><TableHead className="text-right">Energy</TableHead>
               <TableHead className="text-right">Margin</TableHead><TableHead className="text-right">Total</TableHead>
-              <TableHead>Status</TableHead><TableHead></TableHead>
+              <TableHead>Status</TableHead><TableHead>Испратено</TableHead><TableHead></TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {invoices.map(inv => (
@@ -106,15 +164,30 @@ export default function Invoices() {
                   <TableCell className="text-right">{fmtEur(inv.margin_amount_eur)}</TableCell>
                   <TableCell className="text-right font-semibold text-primary">{fmtEur(inv.total_eur)}</TableCell>
                   <TableCell><Badge variant="outline" className="capitalize">{inv.status}</Badge></TableCell>
+                  <TableCell className="text-xs">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {inv.sent_at
+                        ? <Badge variant="secondary">Фактура {format(new Date(inv.sent_at), "dd.MM.yy")}</Badge>
+                        : <Badge variant="outline" className="text-muted-foreground">Непратена</Badge>}
+                      {Number(inv.reminder_count ?? 0) > 0 && <Badge variant="secondary">Потсетување ×{inv.reminder_count}</Badge>}
+                      {Number(inv.dunning_level ?? 0) > 0 && <Badge variant="destructive">Опомена {inv.dunning_level}. степен</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" title="Испрати фактура" disabled={busy !== null}
+                        onClick={() => sendNotices("invoice", [inv.id], `inv-${inv.id}`)}><Send className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" title="Потсетување за плаќање" disabled={busy !== null}
+                        onClick={() => sendNotices("reminder", [inv.id], `rem-${inv.id}`)}><BellRing className="h-4 w-4 text-amber-500" /></Button>
+                      <Button size="icon" variant="ghost" title="Опомена" disabled={busy !== null}
+                        onClick={() => sendNotices("dunning", [inv.id], `dun-${inv.id}`)}><AlertTriangle className="h-4 w-4 text-destructive" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => exportPdf(inv)}><FileDown className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={async () => { await supabase.from("invoices").delete().eq("id", inv.id); load(); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
-              {invoices.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-10">No invoices yet.</TableCell></TableRow>}
+              {invoices.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-10">No invoices yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
