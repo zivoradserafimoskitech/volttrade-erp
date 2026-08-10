@@ -116,6 +116,10 @@ export default function Market() {
   const max = Math.max(...chartData.map(d => d.price), -Infinity);
   const avg = chartData.length ? chartData.reduce((s,d)=>s+d.price,0)/chartData.length : 0;
 
+  const latestTs = prices.length ? new Date(prices[prices.length - 1].delivery_at) : null;
+  const ageHours = latestTs ? (Date.now() - latestTs.getTime()) / 3_600_000 : null;
+  const stale = ageHours === null || ageHours > 24;
+
   return (
     <ErpLayout
       title="Market Prices"
