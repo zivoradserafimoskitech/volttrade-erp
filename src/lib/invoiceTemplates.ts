@@ -240,7 +240,7 @@ function summaryTable(doc: jsPDF, y: number, theme: typeof THEMES[string], rows:
       { content: t.total_to_pay, styles: { fontStyle: "bold", fillColor: theme.primary, textColor: 255 } },
       { content: gross.toFixed(2), styles: { fontStyle: "bold", fillColor: theme.primary, textColor: 255 } },
     ]],
-    styles: { fontSize: 10, cellPadding: 6 },
+    styles: { font: F, fontSize: 10, cellPadding: 6 },
     headStyles: { fillColor: theme.tint, textColor: theme.primary, fontStyle: "bold" },
     columnStyles: { 1: { halign: "right" } },
     margin: { left: 40, right: 40 },
@@ -410,7 +410,7 @@ export function renderInvoicePdf(args: {
 
     autoTable(doc, {
       startY: y2, head, body,
-      styles: { fontSize: 8, cellPadding: 4 },
+      styles: { font: F, fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: theme.tint, textColor: theme.primary },
       margin: { left: 40, right: 40 },
     });
