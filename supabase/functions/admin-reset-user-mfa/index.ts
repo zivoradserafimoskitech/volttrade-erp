@@ -30,16 +30,21 @@ Deno.serve(async (req) => {
     if (!targetUserId) return json({ error: "user_id is required" }, 400);
 
     const listRes = await fetch(`${url}/auth/v1/admin/users/${targetUserId}/factors`, {
-      headers: { "Authorization": `Bearer ${service}`, "apikey": service },
+      headers: adminHeaders(service),
     });
-    if (!listRes.ok) return json({ error: "Could not list MFA factors" }, 500);
-    const factors = (await listRes.json()) as any[] ?? [];
+    if (!listRes.ok) {
+      console.error("list factors failed", listRes.status, await listRes.text());
+      return json({ error: `Could not list MFA factors (${listRes.status})` }, 500);
+    }
+    const payload = await listRes.json();
+    const factors: any[] = Array.isArray(payload) ? payload : (payload?.factors ?? []);
 
     for (const factor of factors) {
-      await fetch(`${url}/auth/v1/admin/users/${targetUserId}/factors/${factor.id}`, {
+      const delRes = await fetch(`${url}/auth/v1/admin/users/${targetUserId}/factors/${factor.id}`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${service}`, "apikey": service },
+        headers: adminHeaders(service),
       });
+      if (!delRes.ok) console.error("delete factor failed", factor.id, await delRes.text());
     }
 
     return json({ ok: true, user_id: targetUserId, removed: factors.length });
@@ -50,4 +55,10 @@ Deno.serve(async (req) => {
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+}
+
+function adminHeaders(service: string): Record<string, string> {
+  return service.startsWith("sb_secret_")
+    ? { apikey: service }
+    : { apikey: service, Authorization: `Bearer ${service}` };
 }
