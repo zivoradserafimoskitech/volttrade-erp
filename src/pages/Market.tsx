@@ -9,10 +9,30 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, HelpCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectGroup, SelectLabel } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Price = { id: string; delivery_at: string; price_eur_mwh: number };
+
+// A single flat list of price sources so there is only one thing to choose.
+const SOURCES = [
+  { value: "entsoe:HU", group: "ENTSO-E Transparency", label: "Hungary — HUPX / MAVIR" },
+  { value: "entsoe:MK", group: "ENTSO-E Transparency", label: "North Macedonia — MEPSO" },
+  { value: "entsoe:RS", group: "ENTSO-E Transparency", label: "Serbia" },
+  { value: "entsoe:BG", group: "ENTSO-E Transparency", label: "Bulgaria" },
+  { value: "entsoe:GR", group: "ENTSO-E Transparency", label: "Greece" },
+  { value: "entsoe:RO", group: "ENTSO-E Transparency", label: "Romania" },
+  { value: "entsoe:HR", group: "ENTSO-E Transparency", label: "Croatia" },
+  { value: "entsoe:SI", group: "ENTSO-E Transparency", label: "Slovenia" },
+  { value: "entsoe:AT", group: "ENTSO-E Transparency", label: "Austria — APG" },
+  { value: "entsoe:DE_LU", group: "ENTSO-E Transparency", label: "Germany / Luxembourg" },
+  { value: "elex", group: "Exchanges & providers", label: "ELEX — MK day-ahead exchange" },
+  { value: "provider:elecz", group: "Exchanges & providers", label: "Elecz (MK)" },
+  { value: "provider:stekker", group: "Exchanges & providers", label: "Stekker" },
+  { value: "provider:eex", group: "Exchanges & providers", label: "EEX" },
+];
 
 export default function Market() {
   const [prices, setPrices] = useState<Price[]>([]);
