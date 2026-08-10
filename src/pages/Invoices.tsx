@@ -167,8 +167,8 @@ export default function Invoices() {
                   <TableCell className="text-xs">
                     <div className="flex flex-wrap items-center gap-1">
                       {inv.sent_at
-                        ? <Badge variant="secondary">Фактура {format(new Date(inv.sent_at), "dd.MM.yy")}</Badge>
-                        : <Badge variant="outline" className="text-muted-foreground">Непратена</Badge>}
+                        ? <Badge variant="secondary">Sent {format(new Date(inv.sent_at), "dd.MM.yy")}</Badge>
+                        : <Badge variant="outline" className="text-muted-foreground">Not sent</Badge>}
                       {Number(inv.reminder_count ?? 0) > 0 && <Badge variant="secondary">Reminder ×{inv.reminder_count}</Badge>}
                       {Number(inv.dunning_level ?? 0) > 0 && <Badge variant="destructive">Notice level {inv.dunning_level}</Badge>}
                     </div>
