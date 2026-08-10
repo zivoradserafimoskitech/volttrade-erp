@@ -304,14 +304,16 @@ function chargesProsumer(_c: InvoiceClient, inv: InvoiceData, exportMwh: number,
   ];
 }
 
-export function renderInvoicePdf(args: {
+export async function renderInvoicePdf(args: {
   inv: InvoiceData;
   client: InvoiceClient;
   meters: InvoiceMeter[];
   readings: InvoiceReading[];
   lang?: InvoiceLang;
   currency?: string;
-}) {
+  /** "save" downloads the file (default); "blob" returns it for attaching/emailing. */
+  output?: "save" | "blob";
+}): Promise<Blob | void> {
   const { inv, client, meters, readings } = args;
   const lang: InvoiceLang = args.lang ?? detectInvoiceLang(client.country_code);
   const t = DICTS[lang];
@@ -352,6 +354,7 @@ export function renderInvoicePdf(args: {
   charges = [...charges, storedVatLine ?? [t.vat_line((VAT * 100).toFixed(0)), vat]];
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
+  F = await ensureUnicodeFont(doc);
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
 
@@ -419,5 +422,6 @@ export function renderInvoicePdf(args: {
   });
 
   footerPages(doc, t);
+  if (args.output === "blob") return doc.output("blob");
   doc.save(`${inv.invoice_number}.pdf`);
 }
