@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ShieldCheck, LogOut } from "lucide-react";
+import QRCode from "qrcode";
 
 type Mode = "loading" | "enroll" | "verify_enroll" | "challenge" | "done";
 
