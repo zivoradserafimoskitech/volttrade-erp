@@ -116,6 +116,10 @@ export default function Market() {
   const max = Math.max(...chartData.map(d => d.price), -Infinity);
   const avg = chartData.length ? chartData.reduce((s,d)=>s+d.price,0)/chartData.length : 0;
 
+  const latestTs = prices.length ? new Date(prices[prices.length - 1].delivery_at) : null;
+  const ageHours = latestTs ? (Date.now() - latestTs.getTime()) / 3_600_000 : null;
+  const stale = ageHours === null || ageHours > 24;
+
   return (
     <ErpLayout
       title="Market Prices"
@@ -164,6 +168,20 @@ export default function Market() {
         </div>
       }
     >
+      {stale && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+          <p className="font-medium">Price data is not up to date</p>
+          <p className="text-muted-foreground mt-1">
+            {latestTs
+              ? <>The newest hour stored is <span className="text-foreground">{format(latestTs, "d MMM yyyy HH:mm")}</span> ({Math.round(ageHours!/24)} days old).</>
+              : <>No market prices have been stored yet.</>}
+            {" "}Automatic fetching is switched off because no market-data credentials are saved for this workspace —
+            ENTSO-E needs a free API token, and the ELEX/Elecz/EEX feeds need their own keys. Until one is added,
+            every fetch returns “not configured”.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Records" value={String(chartData.length)} />
         <Stat label="Min" value={isFinite(min) ? `${fmtNum(min)} €` : "—"} />
