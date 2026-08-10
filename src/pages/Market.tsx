@@ -96,6 +96,14 @@ export default function Market() {
     }
   };
 
+  const [source, setSource] = useState("entsoe:HU");
+  const busy = syncing || elexSyncing || provSyncing;
+  const runSync = async () => {
+    if (source.startsWith("entsoe:")) { setZone(source.slice(7)); await syncEntsoeZone(source.slice(7)); }
+    else if (source === "elex") await syncElex(false);
+    else await syncProviderNamed(source.slice(9));
+  };
+
   const add = async (form: FormData) => {
     const dt = String(form.get("delivery_at"));
     const price = Number(form.get("price"));
