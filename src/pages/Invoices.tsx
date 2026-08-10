@@ -8,22 +8,29 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { fmtEur, fmtMwh, fmtNum } from "@/lib/format";
-import { FileDown, FileSpreadsheet, Trash2 } from "lucide-react";
+import { fmtEur, fmtMwh } from "@/lib/format";
+import { FileDown, FileSpreadsheet, Trash2, Send, BellRing, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { renderInvoicePdf, detectInvoiceLang, type InvoiceLang } from "@/lib/invoiceTemplates";
 
 type Client = { id: string; company_name: string; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; country_code: string | null };
-type Invoice = { id: string; invoice_number: string; period_start: string; period_end: string; total_mwh: number; energy_amount_eur: number; margin_amount_eur: number; total_eur: number; status: string; client_id: string };
+type Invoice = {
+  id: string; invoice_number: string; period_start: string; period_end: string; total_mwh: number;
+  energy_amount_eur: number; margin_amount_eur: number; total_eur: number; paid_amount_eur: number | null;
+  due_date: string | null; status: string; client_id: string;
+  sent_at: string | null; sent_count: number | null;
+  last_reminder_at: string | null; reminder_count: number | null;
+  dunning_level: number | null; last_dunning_at: string | null;
+};
+type NoticeKind = "invoice" | "reminder" | "dunning";
 
 export default function Invoices() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [lang, setLang] = useState<InvoiceLang | "auto">("auto");
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = async () => {
     const { data: cs } = await supabase.from("clients").select("id, company_name, contract_type, fixed_price_eur_mwh, margin_eur_mwh, country_code");
@@ -31,6 +38,30 @@ export default function Invoices() {
     setClients((cs as any) ?? []); setInvoices((inv as any) ?? []);
   };
   useEffect(() => { load(); }, [user]);
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const unsent = invoices.filter(i => !i.sent_at && i.status !== "draft");
+  const overdue = invoices.filter(i => i.status !== "paid" && i.due_date && i.due_date < todayISO
+    && Number(i.total_eur ?? 0) - Number(i.paid_amount_eur ?? 0) > 0.009);
+
+  const sendNotices = async (kind: NoticeKind, invoiceIds?: string[], busyKey = kind) => {
+    setBusy(busyKey);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-invoice-notices", {
+        body: { kind, language: lang, invoice_ids: invoiceIds ?? null },
+      });
+      if (error) throw error;
+      const res = data as { processed: number; skipped: number; results?: { invoice: string; status: string; detail?: string }[] };
+      const labels: Record<NoticeKind, string> = { invoice: "фактури", reminder: "потсетувања", dunning: "опомени" };
+      if (res.processed > 0) toast.success(`Испратени ${res.processed} ${labels[kind]}${res.skipped ? ` · прескокнати ${res.skipped}` : ""}`);
+      else toast.warning(res.skipped ? `Ништо не е испратено — прескокнати ${res.skipped}. ${res.results?.[0]?.detail ?? ""}` : "Нема ништо за испраќање.");
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Испраќањето не успеа");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const exportPdf = async (inv: Invoice) => {
     const client = clients.find(c => c.id === inv.client_id);
@@ -43,7 +74,7 @@ export default function Invoices() {
       ? await supabase.from("consumption_readings").select("reading_at, actual_mwh, metering_point_id")
           .in("metering_point_id", meterIds).gte("reading_at", startISO).lte("reading_at", endISO)
       : { data: [] as any[] };
-    renderInvoicePdf({
+    await renderInvoicePdf({
       inv, client,
       meters: (meters ?? []) as any,
       readings: (readings ?? []) as any,
