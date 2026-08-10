@@ -60,7 +60,6 @@ export default function Market() {
   };
 
   const [elexSyncing, setElexSyncing] = useState(false);
-  const [provider, setProvider] = useState("elecz");
   const [provSyncing, setProvSyncing] = useState(false);
   const syncProviderNamed = async (provider: string) => {
     setProvSyncing(true);
