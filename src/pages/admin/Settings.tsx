@@ -15,13 +15,32 @@ import { useAuth } from "@/lib/auth";
 
 
 export default function Settings() {
-  const { roles, aal } = useAuth();
+  const { roles, aal, refreshAal } = useAuth();
   const isStaff = roles.length > 0;
   const mfaOn = aal.currentLevel === "aal2";
   const [rows, setRows] = useState<any[]>([]);
   const [form, setForm] = useState({ code: "", name: "", currency: "EUR", vat_percent: 0, tso_code: "" });
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPw, setResetPw] = useState("");
+  const [resetting, setResetting] = useState(false);
   const load = async () => { const { data } = await supabase.from("countries").select("*").order("code"); setRows(data ?? []); };
   useEffect(() => { load(); }, []);
+
+  const resetMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("reset-own-mfa", { body: { password: resetPw } });
+    setResetting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Reset failed");
+      return;
+    }
+    toast.success(`2FA reset — ${(data as any)?.removed ?? 0} factor(s) removed. Sign out and back in to enrol a new authenticator.`);
+    setResetOpen(false);
+    setResetPw("");
+    refreshAal();
+  };
+
 
   const add = async () => {
     const { error } = await supabase.from("countries").insert(form);
