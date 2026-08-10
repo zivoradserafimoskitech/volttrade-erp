@@ -44,7 +44,7 @@ export default function Invoices() {
   const overdue = invoices.filter(i => i.status !== "paid" && i.due_date && i.due_date < todayISO
     && Number(i.total_eur ?? 0) - Number(i.paid_amount_eur ?? 0) > 0.009);
 
-  const sendNotices = async (kind: NoticeKind, invoiceIds?: string[], busyKey = kind) => {
+  const sendNotices = async (kind: NoticeKind, invoiceIds?: string[], busyKey: string = kind) => {
     setBusy(busyKey);
     try {
       const { data, error } = await supabase.functions.invoke("send-invoice-notices", {
