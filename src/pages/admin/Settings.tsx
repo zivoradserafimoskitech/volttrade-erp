@@ -106,6 +106,26 @@ export default function Settings() {
           </CardContent>
         </Card>
       </RoleGate>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset your two-factor authentication</DialogTitle>
+            <DialogDescription>
+              Use this if you lost or deleted your authenticator app. Enter your current password to remove the old factor, then sign out and back in to enrol a new one.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={resetMfa} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-pw">Current password</Label>
+              <Input id="reset-pw" type="password" required value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="••••••••" />
+            </div>
+            <Button type="submit" disabled={resetting || !resetPw} className="w-full" style={{ background: "var(--gradient-primary)" }}>
+              {resetting ? "Resetting…" : "Reset 2FA"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </ErpLayout>
   );
 }
