@@ -32,7 +32,13 @@ export default function Settings() {
     const { data, error } = await supabase.functions.invoke("reset-own-mfa", { body: { password: resetPw } });
     setResetting(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? "Reset failed");
+      let msg = (data as any)?.error ?? error?.message ?? "Reset failed";
+      // FunctionsHttpError hides the body — read it so the real reason is shown.
+      const ctx = (error as any)?.context;
+      if (ctx && typeof ctx.json === "function") {
+        try { const b = await ctx.json(); if (b?.error) msg = b.error; } catch { /* ignore */ }
+      }
+      toast.error(msg);
       return;
     }
     toast.success(`2FA reset — ${(data as any)?.removed ?? 0} factor(s) removed. Sign out and back in to enrol a new authenticator.`);
