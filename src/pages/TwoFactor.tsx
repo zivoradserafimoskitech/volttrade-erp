@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ShieldCheck, LogOut } from "lucide-react";
+import QRCode from "qrcode";
 
 type Mode = "loading" | "enroll" | "verify_enroll" | "challenge" | "done";
 
@@ -48,8 +49,19 @@ export default function TwoFactor() {
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `VoltTrade ${Date.now()}` });
     if (error) { toast.error(error.message); return; }
     setFactorId(data.id);
-    setQr(data.totp.qr_code);
     setSecret(data.totp.secret);
+
+    // Re-render the QR code with a clean issuer name so Authenticator apps show "VoltTrade"
+    // instead of the preview/published domain.
+    const issuer = "VoltTrade";
+    const account = user?.email ?? user?.phone ?? "staff";
+    const otpauth = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}?secret=${data.totp.secret}&issuer=${encodeURIComponent(issuer)}`;
+    try {
+      const dataUrl = await QRCode.toDataURL(otpauth, { width: 384, margin: 2, color: { dark: "#0f172a", light: "#ffffff" } });
+      setQr(dataUrl);
+    } catch {
+      setQr(data.totp.qr_code);
+    }
     setMode("verify_enroll");
   };
 
