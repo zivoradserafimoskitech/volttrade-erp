@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -29,6 +30,8 @@ export default function Position() {
   const [date, setDate] = useState(today());
   const [trades, setTrades] = useState<any[]>([]);
   const [forecastMwh, setForecastMwh] = useState(0);
+  const [showGeneration, setShowGeneration] = useState(true);
+  const [genByHour, setGenByHour] = useState<number[]>(Array(24).fill(0));
 
   useEffect(() => { (async () => {
     if (!user) return;
@@ -41,6 +44,17 @@ export default function Position() {
     const { data: fc } = await supabase.from("forecasts")
       .select("forecast_mwh").eq("forecast_date", date);
     setForecastMwh((fc ?? []).reduce((s: number, f: any) => s + Number(f.forecast_mwh || 0), 0));
+    const { data: tel } = await supabase.from("asset_telemetry")
+      .select("ts, pv_generation_kwh, energy_kwh, power_kw")
+      .gte("ts", `${date}T00:00:00Z`).lte("ts", `${date}T23:59:59Z`);
+    const buckets = Array(24).fill(0);
+    for (const t of tel ?? []) {
+      const h = new Date((t as any).ts).getUTCHours();
+      const kwh = Number((t as any).pv_generation_kwh ?? (t as any).energy_kwh ?? 0)
+        || Math.max(0, Number((t as any).power_kw ?? 0));
+      buckets[h] += kwh / 1000; // kWh -> MWh
+    }
+    setGenByHour(buckets);
   })(); }, [user, date]);
 
   const hourly = useMemo(() => {
@@ -65,32 +79,36 @@ export default function Position() {
       }
       const procured = bought - sold; // long if positive
       const consumption = (forecastMwh * DEFAULT_SHAPE[h]) / shapeSum;
-      const position = procured - consumption;
+      const generated = genByHour[h] || 0;
+      const position = procured + generated - consumption;
       return {
         hour: `${String(h).padStart(2, "0")}:00`,
         bought: +bought.toFixed(3),
         sold: +sold.toFixed(3),
         procured: +procured.toFixed(3),
+        generated: +generated.toFixed(3),
         consumption: +consumption.toFixed(3),
         position: +position.toFixed(3),
         status: position > 0.001 ? "Long" : position < -0.001 ? "Short" : "Flat",
         avg_price: priceVol > 0 ? +(weightedPrice / priceVol).toFixed(2) : 0,
       };
     });
-  }, [trades, forecastMwh, date]);
+  }, [trades, forecastMwh, date, genByHour]);
 
   const totals = useMemo(() => hourly.reduce((acc, h) => ({
     procured: acc.procured + h.procured,
+    generated: acc.generated + h.generated,
     consumption: acc.consumption + h.consumption,
     long: acc.long + Math.max(0, h.position),
     short: acc.short + Math.max(0, -h.position),
-  }), { procured: 0, consumption: 0, long: 0, short: 0 }), [hourly]);
+  }), { procured: 0, generated: 0, consumption: 0, long: 0, short: 0 }), [hourly]);
 
   const cols = [
     { key: "hour", label: "Hour" },
     { key: "bought", label: "Bought (MWh)" },
     { key: "sold", label: "Sold (MWh)" },
     { key: "procured", label: "Net procured" },
+    { key: "generated", label: "Generated" },
     { key: "consumption", label: "Consumption" },
     { key: "position", label: "Position" },
     { key: "status", label: "Status" },
@@ -109,7 +127,7 @@ export default function Position() {
           </Button>
         </div>
       }>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
         <Card className="border-border/60 md:col-span-1">
           <CardContent className="p-4 space-y-3">
             <div className="space-y-1">
@@ -120,9 +138,14 @@ export default function Position() {
               Consumption is derived from the daily forecast spread across 24 hours using a default load shape.
               For SLP-fed customers, individual hourly profiles are used in the Balancing → Scheduling page.
             </div>
+            <div className="flex items-center justify-between pt-1">
+              <Label htmlFor="gen" className="text-xs">Show generation</Label>
+              <Switch id="gen" checked={showGeneration} onCheckedChange={setShowGeneration} />
+            </div>
           </CardContent>
         </Card>
         <Stat label="Net procured" value={`${fmtNum(totals.procured)} MWh`} />
+        <Stat label="Generated" value={`${fmtNum(totals.generated)} MWh`} tone="positive" />
         <Stat label="Forecast load" value={`${fmtNum(totals.consumption)} MWh`} />
         <Stat label="Long volume" value={`${fmtNum(totals.long)} MWh`} tone="positive" />
         <Stat label="Short volume" value={`${fmtNum(totals.short)} MWh`} tone="negative" />
@@ -141,6 +164,9 @@ export default function Position() {
               <ReferenceLine y={0} stroke="hsl(var(--border))" />
               <Bar dataKey="position" name="Position (MWh)" fill="hsl(var(--primary))" />
               <Line type="monotone" dataKey="procured" name="Procured" stroke="hsl(var(--chart-2, 142 70% 45%))" dot={false} />
+              {showGeneration && (
+                <Line type="monotone" dataKey="generated" name="Generated" stroke="hsl(var(--chart-4, 45 90% 55%))" dot={false} />
+              )}
               <Line type="monotone" dataKey="consumption" name="Consumption" stroke="hsl(var(--destructive))" strokeDasharray="4 3" dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
@@ -161,6 +187,7 @@ export default function Position() {
                   <TableCell className="text-right">{fmtNum(r.bought)}</TableCell>
                   <TableCell className="text-right">{fmtNum(r.sold)}</TableCell>
                   <TableCell className="text-right">{fmtNum(r.procured)}</TableCell>
+                  <TableCell className="text-right">{fmtNum(r.generated)}</TableCell>
                   <TableCell className="text-right">{fmtNum(r.consumption)}</TableCell>
                   <TableCell className={`text-right font-medium ${r.position > 0 ? "text-emerald-500" : r.position < 0 ? "text-destructive" : ""}`}>
                     {r.position > 0 ? "+" : ""}{fmtNum(r.position)}
