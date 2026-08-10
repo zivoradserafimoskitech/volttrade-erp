@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, AppRole } from "@/lib/auth";
-import { Plus, Trash2, MailPlus } from "lucide-react";
+import { Plus, Trash2, MailPlus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
 
 const ROLES: AppRole[] = ['admin','management','trader','supply_manager','billing_officer','finance','risk_officer','operations','auditor'];
 
