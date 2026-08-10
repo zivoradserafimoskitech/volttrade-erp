@@ -9,10 +9,30 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, HelpCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectGroup, SelectLabel } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Price = { id: string; delivery_at: string; price_eur_mwh: number };
+
+// A single flat list of price sources so there is only one thing to choose.
+const SOURCES = [
+  { value: "entsoe:HU", group: "ENTSO-E Transparency", label: "Hungary — HUPX / MAVIR" },
+  { value: "entsoe:MK", group: "ENTSO-E Transparency", label: "North Macedonia — MEPSO" },
+  { value: "entsoe:RS", group: "ENTSO-E Transparency", label: "Serbia" },
+  { value: "entsoe:BG", group: "ENTSO-E Transparency", label: "Bulgaria" },
+  { value: "entsoe:GR", group: "ENTSO-E Transparency", label: "Greece" },
+  { value: "entsoe:RO", group: "ENTSO-E Transparency", label: "Romania" },
+  { value: "entsoe:HR", group: "ENTSO-E Transparency", label: "Croatia" },
+  { value: "entsoe:SI", group: "ENTSO-E Transparency", label: "Slovenia" },
+  { value: "entsoe:AT", group: "ENTSO-E Transparency", label: "Austria — APG" },
+  { value: "entsoe:DE_LU", group: "ENTSO-E Transparency", label: "Germany / Luxembourg" },
+  { value: "elex", group: "Exchanges & providers", label: "ELEX — MK day-ahead exchange" },
+  { value: "provider:elecz", group: "Exchanges & providers", label: "Elecz (MK)" },
+  { value: "provider:stekker", group: "Exchanges & providers", label: "Stekker" },
+  { value: "provider:eex", group: "Exchanges & providers", label: "EEX" },
+];
 
 export default function Market() {
   const [prices, setPrices] = useState<Price[]>([]);
@@ -24,13 +44,13 @@ export default function Market() {
   };
   useEffect(() => { load(); }, []);
 
-  const syncEntsoe = async () => {
+  const syncEntsoeZone = async (z: string) => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-entsoe-prices", { body: { zone, days: 2 } });
+      const { data, error } = await supabase.functions.invoke("sync-entsoe-prices", { body: { zone: z, days: 2 } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success(`Synced ${(data as any)?.inserted ?? 0} prices from ENTSO-E (${zone})`);
+      toast.success(`Synced ${(data as any)?.inserted ?? 0} prices from ENTSO-E (${z})`);
       load();
     } catch (e: any) {
       toast.error(e?.message ?? "Sync failed");
@@ -40,9 +60,8 @@ export default function Market() {
   };
 
   const [elexSyncing, setElexSyncing] = useState(false);
-  const [provider, setProvider] = useState("elecz");
   const [provSyncing, setProvSyncing] = useState(false);
-  const syncProvider = async () => {
+  const syncProviderNamed = async (provider: string) => {
     setProvSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-price-providers", { body: { provider, zone: "MK" } });
@@ -76,6 +95,14 @@ export default function Market() {
     }
   };
 
+  const [source, setSource] = useState("entsoe:HU");
+  const busy = syncing || elexSyncing || provSyncing;
+  const runSync = async () => {
+    if (source.startsWith("entsoe:")) { setZone(source.slice(7)); await syncEntsoeZone(source.slice(7)); }
+    else if (source === "elex") await syncElex(false);
+    else await syncProviderNamed(source.slice(9));
+  };
+
   const add = async (form: FormData) => {
     const dt = String(form.get("delivery_at"));
     const price = Number(form.get("price"));
@@ -95,36 +122,45 @@ export default function Market() {
       subtitle="Hourly day-ahead prices (€/MWh) — ENTSO-E Transparency"
       actions={
         <div className="flex items-center gap-2">
-          <Select value={zone} onValueChange={setZone}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+          <div className="hidden sm:block text-xs text-muted-foreground">Price source</div>
+          <Select value={source} onValueChange={setSource}>
+            <SelectTrigger className="w-[230px]"><SelectValue placeholder="Choose a price source" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="HU">HU (MAVIR)</SelectItem>
-              <SelectItem value="MK">MK (MEPSO)</SelectItem>
-              <SelectItem value="DE_LU">DE-LU</SelectItem>
-              <SelectItem value="AT">AT (APG)</SelectItem>
-              <SelectItem value="RO">RO</SelectItem>
-              <SelectItem value="RS">RS</SelectItem>
-              <SelectItem value="BG">BG</SelectItem>
-              <SelectItem value="GR">GR</SelectItem>
-              <SelectItem value="HR">HR</SelectItem>
-              <SelectItem value="SI">SI</SelectItem>
+              {["ENTSO-E Transparency", "Exchanges & providers"].map(group => (
+                <SelectGroup key={group}>
+                  <SelectLabel>{group}</SelectLabel>
+                  {SOURCES.filter(s => s.group === group).map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
             </SelectContent>
           </Select>
-          <Button onClick={syncEntsoe} disabled={syncing} style={{ background: "var(--gradient-primary)" }}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing…" : "Sync now"}
+          <Button onClick={runSync} disabled={busy} style={{ background: "var(--gradient-primary)" }}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${busy ? "animate-spin" : ""}`} />
+            {busy ? "Fetching…" : "Fetch prices"}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => syncElex(false)} disabled={elexSyncing}>{elexSyncing ? "ELEX…" : "Sync ELEX"}</Button>
-          <Button size="sm" variant="ghost" onClick={() => syncElex(true)} disabled={elexSyncing} title="Discover the ELEX API endpoints (no data written)">Probe API</Button>
-          <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="elecz">Elecz (MK)</SelectItem>
-              <SelectItem value="stekker">Stekker</SelectItem>
-              <SelectItem value="eex">EEX</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button size="sm" variant="outline" onClick={syncProvider} disabled={provSyncing}>{provSyncing ? "Syncing…" : "Sync provider"}</Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="What does this do?"><HelpCircle className="h-4 w-4" /></Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 text-sm space-y-3">
+              <div>
+                <p className="font-medium">Fetching day-ahead prices</p>
+                <p className="text-muted-foreground mt-1">
+                  Pick where the hourly €/MWh prices should come from, then press <span className="font-medium text-foreground">Fetch prices</span>.
+                  New hours are added and existing hours are updated — nothing is duplicated.
+                </p>
+              </div>
+              <ul className="text-muted-foreground space-y-1">
+                <li><span className="text-foreground">ENTSO-E</span> — official European transparency platform, one bidding zone at a time.</li>
+                <li><span className="text-foreground">ELEX / providers</span> — regional exchanges and commercial feeds (daily call limits apply).</li>
+              </ul>
+              <Button variant="outline" size="sm" className="w-full" disabled={elexSyncing} onClick={() => syncElex(true)}>
+                Test ELEX connection (no data written)
+              </Button>
+            </PopoverContent>
+          </Popover>
         </div>
       }
     >
