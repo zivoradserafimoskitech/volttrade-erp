@@ -49,8 +49,19 @@ export default function TwoFactor() {
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `VoltTrade ${Date.now()}` });
     if (error) { toast.error(error.message); return; }
     setFactorId(data.id);
-    setQr(data.totp.qr_code);
     setSecret(data.totp.secret);
+
+    // Re-render the QR code with a clean issuer name so Authenticator apps show "VoltTrade"
+    // instead of the preview/published domain.
+    const issuer = "VoltTrade";
+    const account = user?.email ?? user?.phone ?? "staff";
+    const otpauth = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}?secret=${data.totp.secret}&issuer=${encodeURIComponent(issuer)}`;
+    try {
+      const dataUrl = await QRCode.toDataURL(otpauth, { width: 384, margin: 2, color: { dark: "#0f172a", light: "#ffffff" } });
+      setQr(dataUrl);
+    } catch {
+      setQr(data.totp.qr_code);
+    }
     setMode("verify_enroll");
   };
 
