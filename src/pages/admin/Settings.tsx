@@ -6,20 +6,41 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Trash2, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Plus, Trash2, ShieldCheck, ShieldAlert, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 
+
 export default function Settings() {
-  const { roles, aal } = useAuth();
+  const { roles, aal, refreshAal } = useAuth();
   const isStaff = roles.length > 0;
   const mfaOn = aal.currentLevel === "aal2";
   const [rows, setRows] = useState<any[]>([]);
   const [form, setForm] = useState({ code: "", name: "", currency: "EUR", vat_percent: 0, tso_code: "" });
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPw, setResetPw] = useState("");
+  const [resetting, setResetting] = useState(false);
   const load = async () => { const { data } = await supabase.from("countries").select("*").order("code"); setRows(data ?? []); };
   useEffect(() => { load(); }, []);
+
+  const resetMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("reset-own-mfa", { body: { password: resetPw } });
+    setResetting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Reset failed");
+      return;
+    }
+    toast.success(`2FA reset — ${(data as any)?.removed ?? 0} factor(s) removed. Sign out and back in to enrol a new authenticator.`);
+    setResetOpen(false);
+    setResetPw("");
+    refreshAal();
+  };
+
 
   const add = async () => {
     const { error } = await supabase.from("countries").insert(form);
@@ -36,16 +57,22 @@ export default function Settings() {
             {mfaOn ? <ShieldCheck className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
             Two-factor authentication
           </CardTitle></CardHeader>
-          <CardContent className="flex items-center justify-between gap-4">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
               {mfaOn ? "TOTP is active on your staff account." : "TOTP is not verified for this session. Enrol or verify to reach full access."}
             </p>
-            <Button asChild variant={mfaOn ? "outline" : "default"} size="sm">
-              <Link to="/2fa">{mfaOn ? "Manage 2FA" : "Enable 2FA"}</Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
+                <RotateCcw className="h-4 w-4 mr-2" /> Reset 2FA
+              </Button>
+              <Button asChild variant={mfaOn ? "outline" : "default"} size="sm">
+                <Link to="/2fa">{mfaOn ? "Manage 2FA" : "Enable 2FA"}</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
+
       <RoleGate roles={['admin']}>
         <Card className="border-border/60">
           <CardHeader><CardTitle>Add country</CardTitle></CardHeader>
@@ -79,6 +106,26 @@ export default function Settings() {
           </CardContent>
         </Card>
       </RoleGate>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset your two-factor authentication</DialogTitle>
+            <DialogDescription>
+              Use this if you lost or deleted your authenticator app. Enter your current password to remove the old factor, then sign out and back in to enrol a new one.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={resetMfa} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-pw">Current password</Label>
+              <Input id="reset-pw" type="password" required value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="••••••••" />
+            </div>
+            <Button type="submit" disabled={resetting || !resetPw} className="w-full" style={{ background: "var(--gradient-primary)" }}>
+              {resetting ? "Resetting…" : "Reset 2FA"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </ErpLayout>
   );
 }

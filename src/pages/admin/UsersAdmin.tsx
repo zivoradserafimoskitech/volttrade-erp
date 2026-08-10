@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, AppRole } from "@/lib/auth";
-import { Plus, Trash2, MailPlus } from "lucide-react";
+import { Plus, Trash2, MailPlus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
 
 const ROLES: AppRole[] = ['admin','management','trader','supply_manager','billing_officer','finance','risk_officer','operations','auditor'];
 
@@ -23,6 +25,10 @@ export default function UsersAdmin() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<AppRole>('trader');
   const [inviting, setInviting] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetUserId, setResetUserId] = useState("");
+  const [resetting, setResetting] = useState(false);
+
 
   const load = async () => { const { data } = await supabase.from("user_roles").select("*").order("created_at", { ascending: false }); setRows(data ?? []); };
   useEffect(() => { load(); }, []);
@@ -45,8 +51,22 @@ export default function UsersAdmin() {
     toast.success(`Invited ${inviteEmail} as ${inviteRole}`);
     setInviteEmail(""); load(); refreshRoles();
   };
+  const openReset = (uid: string) => { setResetUserId(uid); setResetOpen(true); };
+  const resetMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("admin-reset-user-mfa", { body: { user_id: resetUserId } });
+    setResetting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Reset failed");
+      return;
+    }
+    toast.success(`2FA reset for ${resetUserId.slice(0, 8)}… — ${(data as any)?.removed ?? 0} factor(s) removed.`);
+    setResetOpen(false); setResetUserId("");
+  };
 
   return (
+
     <ErpLayout title="Users & Roles" subtitle="Assign system roles to authenticated users">
       <RoleGate roles={['admin']}>
         <Card className="border-border/60">
@@ -87,7 +107,12 @@ export default function UsersAdmin() {
                     <TableCell className="font-mono text-xs">{r.user_id}</TableCell>
                     <TableCell><Badge>{r.role}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
-                    <TableCell className="text-right"><Button size="icon" variant="ghost" onClick={() => del(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" title="Reset 2FA" onClick={() => openReset(r.user_id)}><RotateCcw className="h-4 w-4 text-muted-foreground" /></Button>
+                        <Button size="icon" variant="ghost" onClick={() => del(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-10 text-sm text-muted-foreground">No role assignments yet.</TableCell></TableRow>}
@@ -95,6 +120,22 @@ export default function UsersAdmin() {
             </Table>
           </CardContent>
         </Card>
+
+        <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset user 2FA</DialogTitle>
+              <DialogDescription>
+                This removes all TOTP factors for user <code className="font-mono text-xs">{resetUserId}</code>. They will be prompted to enrol a new authenticator on next sign-in.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={resetMfa} className="space-y-4">
+              <Button type="submit" disabled={resetting} className="w-full" style={{ background: "var(--gradient-primary)" }}>
+                {resetting ? "Resetting…" : "Confirm reset"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </RoleGate>
     </ErpLayout>
   );
