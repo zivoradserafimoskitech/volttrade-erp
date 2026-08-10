@@ -51,8 +51,22 @@ export default function UsersAdmin() {
     toast.success(`Invited ${inviteEmail} as ${inviteRole}`);
     setInviteEmail(""); load(); refreshRoles();
   };
+  const openReset = (uid: string) => { setResetUserId(uid); setResetOpen(true); };
+  const resetMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("admin-reset-user-mfa", { body: { user_id: resetUserId } });
+    setResetting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Reset failed");
+      return;
+    }
+    toast.success(`2FA reset for ${resetUserId.slice(0, 8)}… — ${(data as any)?.removed ?? 0} factor(s) removed.`);
+    setResetOpen(false); setResetUserId("");
+  };
 
   return (
+
     <ErpLayout title="Users & Roles" subtitle="Assign system roles to authenticated users">
       <RoleGate roles={['admin']}>
         <Card className="border-border/60">
