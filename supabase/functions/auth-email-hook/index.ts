@@ -36,7 +36,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "volttrade-erp"
+const SITE_NAME = "VoltTrade"
 const SENDER_DOMAIN = "notify.volttrade.app"
 const ROOT_DOMAIN = "volttrade.app"
 const FROM_DOMAIN = "volttrade.app" // Domain shown in From address (may be root or sender subdomain)
