@@ -24,8 +24,15 @@ export default function Settings() {
   const [resetPw, setResetPw] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetting, setResetting] = useState(false);
+  // Enrolled factors are the source of truth. aal.currentLevel stays "aal2" for the
+  // rest of a session even after every factor is unenrolled, so it can't drive this card.
+  const [totpFactors, setTotpFactors] = useState<any[] | null>(null);
+  const loadFactors = async () => {
+    const { data } = await supabase.auth.mfa.listFactors();
+    setTotpFactors((data?.totp ?? []).filter((f: any) => f.status === "verified"));
+  };
   const load = async () => { const { data } = await supabase.from("countries").select("*").order("code"); setRows(data ?? []); };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadFactors(); }, []);
 
   const resetMfa = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +58,7 @@ export default function Settings() {
     setResetPw("");
     setResetEmail("");
     refreshAal();
+    loadFactors();
   };
 
 
