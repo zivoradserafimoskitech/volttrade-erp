@@ -4,6 +4,7 @@ import * as React from 'npm:react@18.3.1'
 import { Container, Img, Section, Text } from 'npm:@react-email/components@0.0.22'
 
 export const BANNER_URL = 'https://volttrade-erp.lovable.app/email-banner.png'
+export const LOGO_URL = 'https://volttrade-erp.lovable.app/email-logo.png'
 
 export const main = {
   backgroundColor: '#0b1018',
@@ -81,10 +82,23 @@ export const footer = {
   lineHeight: '1.6',
 }
 
+export const logoBar = {
+  backgroundColor: '#0d1220',
+  padding: '22px 32px 14px',
+  borderBottom: '1px solid #16203150',
+}
+
+export const logo = { display: 'block' as const, height: '26px', width: 'auto' }
+
 export const Banner = () => (
-  <Section style={bannerWrap}>
-    <Img src={BANNER_URL} alt="" width="560" style={banner} />
-  </Section>
+  <>
+    <Section style={logoBar}>
+      <Img src={LOGO_URL} alt="VoltTrade" height="26" style={logo} />
+    </Section>
+    <Section style={bannerWrap}>
+      <Img src={BANNER_URL} alt="" width="560" style={banner} />
+    </Section>
+  </>
 )
 
 export const Shell = ({ children }: { children: React.ReactNode }) => (
