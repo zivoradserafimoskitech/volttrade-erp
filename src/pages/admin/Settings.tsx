@@ -79,14 +79,22 @@ export default function Settings() {
           </CardTitle></CardHeader>
           <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              {mfaOn ? "TOTP is active on your staff account." : "TOTP is not verified for this session. Enrol or verify to reach full access."}
+              {totpFactors === null
+                ? "Checking your authenticator…"
+                : totpFactors.length === 0
+                  ? "Two-factor authentication is off for your staff account."
+                  : mfaOn
+                    ? "TOTP is active on your staff account."
+                    : "TOTP is enrolled but not verified for this session."}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
-                <RotateCcw className="h-4 w-4 mr-2" /> Reset 2FA
-              </Button>
-              <Button asChild variant={mfaOn ? "outline" : "default"} size="sm">
-                <Link to="/2fa">{mfaOn ? "Manage 2FA" : "Enable 2FA"}</Link>
+              {(totpFactors?.length ?? 0) > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
+                  <RotateCcw className="h-4 w-4 mr-2" /> Reset 2FA
+                </Button>
+              )}
+              <Button asChild variant={(totpFactors?.length ?? 0) > 0 ? "outline" : "default"} size="sm">
+                <Link to="/2fa">{(totpFactors?.length ?? 0) > 0 ? "Manage 2FA" : "Enable 2FA"}</Link>
               </Button>
             </div>
           </CardContent>
