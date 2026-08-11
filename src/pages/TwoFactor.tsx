@@ -63,9 +63,9 @@ export default function TwoFactor() {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       const { data: list } = await supabase.auth.mfa.listFactors();
       const verified = list?.totp?.find((f: any) => f.status === "verified");
-      if (aal?.currentLevel === "aal2") {
+      if (aal?.currentLevel === "aal2" && verified) {
         // Already fully authenticated — show a manage screen instead of bouncing away.
-        setFactors(list?.totp ?? []);
+        setFactors((list?.totp ?? []).filter((f: any) => f.status === "verified"));
         setMode("manage");
         return;
       }
