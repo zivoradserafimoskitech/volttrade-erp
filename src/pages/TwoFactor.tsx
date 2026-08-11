@@ -127,6 +127,20 @@ export default function TwoFactor() {
     await beginEnroll();
   };
 
+  // Turn 2FA off entirely: unenroll every factor and go back to the app.
+  const disableMfa = async () => {
+    setBusy(true);
+    const { data: list } = await supabase.auth.mfa.listFactors();
+    for (const f of list?.totp ?? []) {
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: f.id });
+      if (error) { setBusy(false); return toast.error(error.message); }
+    }
+    setBusy(false);
+    toast.success("Two-factor authentication turned off");
+    await refreshAal();
+    navigate("/dashboard", { replace: true });
+  };
+
   const challenge = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true);
     const ch = await supabase.auth.mfa.challenge({ factorId });
@@ -202,6 +216,9 @@ export default function TwoFactor() {
                 <p className="text-xs text-muted-foreground">
                   "Replace" removes the current authenticator and immediately shows a new QR code to scan.
                 </p>
+                <Button variant="destructive" className="w-full" disabled={busy} onClick={disableMfa}>
+                  <ShieldOff className="h-4 w-4 mr-2" /> Turn off two-factor authentication
+                </Button>
                 <Button variant="outline" className="w-full" onClick={() => navigate("/dashboard")}>Back to dashboard</Button>
               </CardContent>
             </>
