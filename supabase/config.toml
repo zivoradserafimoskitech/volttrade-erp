@@ -1,39 +1,31 @@
 project_id = "volttrade-erp"
 
-[functions.seed-demo-data]
-verify_jwt = true
-
-[functions.submit-schedule]
-verify_jwt = true
-
-[functions.import-dso-reads]
-verify_jwt = false
-
-[functions.link-consumer-pod]
-verify_jwt = true
-
-[functions.admin-invite-user]
-verify_jwt = true
-
-[functions.admin-invite-consumer]
-verify_jwt = true
-[functions.validate-readings]
-verify_jwt = true
-
-[functions.sync-pv-forecast]
-verify_jwt = true
-
-[functions.forecast-volumes]
-verify_jwt = true
-
-[functions.sync-elex-prices]
-verify_jwt = true
-
-[functions.sync-price-providers]
-verify_jwt = true
-
-[functions.submit-lead]
-verify_jwt = false
-
-[functions.process-email-queue]
-verify_jwt = true
+[functions]
+  [functions.admin-invite-consumer]
+    verify_jwt = true
+  [functions.admin-invite-user]
+    verify_jwt = true
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.forecast-volumes]
+    verify_jwt = true
+  [functions.import-dso-reads]
+    verify_jwt = false
+  [functions.link-consumer-pod]
+    verify_jwt = true
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.seed-demo-data]
+    verify_jwt = true
+  [functions.submit-lead]
+    verify_jwt = false
+  [functions.submit-schedule]
+    verify_jwt = true
+  [functions.sync-elex-prices]
+    verify_jwt = true
+  [functions.sync-price-providers]
+    verify_jwt = true
+  [functions.sync-pv-forecast]
+    verify_jwt = true
+  [functions.validate-readings]
+    verify_jwt = true
