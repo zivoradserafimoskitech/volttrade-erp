@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ShieldCheck, LogOut } from "lucide-react";
+import { ShieldCheck, LogOut, RotateCcw } from "lucide-react";
 import QRCode from "qrcode";
 
 type Mode = "loading" | "enroll" | "verify_enroll" | "challenge" | "manage" | "done";
@@ -22,6 +23,38 @@ export default function TwoFactor() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [factors, setFactors] = useState<any[]>([]);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPw, setResetPw] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  // Self-service recovery for a lost/uninstalled authenticator. Must live here:
+  // /2fa is the only screen a staff member at AAL1 can reach.
+  const resetMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetting(true);
+    await supabase.auth.refreshSession().catch(() => null);
+    const { data, error } = await supabase.functions.invoke("reset-own-mfa", {
+      body: { password: resetPw, email: resetEmail || user?.email || undefined },
+    });
+    setResetting(false);
+    if (error || (data as any)?.error) {
+      let msg = (data as any)?.error ?? error?.message ?? "Reset failed";
+      const ctx = (error as any)?.context;
+      if (ctx && typeof ctx.json === "function") {
+        try { const b = await ctx.json(); if (b?.error) msg = b.error; } catch { /* ignore */ }
+      }
+      toast.error(msg);
+      return;
+    }
+    toast.success("Old authenticator removed — scan the new QR code below.");
+    setResetOpen(false);
+    setResetPw("");
+    setResetEmail("");
+    setCode("");
+    await refreshAal();
+    await beginEnroll();
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -189,10 +222,41 @@ export default function TwoFactor() {
                     {busy ? "Verifying…" : "Continue"}
                   </Button>
                 </form>
+                <div className="mt-4 border-t border-border/60 pt-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-2">Lost or deleted your authenticator app?</p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setResetOpen(true)}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-2" /> Reset 2FA with my password
+                  </Button>
+                </div>
               </CardContent>
             </>
           )}
         </Card>
+
+        <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset your two-factor authentication</DialogTitle>
+              <DialogDescription>
+                Enter your account password to remove the unusable authenticator. You'll then scan a new QR code to finish signing in.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={resetMfa} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Account email</Label>
+                <Input id="reset-email" type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} placeholder={user?.email ?? "you@company.com"} />
+                <p className="text-xs text-muted-foreground">Only needed if your session has expired.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reset-pw">Current password</Label>
+                <Input id="reset-pw" type="password" required value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="••••••••" />
+              </div>
+              <Button type="submit" disabled={resetting || !resetPw} className="w-full" style={{ background: "var(--gradient-primary)" }}>
+                {resetting ? "Resetting…" : "Reset 2FA"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
         <div className="mt-4 text-center">
           <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate("/auth", { replace: true }); }}>
             <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
