@@ -88,12 +88,12 @@ export const logoBar = {
   borderBottom: '1px solid #16203150',
 }
 
-export const logo = { display: 'block' as const, height: '26px', width: 'auto' }
+export const logo = { display: 'block' as const, height: '40px', width: 'auto' }
 
 export const Banner = () => (
   <>
     <Section style={logoBar}>
-      <Img src={LOGO_URL} alt="VoltTrade" height="26" style={logo} />
+      <Img src={LOGO_URL} alt="VoltTrade" height="40" style={logo} />
     </Section>
     <Section style={bannerWrap}>
       <Img src={BANNER_URL} alt="" width="560" style={banner} />
