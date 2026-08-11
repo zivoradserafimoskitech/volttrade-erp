@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { ShieldCheck, LogOut } from "lucide-react";
 import QRCode from "qrcode";
 
-type Mode = "loading" | "enroll" | "verify_enroll" | "challenge" | "done";
+type Mode = "loading" | "enroll" | "verify_enroll" | "challenge" | "manage" | "done";
 
 export default function TwoFactor() {
   const { user, loading, refreshAal, signOut } = useAuth();
@@ -21,15 +21,21 @@ export default function TwoFactor() {
   const [secret, setSecret] = useState<string>("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [factors, setFactors] = useState<any[]>([]);
 
   useEffect(() => {
     if (loading) return;
     if (!user) { navigate("/auth", { replace: true }); return; }
     (async () => {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal?.currentLevel === "aal2") { navigate("/dashboard", { replace: true }); return; }
       const { data: list } = await supabase.auth.mfa.listFactors();
       const verified = list?.totp?.find((f: any) => f.status === "verified");
+      if (aal?.currentLevel === "aal2") {
+        // Already fully authenticated — show a manage screen instead of bouncing away.
+        setFactors(list?.totp ?? []);
+        setMode("manage");
+        return;
+      }
       if (verified) {
         setFactorId(verified.id);
         setMode("challenge");
@@ -75,6 +81,17 @@ export default function TwoFactor() {
     toast.success("Two-factor authentication enabled");
     await refreshAal();
     navigate("/dashboard", { replace: true });
+  };
+
+  const removeFactor = async (id: string) => {
+    setBusy(true);
+    const { error } = await supabase.auth.mfa.unenroll({ factorId: id });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Authenticator removed");
+    await refreshAal();
+    setCode("");
+    await beginEnroll();
   };
 
   const challenge = async (e: React.FormEvent) => {
@@ -126,6 +143,33 @@ export default function TwoFactor() {
                     {busy ? "Verifying…" : "Verify & activate"}
                   </Button>
                 </form>
+              </CardContent>
+            </>
+          )}
+          {mode === "manage" && (
+            <>
+              <CardHeader>
+                <CardTitle>Two-factor is active</CardTitle>
+                <CardDescription>Your staff account is protected with a TOTP authenticator app.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  {factors.filter(f => f.status === "verified").map(f => (
+                    <div key={f.id} className="flex items-center justify-between rounded-lg border border-border/70 p-3">
+                      <div>
+                        <div className="text-sm font-medium">{f.friendly_name ?? "Authenticator"}</div>
+                        <div className="text-xs text-muted-foreground">Added {new Date(f.created_at).toLocaleDateString()}</div>
+                      </div>
+                      <Button variant="outline" size="sm" disabled={busy} onClick={() => removeFactor(f.id)}>
+                        Replace
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  "Replace" removes the current authenticator and immediately shows a new QR code to scan.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => navigate("/dashboard")}>Back to dashboard</Button>
               </CardContent>
             </>
           )}
