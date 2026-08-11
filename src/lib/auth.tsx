@@ -59,8 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return arr.some(x => roles.includes(x));
   };
 
-  // Staff (any role) must be at aal2. Vatra consumers (no roles) are unaffected.
-  const needsMfa = !!session && roles.length > 0 && aal.currentLevel !== 'aal2';
+  // Staff with an enrolled authenticator must complete it (nextLevel === 'aal2').
+  // Staff who turned 2FA off have no verified factor, so nextLevel stays 'aal1' and
+  // they are not gated. Vatra consumers (no roles) are unaffected.
+  const needsMfa = !!session && roles.length > 0
+    && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2';
 
   return (
     <AuthCtx.Provider value={{
