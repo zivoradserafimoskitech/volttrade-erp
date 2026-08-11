@@ -24,8 +24,15 @@ export default function Settings() {
   const [resetPw, setResetPw] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetting, setResetting] = useState(false);
+  // Enrolled factors are the source of truth. aal.currentLevel stays "aal2" for the
+  // rest of a session even after every factor is unenrolled, so it can't drive this card.
+  const [totpFactors, setTotpFactors] = useState<any[] | null>(null);
+  const loadFactors = async () => {
+    const { data } = await supabase.auth.mfa.listFactors();
+    setTotpFactors((data?.totp ?? []).filter((f: any) => f.status === "verified"));
+  };
   const load = async () => { const { data } = await supabase.from("countries").select("*").order("code"); setRows(data ?? []); };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadFactors(); }, []);
 
   const resetMfa = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +58,7 @@ export default function Settings() {
     setResetPw("");
     setResetEmail("");
     refreshAal();
+    loadFactors();
   };
 
 
@@ -66,19 +74,29 @@ export default function Settings() {
       {isStaff && (
         <Card className="border-border/60">
           <CardHeader><CardTitle className="flex items-center gap-2">
-            {mfaOn ? <ShieldCheck className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
+            {(totpFactors?.length ?? 0) > 0 && mfaOn
+              ? <ShieldCheck className="h-4 w-4 text-primary" />
+              : <ShieldAlert className="h-4 w-4 text-destructive" />}
             Two-factor authentication
           </CardTitle></CardHeader>
           <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              {mfaOn ? "TOTP is active on your staff account." : "TOTP is not verified for this session. Enrol or verify to reach full access."}
+              {totpFactors === null
+                ? "Checking your authenticator…"
+                : totpFactors.length === 0
+                  ? "Two-factor authentication is off for your staff account."
+                  : mfaOn
+                    ? "TOTP is active on your staff account."
+                    : "TOTP is enrolled but not verified for this session."}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
-                <RotateCcw className="h-4 w-4 mr-2" /> Reset 2FA
-              </Button>
-              <Button asChild variant={mfaOn ? "outline" : "default"} size="sm">
-                <Link to="/2fa">{mfaOn ? "Manage 2FA" : "Enable 2FA"}</Link>
+              {(totpFactors?.length ?? 0) > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
+                  <RotateCcw className="h-4 w-4 mr-2" /> Reset 2FA
+                </Button>
+              )}
+              <Button asChild variant={(totpFactors?.length ?? 0) > 0 ? "outline" : "default"} size="sm">
+                <Link to="/2fa">{(totpFactors?.length ?? 0) > 0 ? "Manage 2FA" : "Enable 2FA"}</Link>
               </Button>
             </div>
           </CardContent>
