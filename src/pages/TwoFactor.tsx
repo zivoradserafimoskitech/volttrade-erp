@@ -146,6 +146,33 @@ export default function TwoFactor() {
               </CardContent>
             </>
           )}
+          {mode === "manage" && (
+            <>
+              <CardHeader>
+                <CardTitle>Two-factor is active</CardTitle>
+                <CardDescription>Your staff account is protected with a TOTP authenticator app.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  {factors.filter(f => f.status === "verified").map(f => (
+                    <div key={f.id} className="flex items-center justify-between rounded-lg border border-border/70 p-3">
+                      <div>
+                        <div className="text-sm font-medium">{f.friendly_name ?? "Authenticator"}</div>
+                        <div className="text-xs text-muted-foreground">Added {new Date(f.created_at).toLocaleDateString()}</div>
+                      </div>
+                      <Button variant="outline" size="sm" disabled={busy} onClick={() => removeFactor(f.id)}>
+                        Replace
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  "Replace" removes the current authenticator and immediately shows a new QR code to scan.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => navigate("/dashboard")}>Back to dashboard</Button>
+              </CardContent>
+            </>
+          )}
           {mode === "challenge" && (
             <>
               <CardHeader>
