@@ -74,7 +74,9 @@ export default function Settings() {
       {isStaff && (
         <Card className="border-border/60">
           <CardHeader><CardTitle className="flex items-center gap-2">
-            {mfaOn ? <ShieldCheck className="h-4 w-4 text-primary" /> : <ShieldAlert className="h-4 w-4 text-destructive" />}
+            {(totpFactors?.length ?? 0) > 0 && mfaOn
+              ? <ShieldCheck className="h-4 w-4 text-primary" />
+              : <ShieldAlert className="h-4 w-4 text-destructive" />}
             Two-factor authentication
           </CardTitle></CardHeader>
           <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
