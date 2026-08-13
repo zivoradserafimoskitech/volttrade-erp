@@ -102,6 +102,13 @@ Deno.serve(async (req) => {
     const invoiceIds: string[] | null = Array.isArray(payload?.invoice_ids) && payload.invoice_ids.length
       ? payload.invoice_ids.filter((v: unknown) => typeof v === "string")
       : null;
+    // Operator-chosen sender (must be on the verified domain — validated again
+    // inside send-transactional-email) and optional recipient override for
+    // one-off sends to a different address than the client contact.
+    const fromEmail: string | null = typeof payload?.from_email === "string" && payload.from_email.includes("@")
+      ? payload.from_email.trim() : null;
+    const recipientOverride: string | null = typeof payload?.recipient_email === "string" && payload.recipient_email.includes("@")
+      ? payload.recipient_email.trim() : null;
 
     const today = new Date();
     const todayISO = today.toISOString().slice(0, 10);
