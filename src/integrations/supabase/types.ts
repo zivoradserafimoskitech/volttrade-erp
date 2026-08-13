@@ -431,7 +431,7 @@ export type Database = {
           status: string
           tax_id: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           address?: string | null
@@ -454,7 +454,7 @@ export type Database = {
           status?: string
           tax_id?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           address?: string | null
@@ -477,7 +477,7 @@ export type Database = {
           status?: string
           tax_id?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -908,6 +908,7 @@ export type Database = {
       external_api_log: {
         Row: {
           called_at: string
+          detail: Json | null
           endpoint: string | null
           id: string
           provider: string
@@ -915,6 +916,7 @@ export type Database = {
         }
         Insert: {
           called_at?: string
+          detail?: Json | null
           endpoint?: string | null
           id?: string
           provider: string
@@ -922,6 +924,7 @@ export type Database = {
         }
         Update: {
           called_at?: string
+          detail?: Json | null
           endpoint?: string | null
           id?: string
           provider?: string
@@ -1067,7 +1070,7 @@ export type Database = {
           tax_amount_eur: number
           total_eur: number
           total_mwh: number
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           billing_run_id?: string | null
@@ -1095,7 +1098,7 @@ export type Database = {
           tax_amount_eur?: number
           total_eur?: number
           total_mwh?: number
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           billing_run_id?: string | null
@@ -1123,7 +1126,7 @@ export type Database = {
           tax_amount_eur?: number
           total_eur?: number
           total_mwh?: number
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
