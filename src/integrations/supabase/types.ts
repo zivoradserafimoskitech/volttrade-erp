@@ -849,6 +849,27 @@ export type Database = {
         }
         Relationships: []
       }
+      eic_areas: {
+        Row: {
+          country_code: string | null
+          eic: string
+          is_default: boolean
+          name: string
+        }
+        Insert: {
+          country_code?: string | null
+          eic: string
+          is_default?: boolean
+          name: string
+        }
+        Update: {
+          country_code?: string | null
+          eic?: string
+          is_default?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -933,6 +954,36 @@ export type Database = {
           id?: string
           token?: string
           used_at?: string | null
+        }
+        Relationships: []
+      }
+      ess_settings: {
+        Row: {
+          default_area_eic: string
+          id: boolean
+          receiver_eic: string
+          receiver_role: string
+          sender_eic: string
+          sender_role: string
+          updated_at: string
+        }
+        Insert: {
+          default_area_eic?: string
+          id?: boolean
+          receiver_eic?: string
+          receiver_role?: string
+          sender_eic: string
+          sender_role?: string
+          updated_at?: string
+        }
+        Update: {
+          default_area_eic?: string
+          id?: boolean
+          receiver_eic?: string
+          receiver_role?: string
+          sender_eic?: string
+          sender_role?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3156,17 +3207,24 @@ export type Database = {
       }
       trades: {
         Row: {
+          capacity_agreement_id: string | null
           counterparty_id: string | null
           created_at: string
           created_by: string | null
           delivery_end: string
           delivery_start: string
+          ess_business_type: string | null
+          ess_series_id: string | null
           hub: string | null
           id: string
+          in_area_eic: string | null
           market: string
+          mtu_shape: Json | null
           notes: string | null
           organization_id: string
+          out_area_eic: string | null
           price_eur_mwh: number
+          schedulable: boolean
           side: string
           status: string
           total_value_eur: number | null
@@ -3177,17 +3235,24 @@ export type Database = {
           volume_mwh: number
         }
         Insert: {
+          capacity_agreement_id?: string | null
           counterparty_id?: string | null
           created_at?: string
           created_by?: string | null
           delivery_end: string
           delivery_start: string
+          ess_business_type?: string | null
+          ess_series_id?: string | null
           hub?: string | null
           id?: string
+          in_area_eic?: string | null
           market?: string
+          mtu_shape?: Json | null
           notes?: string | null
           organization_id?: string
+          out_area_eic?: string | null
           price_eur_mwh: number
+          schedulable?: boolean
           side: string
           status?: string
           total_value_eur?: number | null
@@ -3198,17 +3263,24 @@ export type Database = {
           volume_mwh: number
         }
         Update: {
+          capacity_agreement_id?: string | null
           counterparty_id?: string | null
           created_at?: string
           created_by?: string | null
           delivery_end?: string
           delivery_start?: string
+          ess_business_type?: string | null
+          ess_series_id?: string | null
           hub?: string | null
           id?: string
+          in_area_eic?: string | null
           market?: string
+          mtu_shape?: Json | null
           notes?: string | null
           organization_id?: string
+          out_area_eic?: string | null
           price_eur_mwh?: number
+          schedulable?: boolean
           side?: string
           status?: string
           total_value_eur?: number | null
