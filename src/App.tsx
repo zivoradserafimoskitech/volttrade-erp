@@ -12,6 +12,7 @@ import Invoices from "./pages/Invoices";
 import AuthPage from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import TwoFactor from "./pages/TwoFactor";
+import Unsubscribe from "./pages/Unsubscribe";
 import VatraSignup from "./pages/vatra/Signup";
 import VatraJoin from "./pages/vatra/Join";
 import NotFound from "./pages/NotFound";
@@ -86,6 +87,7 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/2fa" element={<TwoFactor />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/vatra/join" element={<VatraJoin />} />
             <Route path="/join" element={<VatraJoin />} />
             <Route path="/vatra/signup" element={<VatraSignup />} />

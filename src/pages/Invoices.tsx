@@ -132,7 +132,7 @@ export default function Invoices() {
             Final notice ({overdue.length})
           </Button>
           <span className="text-xs text-muted-foreground">
-            Notices are delivered in the customer portal (Vatra) in Macedonian, Albanian or English — based on the customer country or the language selected above.
+            Notices are delivered by email to the client contact address and in the customer portal (Vatra), in Macedonian, Albanian or English — based on the customer country or the language selected above. New invoices go out automatically every morning; payment reminders run weekly.
           </span>
         </CardContent>
       </Card>

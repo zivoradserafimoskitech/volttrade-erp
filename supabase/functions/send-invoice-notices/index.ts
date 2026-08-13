@@ -78,16 +78,22 @@ Deno.serve(async (req) => {
     const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authed = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
-    const { data: userRes, error: userErr } = await authed.auth.getUser();
-    if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
-    const uid = userRes.user.id;
-
     const admin = createClient(url, service);
-    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", uid);
-    const allowed = ["admin", "management", "billing_officer", "finance"];
-    if (!(roles ?? []).some((r: { role: string }) => allowed.includes(r.role))) {
-      return json({ error: "Forbidden — billing role required" }, 403);
+
+    // Automated runs (pg_cron / server-side schedulers) present the service-role
+    // key; interactive runs present a staff JWT that must carry a billing role.
+    const bearer = authHeader.slice(7).trim();
+    let uid: string | null = null;
+    if (bearer !== service) {
+      const authed = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
+      const { data: userRes, error: userErr } = await authed.auth.getUser();
+      if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
+      uid = userRes.user.id;
+      const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", uid);
+      const allowed = ["admin", "management", "billing_officer", "finance"];
+      if (!(roles ?? []).some((r: { role: string }) => allowed.includes(r.role))) {
+        return json({ error: "Forbidden — billing role required" }, 403);
+      }
     }
 
     const payload = await req.json().catch(() => ({}));
@@ -156,6 +162,7 @@ Deno.serve(async (req) => {
       let channel = "portal";
       let status = "sent";
       let error: string | null = null;
+      let emailed = false;
 
       if (client.portal_user_id) {
         const { error: nErr } = await admin.from("notifications").insert({
@@ -172,6 +179,39 @@ Deno.serve(async (req) => {
         channel = "none";
         status = "failed";
         error = "Клиентот нема активна порталска сметка (нема на кого да се достави).";
+      }
+
+      // Email delivery — the invoice notice also goes to the client's billing
+      // address, so customers without a portal login still get the document.
+      if (client.contact_email) {
+        const { data: mailRes, error: mailErr } = await admin.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "invoice-notice",
+            recipientEmail: client.contact_email,
+            idempotencyKey: `inv-${kind}-${inv.id}-${kind === "invoice" ? "1" : new Date().toISOString().slice(0, 10)}`,
+            templateData: {
+              kind,
+              lang,
+              companyName: client.company_name,
+              invoiceNumber: inv.invoice_number,
+              amount,
+              dueDate: dueDate ? new Date(dueDate).toLocaleDateString("mk-MK") : "—",
+              daysOverdue: days,
+              dunningLevel: level || 1,
+              portalUrl: "https://volttrade.app/portal/invoices",
+            },
+          },
+        });
+        if (mailErr) {
+          console.error("invoice email failed", inv.invoice_number, mailErr);
+        } else if ((mailRes as { success?: boolean } | null)?.success) {
+          emailed = true;
+        }
+        if (emailed) {
+          channel = channel === "portal" ? "portal+email" : "email";
+          status = "sent";
+          error = null;
+        }
       }
 
       await admin.from("invoice_dispatches").insert({
