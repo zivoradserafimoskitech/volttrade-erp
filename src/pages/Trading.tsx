@@ -60,10 +60,8 @@ export default function Trading() {
   const add = async (form: FormData) => {
     const dStart = String(form.get("delivery_start"));
     const dEnd = String(form.get("delivery_end"));
-    let uid: string;
-    try { uid = await requireUid(); } catch (e: any) { return toast.error(e.message); }
+    try { await requireUid(); } catch (e: any) { return toast.error(e.message); }
     const { error } = await supabase.from("trades").insert({
-      user_id: uid,
       trade_number: String(form.get("trade_number")),
       counterparty_id: form.get("counterparty_id") || null,
       trading_contract_id: form.get("trading_contract_id") || null,

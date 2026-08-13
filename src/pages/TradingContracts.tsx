@@ -34,10 +34,8 @@ export default function TradingContracts() {
   useEffect(() => { load(); }, [user]);
 
   const add = async (form: FormData) => {
-    let uid: string;
-    try { uid = await requireUid(); } catch (e: any) { return toast.error(e.message); }
+    try { await requireUid(); } catch (e: any) { return toast.error(e.message); }
     const { error } = await supabase.from("trading_contracts").insert({
-      user_id: uid,
       counterparty_id: String(form.get("counterparty_id")),
       contract_number: String(form.get("contract_number")),
       contract_type: String(form.get("contract_type")),

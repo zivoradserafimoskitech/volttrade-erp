@@ -216,7 +216,7 @@ export default function Forecasting() {
       if (error) toast.error(error.message);
     } else {
       const { error } = await supabase.from("forecasts").insert({
-        user_id: user.id, client_id: clientId, forecast_date: date, forecast_mwh: value, method,
+        client_id: clientId, forecast_date: date, forecast_mwh: value, method,
       });
       if (error) toast.error(error.message);
     }
@@ -246,7 +246,7 @@ export default function Forecasting() {
       toast.info("No prior-year consumption found for these clients.");
       return;
     }
-    const { error } = await supabase.from("forecasts").upsert(rowsToUpsert, { onConflict: "user_id,client_id,forecast_date" });
+    const { error } = await supabase.from("forecasts").upsert(rowsToUpsert, { onConflict: "organization_id,client_id,forecast_date" });
     if (error) return toast.error(error.message);
     toast.success(`Generated ${rowsToUpsert.length} forecast rows`);
     await load();
