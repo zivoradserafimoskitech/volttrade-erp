@@ -18,10 +18,13 @@ export type Database = {
         Row: {
           asset_id: string
           created_at: string
+          gateway_plan_id: number | null
           id: string
+          last_error: string | null
           mode: string
           notes: string | null
           schedule_id: string | null
+          sent_at: string | null
           setpoint_kw: number
           status: string
           ts_from: string
@@ -32,10 +35,13 @@ export type Database = {
         Insert: {
           asset_id: string
           created_at?: string
+          gateway_plan_id?: number | null
           id?: string
+          last_error?: string | null
           mode?: string
           notes?: string | null
           schedule_id?: string | null
+          sent_at?: string | null
           setpoint_kw: number
           status?: string
           ts_from: string
@@ -46,10 +52,13 @@ export type Database = {
         Update: {
           asset_id?: string
           created_at?: string
+          gateway_plan_id?: number | null
           id?: string
+          last_error?: string | null
           mode?: string
           notes?: string | null
           schedule_id?: string | null
+          sent_at?: string | null
           setpoint_kw?: number
           status?: string
           ts_from?: string
@@ -192,6 +201,7 @@ export type Database = {
           asset_type: Database["public"]["Enums"]["asset_type"]
           created_at: string
           external_ref: string | null
+          gateway_device_id: number | null
           id: string
           install_date: string | null
           model: string | null
@@ -209,6 +219,7 @@ export type Database = {
           asset_type: Database["public"]["Enums"]["asset_type"]
           created_at?: string
           external_ref?: string | null
+          gateway_device_id?: number | null
           id?: string
           install_date?: string | null
           model?: string | null
@@ -226,6 +237,7 @@ export type Database = {
           asset_type?: Database["public"]["Enums"]["asset_type"]
           created_at?: string
           external_ref?: string | null
+          gateway_device_id?: number | null
           id?: string
           install_date?: string | null
           model?: string | null
@@ -1024,6 +1036,78 @@ export type Database = {
         }
         Relationships: []
       }
+      gateway_alarms: {
+        Row: {
+          acknowledged_at: string | null
+          asset_id: string | null
+          device_id: number | null
+          gateway_alarm_id: number
+          gateway_id: number | null
+          id: string
+          message: string | null
+          metering_point_id: string | null
+          metric: string
+          resolved_at: string | null
+          severity: string
+          status: string
+          synced_at: string
+          threshold: number | null
+          triggered_at: string
+          value: number | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          asset_id?: string | null
+          device_id?: number | null
+          gateway_alarm_id: number
+          gateway_id?: number | null
+          id?: string
+          message?: string | null
+          metering_point_id?: string | null
+          metric: string
+          resolved_at?: string | null
+          severity: string
+          status: string
+          synced_at?: string
+          threshold?: number | null
+          triggered_at: string
+          value?: number | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          asset_id?: string | null
+          device_id?: number | null
+          gateway_alarm_id?: number
+          gateway_id?: number | null
+          id?: string
+          message?: string | null
+          metering_point_id?: string | null
+          metric?: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          synced_at?: string
+          threshold?: number | null
+          triggered_at?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_alarms_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_alarms_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_dispatches: {
         Row: {
           channel: string
@@ -1319,6 +1403,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lead_submission_throttle: {
+        Row: {
+          blocked_until: string | null
+          count: number
+          ip_hash: string
+          window_start: string
+        }
+        Insert: {
+          blocked_until?: string | null
+          count?: number
+          ip_hash: string
+          window_start?: string
+        }
+        Update: {
+          blocked_until?: string | null
+          count?: number
+          ip_hash?: string
+          window_start?: string
+        }
+        Relationships: []
       }
       leads: {
         Row: {
@@ -2929,6 +3034,18 @@ export type Database = {
         Args: { p_fiscal_year: number }
         Returns: string
       }
+      check_lead_throttle: {
+        Args: {
+          p_block_minutes?: number
+          p_ip_hash: string
+          p_max_per_window?: number
+          p_window_minutes?: number
+        }
+        Returns: {
+          allowed: boolean
+          retry_after_seconds: number
+        }[]
+      }
       current_portal_client_id: { Args: never; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -2971,6 +3088,7 @@ export type Database = {
         Returns: number
       }
       next_invoice_number: { Args: never; Returns: string }
+      prune_lead_throttle: { Args: never; Returns: number }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
