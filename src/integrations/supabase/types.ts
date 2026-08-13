@@ -1549,8 +1549,10 @@ export type Database = {
           notes: string | null
           organization_id: string
           owner: string | null
+          pod_code: string | null
           source: string | null
           stage: string
+          tax_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1570,8 +1572,10 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           owner?: string | null
+          pod_code?: string | null
           source?: string | null
           stage?: string
+          tax_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1591,8 +1595,10 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           owner?: string | null
+          pod_code?: string | null
           source?: string | null
           stage?: string
+          tax_id?: string | null
           updated_at?: string
         }
         Relationships: [
