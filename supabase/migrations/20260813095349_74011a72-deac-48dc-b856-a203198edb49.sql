@@ -1,0 +1,1 @@
+GRANT SELECT ON public.pv_forecasts TO authenticated;
