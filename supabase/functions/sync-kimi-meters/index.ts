@@ -1,161 +1,233 @@
-// Sync meter reads from Enertrek/Kimi TimescaleDB (`telemetry` hypertable)
-// into public.meter_readings (settlement-grade cumulative registers) and
-// public.consumption_readings (interval kWh for charts).
+// Sync meter reads from the VoltTrade Cloud gateway platform into
+// public.meter_readings (settlement-grade cumulative registers) and
+// public.consumption_readings (interval kWh for charts and billing).
 //
-// Mapping: telemetry.meter_id (bigint) -> metering_points.kimi_meter_id.
-// Requires secret: TIMESCALE_URL (postgres://user:pass@host:5432/db?sslmode=require)
+// Mapping: metering_points.kimi_meter_id -> gateway device id.
+//
+// ── WHAT CHANGED AND WHY (audit P0-1/P0-3/§5) ────────────────────────────────
+//
+// 1. AUTH (P0-3). The previous version required an interactive user and then
+//    filtered `metering_points.user_id = user.id`. cron.sql calls this with the
+//    service-role key, which has no `sub` claim, so getUser() failed and every
+//    scheduled run returned 401. Now handled by _shared/auth.ts: a service
+//    caller syncs ALL linked metering points; a user caller syncs the same set
+//    (RLS-visible staff scope), not just rows they personally created.
+//
+// 2. TRANSPORT (§5). The previous version opened a raw `postgres://` socket to
+//    the gateway's TimescaleDB, which forced that port to be internet-exposed,
+//    provided no revocable credential, and coupled billing to the gateway's
+//    internal column names. It now calls the purpose-built, API-key
+//    authenticated REST endpoint:
+//        GET /api/v1/devices/:id/energy?from&to&bucketMin
+//
+// 3. CORRECTNESS (§5 — this one reached invoices). The old SQL derived interval
+//    energy as `MAX(energy_import_kwh) - MIN(energy_import_kwh)` per bucket.
+//    That is wrong across a counter rollover or a meter replacement: the
+//    register resets to zero mid-bucket and MAX-MIN yields the whole pre-reset
+//    reading as "consumption". The gateway's endpoint already implements
+//    counter-reset-safe non-negative deltas and flags affected buckets as
+//    `quality: "estimated"`. We now consume that and propagate the flag, so VEE
+//    can quarantine estimated intervals instead of billing them silently.
+//
+// Secrets required:
+//   GATEWAY_API_URL    e.g. https://cloud.volttrade.mk
+//   GATEWAY_API_KEY    an etk_... key created in the gateway UI (Settings →
+//                      API keys). Use a dedicated key named "erp-sync" with
+//                      viewer role so it can be revoked without collateral.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.0";
-import { Client as PgClient } from "https://deno.land/x/postgres@v0.19.3/mod.ts";
+import { authenticate, handler, json } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const MAX_RANGE_MINUTES = 31 * 24 * 60; // gateway rejects ranges over 31 days
+const CHUNK = 500;
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+interface EnergyBucket {
+  ts: string;
+  importKwh: number | null;
+  exportKwh: number | null;
+  avgPowerKw: number | null;
+  quality: "measured" | "estimated";
+}
 
-  try {
-    const TIMESCALE_URL = Deno.env.get("TIMESCALE_URL");
-    if (!TIMESCALE_URL) {
-      return json({ ok: false, error: "TIMESCALE_URL not configured" }, 400);
-    }
+interface MeteringPoint {
+  id: string;
+  edu_code: string;
+  kimi_meter_id: number;
+}
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseService = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const authHeader = req.headers.get("Authorization") ?? "";
-
-    const userClient = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !user) return json({ ok: false, error: "Not authenticated" }, 401);
-
-    const admin = createClient(supabaseUrl, supabaseService);
-
-    let body: any = {};
-    try { body = await req.json(); } catch { /* no body */ }
-    const windowMinutes = Math.min(Math.max(Number(body.window_minutes) || 60, 5), 60 * 24 * 7);
-    const bucketMinutes = Math.min(Math.max(Number(body.bucket_minutes) || 60, 15), 1440);
-
-    // 1) Load MPs owned by user that are linked to a Kimi meter
-    const { data: mps, error: mpErr } = await admin
-      .from("metering_points")
-      .select("id, edu_code, kimi_meter_id, user_id")
-      .eq("user_id", user.id)
-      .not("kimi_meter_id", "is", null);
-    if (mpErr) throw mpErr;
-
-    const idMap = new Map<number, { id: string; edu_code: string }>();
-    (mps ?? []).forEach((m: any) => idMap.set(Number(m.kimi_meter_id), { id: m.id, edu_code: m.edu_code }));
-    const meterIds = Array.from(idMap.keys());
-    if (meterIds.length === 0) {
-      return json({ ok: true, synced: 0, message: "No metering points linked to Kimi meters." });
-    }
-
-    // 2) Connect to Timescale
-    const pg = new PgClient(TIMESCALE_URL);
-    await pg.connect();
-
-    // Latest cumulative register per meter (for meter_readings)
-    const latestSql = `
-      SELECT DISTINCT ON (meter_id) meter_id, ts,
-             energy_import_kwh, energy_export_kwh
-      FROM telemetry
-      WHERE meter_id = ANY($1::bigint[])
-        AND ts >= now() - ($2 || ' minutes')::interval
-      ORDER BY meter_id, ts DESC
-    `;
-    const latest = await pg.queryObject<{
-      meter_id: bigint; ts: Date; energy_import_kwh: number | null; energy_export_kwh: number | null;
-    }>(latestSql, [meterIds, String(windowMinutes)]);
-
-    // Interval consumption via bucketed max−min of cumulative registers
-    const intervalSql = `
-      SELECT meter_id,
-             time_bucket($3::interval, ts) AS bucket,
-             MAX(energy_import_kwh) - MIN(energy_import_kwh) AS import_kwh,
-             MAX(energy_export_kwh) - MIN(energy_export_kwh) AS export_kwh,
-             AVG(active_power_kw) AS avg_power_kw
-      FROM telemetry
-      WHERE meter_id = ANY($1::bigint[])
-        AND ts >= now() - ($2 || ' minutes')::interval
-      GROUP BY meter_id, bucket
-      ORDER BY bucket
-    `;
-    const intervals = await pg.queryObject<{
-      meter_id: bigint; bucket: Date; import_kwh: number | null; export_kwh: number | null; avg_power_kw: number | null;
-    }>(intervalSql, [meterIds, String(windowMinutes), `${bucketMinutes} minutes`]);
-
-    await pg.end();
-
-    // 3) Upsert cumulative reads → meter_readings (settlement-grade)
-    const readingRows = latest.rows.map(r => {
-      const mp = idMap.get(Number(r.meter_id))!;
-      return {
-        metering_point_id: mp.id,
-        reading_at: new Date(r.ts).toISOString(),
-        import_kwh: r.energy_import_kwh ?? 0,
-        export_kwh: r.energy_export_kwh ?? 0,
-        source: "api",
-        validation_status: "pending",
-        created_by: user.id,
-        notes: "Auto-synced from Kimi/Enertrek Timescale — awaiting VEE",
-      };
-    });
-    let readingsInserted = 0;
-    if (readingRows.length > 0) {
-      const { error, count } = await admin.from("meter_readings")
-        .upsert(readingRows as any, { onConflict: "metering_point_id,reading_at", count: "exact" });
-      if (error) throw error;
-      readingsInserted = count ?? readingRows.length;
-    }
-
-    // 4) Upsert interval reads → consumption_readings
-    const intervalRows = intervals.rows
-      .filter(r => (r.import_kwh ?? 0) >= 0)
-      .map(r => {
-        const mp = idMap.get(Number(r.meter_id))!;
-        return {
-          metering_point_id: mp.id,
-          reading_at: new Date(r.bucket).toISOString(),
-          actual_mwh: Number(r.import_kwh ?? 0) / 1000,
-          source: "PRIVATE_SMART",
-          is_estimated: false,
-          quality: "measured",
-        };
-      });
-    let intervalsInserted = 0;
-    if (intervalRows.length > 0) {
-      const chunk = 500;
-      for (let i = 0; i < intervalRows.length; i += chunk) {
-        const slice = intervalRows.slice(i, i + chunk);
-        const { error } = await admin.from("consumption_readings")
-          .upsert(slice as any, { onConflict: "metering_point_id,reading_at" });
-        if (error) throw error;
-        intervalsInserted += slice.length;
-      }
-    }
-
-    return json({
-      ok: true,
-      meters: meterIds.length,
-      readings_synced: readingsInserted,
-      intervals_synced: intervalsInserted,
-      window_minutes: windowMinutes,
-      bucket_minutes: bucketMinutes,
-    });
-  } catch (err: any) {
-    console.error("sync-kimi-meters error:", err);
-    return json({ ok: false, error: err?.message ?? "Unknown error" }, 500);
-  }
-});
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+Deno.serve(handler(async (req) => {
+  const auth = await authenticate(req, {
+    roles: ["admin", "management", "operations", "supply_manager"],
   });
+  const admin = auth.admin;
+
+  const apiUrl = (Deno.env.get("GATEWAY_API_URL") ?? "").replace(/\/+$/, "");
+  const apiKey = Deno.env.get("GATEWAY_API_KEY") ?? "";
+  if (!apiUrl || !apiKey) {
+    return json(
+      {
+        ok: false,
+        error:
+          "GATEWAY_API_URL and GATEWAY_API_KEY must be configured. Create a viewer-role API key in the gateway UI (Settings → API keys).",
+      },
+      400,
+    );
+  }
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    /* no body — use defaults */
+  }
+  const windowMinutes = clamp(Number(body.window_minutes) || 60, 5, MAX_RANGE_MINUTES);
+  const bucketMinutes = clamp(Number(body.bucket_minutes) || 60, 15, 1440);
+
+  // ── 1. Linked metering points ────────────────────────────────────────────
+  // No user_id filter: the sync is an organisation-level job. Which points
+  // exist is governed by the link (kimi_meter_id), not by who created the row.
+  const { data: mps, error: mpErr } = await admin
+    .from("metering_points")
+    .select("id, edu_code, kimi_meter_id")
+    .not("kimi_meter_id", "is", null);
+  if (mpErr) throw mpErr;
+
+  const points = (mps ?? []) as MeteringPoint[];
+  if (points.length === 0) {
+    return json({ ok: true, synced: 0, message: "No metering points linked to a gateway device." });
+  }
+
+  const to = new Date();
+  const from = new Date(to.getTime() - windowMinutes * 60_000);
+
+  let readingsUpserted = 0;
+  let intervalsUpserted = 0;
+  let estimatedBuckets = 0;
+  const failures: Array<{ edu_code: string; error: string }> = [];
+
+  // Sequential rather than Promise.all: the gateway is a single node and a
+  // 200-device fleet firing concurrently would be a self-inflicted DoS.
+  for (const mp of points) {
+    try {
+      const url =
+        `${apiUrl}/api/v1/devices/${mp.kimi_meter_id}/energy` +
+        `?from=${encodeURIComponent(from.toISOString())}` +
+        `&to=${encodeURIComponent(to.toISOString())}` +
+        `&bucketMin=${bucketMinutes}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        failures.push({
+          edu_code: mp.edu_code,
+          error: `gateway ${res.status}: ${detail.slice(0, 200)}`,
+        });
+        continue;
+      }
+
+      const payload = (await res.json()) as { buckets?: EnergyBucket[] };
+      const buckets = payload.buckets ?? [];
+
+      // ── Interval readings ────────────────────────────────────────────────
+      // Buckets with no samples come back explicitly as null (the endpoint
+      // never omits them) — skip those rather than writing zeros, which would
+      // otherwise read as "confirmed zero consumption" downstream.
+      const intervalRows = buckets
+        .filter((b) => b.importKwh !== null && b.importKwh >= 0)
+        .map((b) => {
+          if (b.quality === "estimated") estimatedBuckets++;
+          return {
+            metering_point_id: mp.id,
+            reading_at: b.ts,
+            actual_mwh: (b.importKwh as number) / 1000,
+            source: "PRIVATE_SMART",
+            is_estimated: b.quality === "estimated",
+            quality: b.quality,
+          };
+        });
+
+      for (let i = 0; i < intervalRows.length; i += CHUNK) {
+        const slice = intervalRows.slice(i, i + CHUNK);
+        const { error } = await admin
+          .from("consumption_readings")
+          .upsert(slice, { onConflict: "metering_point_id,reading_at" });
+        if (error) throw error;
+        intervalsUpserted += slice.length;
+      }
+
+      // ── Cumulative register ──────────────────────────────────────────────
+      // /latest gives the true cumulative counter. Deriving it by summing
+      // buckets would drift, so read it directly.
+      const latestRes = await fetch(`${apiUrl}/api/v1/devices/${mp.kimi_meter_id}/latest`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (latestRes.ok) {
+        const latest = (await latestRes.json()) as {
+          ts: string | null;
+          values?: Record<string, number | null>;
+        };
+        if (latest.ts && latest.values) {
+          const imp = latest.values.energyImportKwh ?? latest.values.energy_import_kwh;
+          const exp = latest.values.energyExportKwh ?? latest.values.energy_export_kwh;
+          if (imp !== undefined && imp !== null) {
+            const { error } = await admin.from("meter_readings").upsert(
+              {
+                metering_point_id: mp.id,
+                reading_at: latest.ts,
+                import_kwh: imp,
+                export_kwh: exp ?? 0,
+                source: "api",
+                validation_status: "pending",
+                created_by: auth.userId, // null for scheduled runs — intended
+                notes: "Auto-synced from VoltTrade Cloud /api/v1 — awaiting VEE",
+              },
+              { onConflict: "metering_point_id,reading_at" },
+            );
+            if (error) throw error;
+            readingsUpserted++;
+          }
+        }
+      }
+    } catch (err) {
+      failures.push({
+        edu_code: mp.edu_code,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const result = {
+    ok: failures.length === 0,
+    caller: auth.kind,
+    devices: points.length,
+    readings_synced: readingsUpserted,
+    intervals_synced: intervalsUpserted,
+    estimated_buckets: estimatedBuckets,
+    window_minutes: windowMinutes,
+    bucket_minutes: bucketMinutes,
+    failures,
+  };
+
+  // Feed /admin/sync-health rather than failing silently at 03:00.
+  await admin
+    .from("external_api_log")
+    .insert({
+      provider: "volttrade-cloud",
+      endpoint: "/api/v1/devices/:id/energy",
+      status: failures.length === 0 ? 200 : 207,
+      detail: result as unknown as Record<string, unknown>,
+    })
+    .then(() => undefined, () => undefined); // never let logging break the sync
+
+  // Partial failure is a 207-shaped condition; return 200 with the detail so
+  // pg_cron does not retry-storm, but surface `ok: false` for the UI.
+  return json(result);
+}));
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(Math.max(n, lo), hi);
 }

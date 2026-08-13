@@ -1,8 +1,29 @@
 // Edge function: pull daily consumption forecasts from InfluxDB Cloud v2
 // and upsert them into public.forecasts.forecast_mwh_external.
 // Mapping: InfluxDB tag `edu_code` → metering_points.edu_code → client_id.
+//
+// ── PHASE 3 STATUS — READ BEFORE TOUCHING ──────────────────────────────────
+//
+// 1. INFLUXDB IS NOT FULLY RETIRED, AND THAT IS CORRECT.
+//    Phase 3 retired InfluxDB for ASSET TELEMETRY (sync-asset-telemetry),
+//    because that data duplicated what the gateway platform already ingests.
+//    THIS function is different: it pulls a third-party forecasting provider's
+//    output. The gateway does not produce forecasts and cannot replace it, so
+//    InfluxDB remains a dependency for this feed alone.
+//
+// 2. P0-3 AUTH — FIXED IN PHASE 4.
+//    Phase 3 deliberately left this broken: it both WROTE `user_id` into
+//    public.forecasts and FILTERED deletes by it, so accepting a service-role
+//    caller (no user id) would have inserted NULL user_ids and run a delete
+//    filtered on NULL — worse than an honest 401.
+//
+//    Phase 4 made that safe. `forecasts.user_id` is now `created_by`
+//    (nullable, defaulted to auth.uid()), ownership moved to
+//    `organization_id`, and the delete is scoped by organization instead of by
+//    person. Scheduled runs work.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.0";
+import { authenticate } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,29 +62,32 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Auth: identify the calling user
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseService = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const userClient = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: authHeader } },
+    // Accepts EITHER a staff JWT or the service-role key (pg_cron).
+    const auth = await authenticate(req, {
+      roles: ["admin", "management", "operations", "trading"],
     });
-    const { data: { user }, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !user) {
-      return new Response(JSON.stringify({ ok: false, error: "Not authenticated" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const admin = auth.admin;
 
-    // Service client for DB writes (RLS bypass) — still scoped by user_id in payloads
-    const admin = createClient(supabaseUrl, supabaseService);
+    // Ownership is the organization, not the caller. A service-role run has no
+    // user, so resolve the org directly rather than through current_org_id().
+    const { data: orgRow, error: orgErr } = await admin
+      .from("organizations")
+      .select("id")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (orgErr) throw orgErr;
+    if (!orgRow) {
+      return new Response(JSON.stringify({ ok: false, error: "No organization configured." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const organizationId = orgRow.id as string;
 
     // 1) Load metering points for this user with their edu_code → client_id mapping
     const { data: mps, error: mpErr } = await admin
       .from("metering_points")
-      .select("edu_code, client_id, clients!inner(user_id)")
-      .eq("clients.user_id", user.id);
+      .select("edu_code, client_id, clients!inner(organization_id)")
+      .eq("clients.organization_id", organizationId);
     if (mpErr) throw mpErr;
     const eduToClient = new Map<string, string>();
     (mps ?? []).forEach((m: any) => { if (m.edu_code) eduToClient.set(String(m.edu_code), m.client_id); });
@@ -116,7 +140,8 @@ from(bucket: "${INFLUX_BUCKET}")
       if (!clientId) continue;
       const date = t.slice(0, 10);
       upserts.push({
-        user_id: user.id,
+        organization_id: organizationId,
+        created_by: auth.userId, // null on scheduled runs — intended
         client_id: clientId,
         forecast_date: date,
         forecast_mwh: 0, // do not override internal forecast on insert
@@ -132,15 +157,17 @@ from(bucket: "${INFLUX_BUCKET}")
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Upsert in chunks — on conflict only touch external columns (keep manual forecast_mwh intact)
-    // We rely on UNIQUE(user_id, client_id, forecast_date). To preserve existing forecast_mwh,
-    // we first fetch existing rows then build update/insert separately.
+    // Upsert in chunks — on conflict only touch external columns (keep manual
+    // forecast_mwh intact). Phase 4 re-keyed the constraint to
+    // UNIQUE(organization_id, client_id, forecast_date): it was
+    // UNIQUE(user_id, ...), which after the created_by rename would have been
+    // nullable and stopped deduplicating scheduled runs entirely.
     const dates = Array.from(new Set(upserts.map(u => u.forecast_date)));
     const clientIds = Array.from(new Set(upserts.map(u => u.client_id)));
     const { data: existing } = await admin
       .from("forecasts")
       .select("id, client_id, forecast_date, forecast_mwh")
-      .eq("user_id", user.id)
+      .eq("organization_id", organizationId)
       .in("client_id", clientIds)
       .in("forecast_date", dates);
     const existIndex = new Map<string, { id: string; forecast_mwh: number }>();

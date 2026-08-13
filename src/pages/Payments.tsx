@@ -37,7 +37,6 @@ export default function Payments() {
 
   const add = async (form: FormData) => {
     const { error } = await supabase.from("payments").insert({
-      user_id: user!.id,
       client_id: String(form.get("client_id")),
       amount_eur: Number(form.get("amount_eur")),
       paid_at: String(form.get("paid_at")),

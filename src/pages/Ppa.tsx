@@ -49,7 +49,6 @@ export default function PpaPage() {
 
   const addPpa = async (form: FormData) => {
     const payload: any = {
-      user_id: user!.id,
       client_id: form.get("client_id"),
       metering_point_id: form.get("metering_point_id") || null,
       ppa_code: form.get("ppa_code"),

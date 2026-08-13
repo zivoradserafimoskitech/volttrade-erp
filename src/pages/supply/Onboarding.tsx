@@ -75,7 +75,6 @@ function Inner() {
 
   const addLead = async (form: FormData) => {
     const { error } = await supabase.from("leads").insert({
-      user_id: user!.id,
       company_name: String(form.get("company_name")),
       contact_name: form.get("contact_name") as string || null,
       contact_email: form.get("contact_email") as string || null,
@@ -140,14 +139,14 @@ function Inner() {
     if (!picked) return;
     if (!confirm("Activate this lead? A customer and supply contract will be created.")) return;
     const { data: client, error: e1 } = await supabase.from("clients").insert({
-      user_id: user!.id, company_name: picked.company_name, contact_name: picked.contact_name,
+      company_name: picked.company_name, contact_name: picked.contact_name,
       contact_email: picked.contact_email, contact_phone: picked.contact_phone, country: picked.country,
     } as any).select().single();
     if (e1 || !client) return toast.error(e1?.message ?? "Failed");
     const accepted = quotes.find(q => q.status === "accepted") ?? quotes[0];
     if (accepted) {
       await supabase.from("supply_contracts").insert({
-        user_id: user!.id, client_id: client.id, tariff_id: accepted.tariff_id,
+        client_id: client.id, tariff_id: accepted.tariff_id,
         contract_number: `SC-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`,
         start_date: new Date().toISOString().slice(0, 10),
         annual_volume_mwh: accepted.annual_volume_mwh, status: "active",

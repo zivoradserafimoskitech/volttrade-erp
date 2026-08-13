@@ -1,0 +1,38 @@
+{
+  "//": [
+    "Phase 4 (audit P0-5) — THE STRICT RATCHET.",
+    "",
+    "tsconfig.json has strictNullChecks:false and noImplicitAny:false, with 361",
+    "`any` usages across src/. In a system that issues tax invoices that means",
+    "the compiler will not tell you a price can be undefined before you multiply",
+    "by it — precisely the class of bug that produces a wrong invoice.",
+    "",
+    "Flipping strict on globally would produce hundreds of errors at once and",
+    "get switched back off within a day. Instead this config enforces FULL",
+    "strict mode on an allowlist, and CI fails if anything on that list",
+    "regresses. The list only ever grows.",
+    "",
+    "To add a file: fix it, add it to `files` below, confirm `npm run",
+    "typecheck:strict` is clean, commit. The base tsconfig still compiles",
+    "everything else, so nothing breaks while the list is short.",
+    "",
+    "Seeded with the money path, because that is where a null bug costs money.",
+    "Both entries verified clean under --strict."
+  ],
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": false,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "files": [
+    "supabase/functions/_shared/money.ts",
+    "supabase/functions/_shared/billing-engine.ts"
+  ]
+}

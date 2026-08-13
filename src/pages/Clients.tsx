@@ -42,7 +42,6 @@ export default function Clients() {
 
   const addClient = async (form: FormData) => {
     const payload: any = {
-      user_id: user!.id,
       company_name: form.get("company_name"),
       tax_id: form.get("tax_id") || null,
       contact_name: form.get("contact_name") || null,

@@ -45,7 +45,6 @@ export default function Tariffs() {
       ...(freeBelowRaw !== null && freeBelowRaw !== '' ? [{ type: 'free_below', label: 'Free when market price ≤ (€/MWh)', unit: '€/MWh', value: Number(freeBelowRaw) }] : []),
     ];
     const { error } = await supabase.from("tariffs").insert({
-      user_id: user!.id,
       code: String(form.get("code")), name: String(form.get("name")),
       model: String(form.get("model")), currency: String(form.get("currency") || 'EUR'),
       valid_from: String(form.get("valid_from")), valid_to: form.get("valid_to") || null,

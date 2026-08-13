@@ -1,0 +1,157 @@
+# CI quality gates for volttrade-erp.
+#
+# The repo previously had NO CI at all: no typecheck, no build gate, no tests.
+# For an application that issues tax invoices that is the single loudest
+# "not production software" signal a technical buyer sees.
+#
+# Gates, in order of how fast they fail:
+#   1. install (bun lockfile is authoritative; npm lockfile kept in sync)
+#   2. lint
+#   3. typecheck  — see the note on strictness below
+#   4. test       — vitest
+#   5. build      — production bundle must actually build
+#   6. audit      — fail on high/critical advisories
+#   7. supabase   — migrations must apply cleanly to an empty database
+#
+# NOTE ON TYPECHECK: tsconfig currently has strictNullChecks:false and
+# noImplicitAny:false, so `tsc` catches far less than it should. Phase 4 turns
+# strict on. Until then this gate still catches structural breakage, and the
+# `strict-preview` job below reports the real error count without failing the
+# build — that number is the Phase 4 burndown.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bunx eslint .
+
+      - name: Typecheck
+        run: bunx tsc -b --pretty false
+
+      # Phase 4 (P0-5): the strict ratchet. Full strict mode on an allowlist
+      # (tsconfig.strict.json). This gate is what stops the list regressing —
+      # without it the allowlist is just a comment.
+      - name: Typecheck (strict allowlist)
+        run: bunx tsc -p tsconfig.strict.json
+
+      - name: Test
+        run: bunx vitest run --reporter=verbose
+
+      - name: Build
+        run: bunx vite build
+
+      - name: Audit (high and critical only)
+        run: bun audit --audit-level=high
+
+  strict-preview:
+    name: Strict-mode burndown (non-blocking)
+    # Reports how many errors remain OUTSIDE the allowlist. This number is the
+    # Phase 4 backlog; it should fall every sprint. Non-blocking by design.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+
+      - name: Count errors under strictNullChecks
+        run: |
+          bunx tsc --noEmit --strictNullChecks --noImplicitAny \
+            --skipLibCheck --jsx react-jsx --target ES2020 --module ESNext \
+            --moduleResolution bundler --baseUrl . --paths '{"@/*":["./src/*"]}' \
+            "src/**/*.ts" "src/**/*.tsx" 2>&1 | tee strict.log || true
+          echo "── Phase 4 burndown ──"
+          echo "Errors under strict mode: $(grep -c 'error TS' strict.log || echo 0)"
+
+  migrations:
+    name: Migrations apply cleanly
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare a Supabase-shaped database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          # Migrations reference auth.uid(), auth.users and the supabase roles.
+          # Stub just enough for them to apply against a bare Postgres.
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+            CREATE SCHEMA IF NOT EXISTS auth;
+            CREATE TABLE IF NOT EXISTS auth.users (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              email text
+            );
+            CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+              LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+            CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
+              LANGUAGE sql STABLE AS $$ SELECT '{}'::jsonb $$;
+            DO $$ BEGIN
+              CREATE ROLE anon NOLOGIN;        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+            DO $$ BEGIN
+              CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+            DO $$ BEGIN
+              CREATE ROLE service_role NOLOGIN;  EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          SQL
+
+      - name: Apply every migration in order
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            echo "── applying $(basename "$f")"
+            psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f "$f"
+          done
+          echo "All migrations applied cleanly."
+
+      - name: Re-apply to prove idempotency
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          # Only the newest migrations are required to be re-runnable; older
+          # Lovable-generated ones are not, so this is reported, not enforced.
+          for f in $(ls supabase/migrations/2026081*.sql 2>/dev/null | sort); do
+            echo "── re-applying $(basename "$f")"
+            psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f "$f"
+          done

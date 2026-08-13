@@ -1,4 +1,16 @@
 // Public lead capture from the Vatra landing page. No auth (verify_jwt=false).
+//
+// P1-13 (audit): this endpoint had no rate limit, no captcha and no IP
+// throttle, and it triggers a confirmation email — a spam relay and a
+// database-flooding vector. It is now throttled per source IP by
+// public.check_lead_throttle(), which keeps its state in the DATABASE so the
+// limit holds across edge-function instances (an in-process counter would be
+// per-instance and trivially bypassed).
+//
+// PRIVACY: only a SALTED SHA-256 of the IP is stored, never the address, so
+// the throttle table is not a visitor log. Set LEAD_THROTTLE_SALT to a random
+// value; without it a global salt is used and the hashes are still not
+// reversible in practice, but a per-deployment salt is better.
 // Writes a lead via service role, then sends a confirmation email. SMS is
 // wired but disabled until an MK SMS provider is configured (SMS_PROVIDER_URL).
 //
@@ -26,6 +38,33 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // ── Rate limit BEFORE any write or email ────────────────────────────
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip")?.trim() ||
+      "unknown";
+    const salt = Deno.env.get("LEAD_THROTTLE_SALT") ?? "volttrade-lead-throttle-v1";
+    const ipHash = Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + ip))),
+    )
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("");
+
+    const { data: throttle, error: throttleErr } = await admin
+      .rpc("check_lead_throttle", { p_ip_hash: ipHash })
+      .maybeSingle();
+    // Fail OPEN on a throttle error: a broken limiter must not take the public
+    // signup form offline. It is logged so the failure is visible.
+    if (throttleErr) {
+      console.error("lead throttle check failed (failing open):", throttleErr.message);
+    } else if (throttle && throttle.allowed === false) {
+      return json({
+        ok: false,
+        error: "Премногу барања. Обидете се повторно подоцна.",
+        retry_after_seconds: throttle.retry_after_seconds,
+      });
+    }
 
     // Basic dedupe: same email or phone still in early stages within 30 days
     if (email || phone) {

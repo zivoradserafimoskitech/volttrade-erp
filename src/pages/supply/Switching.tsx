@@ -40,7 +40,6 @@ function Inner() {
 
   const add = async (form: FormData) => {
     const { error } = await supabase.from("switch_requests").insert({
-      user_id: user!.id,
       edu_code: String(form.get("edu_code")),
       direction: String(form.get("direction")),
       current_supplier: form.get("current_supplier") as string || null,

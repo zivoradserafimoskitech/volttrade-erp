@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc -b",
+    "typecheck:strict": "tsc -p tsconfig.strict.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
