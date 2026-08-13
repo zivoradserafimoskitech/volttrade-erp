@@ -102,6 +102,13 @@ Deno.serve(async (req) => {
     const invoiceIds: string[] | null = Array.isArray(payload?.invoice_ids) && payload.invoice_ids.length
       ? payload.invoice_ids.filter((v: unknown) => typeof v === "string")
       : null;
+    // Operator-chosen sender (must be on the verified domain — validated again
+    // inside send-transactional-email) and optional recipient override for
+    // one-off sends to a different address than the client contact.
+    const fromEmail: string | null = typeof payload?.from_email === "string" && payload.from_email.includes("@")
+      ? payload.from_email.trim() : null;
+    const recipientOverride: string | null = typeof payload?.recipient_email === "string" && payload.recipient_email.includes("@")
+      ? payload.recipient_email.trim() : null;
 
     const today = new Date();
     const todayISO = today.toISOString().slice(0, 10);
@@ -183,12 +190,14 @@ Deno.serve(async (req) => {
 
       // Email delivery — the invoice notice also goes to the client's billing
       // address, so customers without a portal login still get the document.
-      if (client.contact_email) {
+      const mailTo = recipientOverride ?? client.contact_email;
+      if (mailTo) {
         const { data: mailRes, error: mailErr } = await admin.functions.invoke("send-transactional-email", {
           body: {
             templateName: "invoice-notice",
-            recipientEmail: client.contact_email,
-            idempotencyKey: `inv-${kind}-${inv.id}-${kind === "invoice" ? "1" : new Date().toISOString().slice(0, 10)}`,
+            recipientEmail: mailTo,
+            ...(fromEmail ? { fromEmail, replyTo: fromEmail } : {}),
+            idempotencyKey: `inv-${kind}-${inv.id}-${mailTo}-${kind === "invoice" ? "1" : new Date().toISOString().slice(0, 10)}`,
             templateData: {
               kind,
               lang,
@@ -221,7 +230,7 @@ Deno.serve(async (req) => {
         dunning_level: level,
         channel,
         language: lang,
-        recipient: client.contact_email ?? null,
+        recipient: mailTo ?? null,
         status,
         error,
         created_by: uid,
