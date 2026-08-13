@@ -1857,6 +1857,8 @@ export type Database = {
           id: string
           is_prosumer: boolean
           kimi_meter_id: number | null
+          latitude: number | null
+          longitude: number | null
           meter_id: string | null
           metering_category:
             | Database["public"]["Enums"]["metering_category"]
@@ -1864,7 +1866,10 @@ export type Database = {
           notes: string | null
           producer_party_eic: string | null
           prosumer_scheme: Database["public"]["Enums"]["prosumer_scheme"] | null
+          pv_azimuth_deg: number | null
+          pv_calibration: number
           pv_capacity_kw: number | null
+          pv_tilt_deg: number | null
           slp_category: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code: string | null
           status: string
@@ -1892,6 +1897,8 @@ export type Database = {
           id?: string
           is_prosumer?: boolean
           kimi_meter_id?: number | null
+          latitude?: number | null
+          longitude?: number | null
           meter_id?: string | null
           metering_category?:
             | Database["public"]["Enums"]["metering_category"]
@@ -1901,7 +1908,10 @@ export type Database = {
           prosumer_scheme?:
             | Database["public"]["Enums"]["prosumer_scheme"]
             | null
+          pv_azimuth_deg?: number | null
+          pv_calibration?: number
           pv_capacity_kw?: number | null
+          pv_tilt_deg?: number | null
           slp_category?: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code?: string | null
           status?: string
@@ -1929,6 +1939,8 @@ export type Database = {
           id?: string
           is_prosumer?: boolean
           kimi_meter_id?: number | null
+          latitude?: number | null
+          longitude?: number | null
           meter_id?: string | null
           metering_category?:
             | Database["public"]["Enums"]["metering_category"]
@@ -1938,7 +1950,10 @@ export type Database = {
           prosumer_scheme?:
             | Database["public"]["Enums"]["prosumer_scheme"]
             | null
+          pv_azimuth_deg?: number | null
+          pv_calibration?: number
           pv_capacity_kw?: number | null
+          pv_tilt_deg?: number | null
           slp_category?: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code?: string | null
           status?: string
@@ -2465,6 +2480,47 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      pv_forecasts: {
+        Row: {
+          created_at: string
+          forecast_kwh: number
+          ghi_wm2: number | null
+          id: string
+          metering_point_id: string
+          source: string
+          temp_c: number | null
+          ts: string
+        }
+        Insert: {
+          created_at?: string
+          forecast_kwh: number
+          ghi_wm2?: number | null
+          id?: string
+          metering_point_id: string
+          source?: string
+          temp_c?: number | null
+          ts: string
+        }
+        Update: {
+          created_at?: string
+          forecast_kwh?: number
+          ghi_wm2?: number | null
+          id?: string
+          metering_point_id?: string
+          source?: string
+          temp_c?: number | null
+          ts?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pv_forecasts_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       referrals: {
         Row: {
