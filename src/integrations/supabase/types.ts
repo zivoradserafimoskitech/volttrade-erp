@@ -961,6 +961,8 @@ export type Database = {
         Row: {
           default_area_eic: string
           id: boolean
+          opee_eic: string | null
+          ppee_series_id: string
           receiver_eic: string
           receiver_role: string
           sender_eic: string
@@ -970,6 +972,8 @@ export type Database = {
         Insert: {
           default_area_eic?: string
           id?: boolean
+          opee_eic?: string | null
+          ppee_series_id?: string
           receiver_eic?: string
           receiver_role?: string
           sender_eic: string
@@ -979,6 +983,8 @@ export type Database = {
         Update: {
           default_area_eic?: string
           id?: boolean
+          opee_eic?: string | null
+          ppee_series_id?: string
           receiver_eic?: string
           receiver_role?: string
           sender_eic?: string
@@ -2334,6 +2340,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ppee_coefficients: {
+        Row: {
+          coefficient_pct: number
+          created_at: string
+          delivery_date: string
+          hour: number
+          is_final: boolean
+          source: string
+        }
+        Insert: {
+          coefficient_pct: number
+          created_at?: string
+          delivery_date: string
+          hour: number
+          is_final?: boolean
+          source?: string
+        }
+        Update: {
+          coefficient_pct?: number
+          created_at?: string
+          delivery_date?: string
+          hour?: number
+          is_final?: boolean
+          source?: string
+        }
+        Relationships: []
       }
       public_holidays: {
         Row: {
