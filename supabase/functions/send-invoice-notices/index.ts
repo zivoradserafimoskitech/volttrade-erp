@@ -162,6 +162,7 @@ Deno.serve(async (req) => {
       let channel = "portal";
       let status = "sent";
       let error: string | null = null;
+      let emailed = false;
 
       if (client.portal_user_id) {
         const { error: nErr } = await admin.from("notifications").insert({
@@ -178,6 +179,39 @@ Deno.serve(async (req) => {
         channel = "none";
         status = "failed";
         error = "Клиентот нема активна порталска сметка (нема на кого да се достави).";
+      }
+
+      // Email delivery — the invoice notice also goes to the client's billing
+      // address, so customers without a portal login still get the document.
+      if (client.contact_email) {
+        const { data: mailRes, error: mailErr } = await admin.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "invoice-notice",
+            recipientEmail: client.contact_email,
+            idempotencyKey: `inv-${kind}-${inv.id}-${kind === "invoice" ? "1" : new Date().toISOString().slice(0, 10)}`,
+            templateData: {
+              kind,
+              lang,
+              companyName: client.company_name,
+              invoiceNumber: inv.invoice_number,
+              amount,
+              dueDate: dueDate ? new Date(dueDate).toLocaleDateString("mk-MK") : "—",
+              daysOverdue: days,
+              dunningLevel: level || 1,
+              portalUrl: "https://volttrade.app/portal/invoices",
+            },
+          },
+        });
+        if (mailErr) {
+          console.error("invoice email failed", inv.invoice_number, mailErr);
+        } else if ((mailRes as { success?: boolean } | null)?.success) {
+          emailed = true;
+        }
+        if (emailed) {
+          channel = channel === "portal" ? "portal+email" : "email";
+          status = "sent";
+          error = null;
+        }
       }
 
       await admin.from("invoice_dispatches").insert({
