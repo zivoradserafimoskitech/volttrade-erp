@@ -192,7 +192,8 @@ async function previewRun(admin: any, run: any, userId: string | null) {
     const due = new Date(run.period_end);
     due.setDate(due.getDate() + (contract?.payment_terms_days ?? 14));
     return {
-      user_id: userId, // null for automated runs; no longer load-bearing
+      created_by: userId, // null for automated runs; no longer load-bearing
+      organization_id: run.organization_id,
       client_id: inv.client_id,
       billing_run_id: run.id,
       invoice_number: null, // allocated at ISSUE time — see migration §2
