@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
     if (!ROLES.has(role)) return json({ error: "Invalid role" }, 400);
 
     let userId: string | null = null;
+    let emailKind: "invite" | "recovery" | "none" = "none";
 
     const invited = await admin.auth.admin.inviteUserByEmail(email, redirectTo ? { redirectTo } : undefined);
     if (invited.error) {
@@ -43,8 +44,16 @@ Deno.serve(async (req) => {
       const found = list.data.users.find(u => (u.email ?? "").toLowerCase() === email);
       if (!found) return json({ error: invited.error.message }, 500);
       userId = found.id;
+      // Existing account: send a password-reset email so they can (re)gain access.
+      const reset = await admin.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
+      if (reset.error) {
+        console.error("reset email failed", reset.error.message);
+      } else {
+        emailKind = "recovery";
+      }
     } else {
       userId = invited.data.user?.id ?? null;
+      emailKind = "invite";
     }
     if (!userId) return json({ error: "Could not resolve invited user" }, 500);
 
@@ -52,7 +61,7 @@ Deno.serve(async (req) => {
     // Ignore duplicate role conflicts (unique constraint) — that's fine.
     if (rErr && !/duplicate|unique/i.test(rErr.message)) return json({ error: rErr.message }, 500);
 
-    return json({ ok: true, user_id: userId, invited: !invited.error });
+    return json({ ok: true, user_id: userId, invited: !invited.error, email_kind: emailKind });
   } catch (e) {
     return json({ error: String((e as Error).message ?? e) }, 500);
   }
