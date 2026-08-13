@@ -29,14 +29,19 @@ Deno.serve(async (req) => {
   const { data: isAdmin } = await supabaseAdmin_ROLECHECK.rpc("has_role", { _user_id: user.id, _role: "admin" });
   if (!isAdmin) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
 
+  const { data: orgRow } = await supabaseAdmin_ROLECHECK
+    .from("organization_members").select("organization_id").eq("user_id", user.id).limit(1).maybeSingle();
+  const orgId = orgRow?.organization_id;
+  if (!orgId) return new Response(JSON.stringify({ error: "No organization membership" }), { status: 403, headers: corsHeaders });
+
   try {
     // 1) Clients
     const clientPayload = [
-      { user_id: user.id, company_name: "Magyar Acél Zrt.", tax_id: "HU12345678", contact_name: "Kovács Péter", contact_email: "p.kovacs@magyaracel.hu", contact_phone: "+36 1 234 5678", contract_type: "market", margin_eur_mwh: 4.50 },
-      { user_id: user.id, company_name: "Budapest Logistics Kft.", tax_id: "HU23456789", contact_name: "Nagy Éva", contact_email: "eva.nagy@bplog.hu", contact_phone: "+36 1 345 6789", contract_type: "fixed", fixed_price_eur_mwh: 118.50, margin_eur_mwh: 3.80 },
-      { user_id: user.id, company_name: "Danube Chemicals SA", tax_id: "HU34567890", contact_name: "Szabó János", contact_email: "j.szabo@danube-chem.eu", contact_phone: "+36 1 456 7890", contract_type: "market", margin_eur_mwh: 5.20 },
-      { user_id: user.id, company_name: "Pannon Foods Kft.", tax_id: "HU45678901", contact_name: "Tóth Anna", contact_email: "anna.toth@pannonfoods.hu", contact_phone: "+36 1 567 8901", contract_type: "fixed", fixed_price_eur_mwh: 124.00, margin_eur_mwh: 3.20 },
-      { user_id: user.id, company_name: "Visegrád Cement Zrt.", tax_id: "HU56789012", contact_name: "Horváth Béla", contact_email: "b.horvath@vcement.hu", contact_phone: "+36 1 678 9012", contract_type: "market", margin_eur_mwh: 4.00 },
+      { created_by: user.id, organization_id: orgId, company_name: "Magyar Acél Zrt.", tax_id: "HU12345678", contact_name: "Kovács Péter", contact_email: "p.kovacs@magyaracel.hu", contact_phone: "+36 1 234 5678", contract_type: "market", margin_eur_mwh: 4.50 },
+      { created_by: user.id, organization_id: orgId, company_name: "Budapest Logistics Kft.", tax_id: "HU23456789", contact_name: "Nagy Éva", contact_email: "eva.nagy@bplog.hu", contact_phone: "+36 1 345 6789", contract_type: "fixed", fixed_price_eur_mwh: 118.50, margin_eur_mwh: 3.80 },
+      { created_by: user.id, organization_id: orgId, company_name: "Danube Chemicals SA", tax_id: "HU34567890", contact_name: "Szabó János", contact_email: "j.szabo@danube-chem.eu", contact_phone: "+36 1 456 7890", contract_type: "market", margin_eur_mwh: 5.20 },
+      { created_by: user.id, organization_id: orgId, company_name: "Pannon Foods Kft.", tax_id: "HU45678901", contact_name: "Tóth Anna", contact_email: "anna.toth@pannonfoods.hu", contact_phone: "+36 1 567 8901", contract_type: "fixed", fixed_price_eur_mwh: 124.00, margin_eur_mwh: 3.20 },
+      { created_by: user.id, organization_id: orgId, company_name: "Visegrád Cement Zrt.", tax_id: "HU56789012", contact_name: "Horváth Béla", contact_email: "b.horvath@vcement.hu", contact_phone: "+36 1 678 9012", contract_type: "market", margin_eur_mwh: 4.00 },
     ];
     const { data: insertedClients, error: ce } = await supabase.from("clients").insert(clientPayload).select();
     if (ce) throw ce;
@@ -105,8 +110,8 @@ Deno.serve(async (req) => {
     const noms: any[] = [];
     for (let d = 0; d < 5; d++) {
       const date = new Date(now.getTime() - d*24*3600*1000).toISOString().slice(0,10);
-      noms.push({ user_id: user.id, trade_date: date, side: "buy",  counterparty: "HUPX DAM", volume_mwh: 120 + Math.round(Math.random()*60), price_eur_mwh: +(95 + Math.random()*20).toFixed(2), balancing_cost_eur: +(Math.random()*250).toFixed(2) });
-      noms.push({ user_id: user.id, trade_date: date, side: "sell", counterparty: "OTC Bilateral", volume_mwh: 80 + Math.round(Math.random()*60), price_eur_mwh: +(110 + Math.random()*20).toFixed(2), balancing_cost_eur: +(Math.random()*150).toFixed(2) });
+      noms.push({ created_by: user.id, organization_id: orgId, trade_date: date, side: "buy",  counterparty: "HUPX DAM", volume_mwh: 120 + Math.round(Math.random()*60), price_eur_mwh: +(95 + Math.random()*20).toFixed(2), balancing_cost_eur: +(Math.random()*250).toFixed(2) });
+      noms.push({ created_by: user.id, organization_id: orgId, trade_date: date, side: "sell", counterparty: "OTC Bilateral", volume_mwh: 80 + Math.round(Math.random()*60), price_eur_mwh: +(110 + Math.random()*20).toFixed(2), balancing_cost_eur: +(Math.random()*150).toFixed(2) });
     }
     await supabase.from("nominations").insert(noms);
 
