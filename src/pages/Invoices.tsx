@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +33,12 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [lang, setLang] = useState<InvoiceLang | "auto">("auto");
   const [busy, setBusy] = useState<string | null>(null);
+  // Sender address used for outgoing invoice mail. Must be on the verified
+  // volttrade.app domain — anything else is rejected server-side.
+  const [fromEmail, setFromEmail] = useState<string>(
+    () => localStorage.getItem("invoiceFromEmail") || "invoices@volttrade.app",
+  );
+  const [recipientOverride, setRecipientOverride] = useState<string>("");
 
   const load = async () => {
     const { data: cs } = await supabase.from("clients").select("id, company_name, contract_type, fixed_price_eur_mwh, margin_eur_mwh, country_code");
@@ -48,7 +56,13 @@ export default function Invoices() {
     setBusy(busyKey);
     try {
       const { data, error } = await supabase.functions.invoke("send-invoice-notices", {
-        body: { kind, language: lang, invoice_ids: invoiceIds ?? null },
+        body: {
+          kind,
+          language: lang,
+          invoice_ids: invoiceIds ?? null,
+          from_email: fromEmail.trim() || null,
+          recipient_email: recipientOverride.trim() || null,
+        },
       });
       if (error) throw error;
       const res = data as { processed: number; skipped: number; results?: { invoice: string; status: string; detail?: string }[] };
@@ -114,7 +128,24 @@ export default function Invoices() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Send to end customers</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-2">
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 max-w-2xl">
+            <div className="space-y-1.5">
+              <Label htmlFor="fromEmail" className="text-xs">Send from</Label>
+              <Input id="fromEmail" type="email" value={fromEmail}
+                onChange={e => { setFromEmail(e.target.value); localStorage.setItem("invoiceFromEmail", e.target.value); }}
+                placeholder="invoices@volttrade.app" />
+              <p className="text-[11px] text-muted-foreground">Must be an address on volttrade.app.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="toEmail" className="text-xs">Send to (optional override)</Label>
+              <Input id="toEmail" type="email" value={recipientOverride}
+                onChange={e => setRecipientOverride(e.target.value)}
+                placeholder="Leave empty to use the client contact email" />
+              <p className="text-[11px] text-muted-foreground">Applies to every send below while filled in.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
           <Button
             disabled={busy !== null || unsent.length === 0}
             onClick={() => sendNotices("invoice")}
@@ -132,8 +163,9 @@ export default function Invoices() {
             Final notice ({overdue.length})
           </Button>
           <span className="text-xs text-muted-foreground">
-            Notices are delivered by email to the client contact address and in the customer portal (Vatra), in Macedonian, Albanian or English — based on the customer country or the language selected above. New invoices go out automatically every morning; payment reminders run weekly.
+            Nothing is sent automatically — invoices, reminders and final notices go out only when you press a send button here or the send icon on a row. Notices are delivered by email and in the customer portal (Vatra), in Macedonian, Albanian or English — based on the customer country or the language selected above.
           </span>
+          </div>
         </CardContent>
       </Card>
 
