@@ -39,7 +39,7 @@ export default function Dashboard() {
     if (!user) return;
     const [{ count: cc }, { data: edus }, { data: pr }] = await Promise.all([
       supabase.from("clients").select("id", { count: "exact", head: true }),
-      supabase.from("metering_points").select("id, client:clients!inner(user_id)").eq("client.user_id", user.id),
+      supabase.from("metering_points").select("id"),
       supabase.from("market_prices").select("delivery_at, price_eur_mwh").order("delivery_at", { ascending: true }).limit(48),
     ]);
     setClientCount(cc ?? 0);
@@ -49,8 +49,7 @@ export default function Dashboard() {
     // PV aggregation for the selected delivery period (rolling window ending today)
     const { data: pvRows } = await supabase
       .from("metering_points")
-      .select("pv_capacity_kw, has_pv, client:clients!inner(user_id)")
-      .eq("client.user_id", user.id)
+      .select("pv_capacity_kw, has_pv")
       .eq("has_pv", true);
     const totalKwp = (pvRows ?? []).reduce((s: number, r: any) => s + Number(r.pv_capacity_kw ?? 0), 0);
     const days = Number(period);
@@ -89,7 +88,7 @@ export default function Dashboard() {
     setPv({ count: pvRows?.length ?? 0, kwp: totalKwp, daily });
 
     // Get readings for the most recent 24h
-    const { data: meterIds } = await supabase.from("metering_points").select("id, client:clients!inner(user_id)").eq("client.user_id", user.id);
+    const { data: meterIds } = await supabase.from("metering_points").select("id");
     const ids = (meterIds ?? []).map((m: any) => m.id);
     if (ids.length) {
       const { data: rd } = await supabase
