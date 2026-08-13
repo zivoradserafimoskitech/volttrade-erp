@@ -614,6 +614,89 @@ export type Database = {
           },
         ]
       }
+      compliance_obligations: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          description: string | null
+          due_rule: Json
+          id: string
+          legal_ref: string | null
+          recurrence: string
+          responsible_role: Database["public"]["Enums"]["app_role"] | null
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          description?: string | null
+          due_rule: Json
+          id?: string
+          legal_ref?: string | null
+          recurrence: string
+          responsible_role?: Database["public"]["Enums"]["app_role"] | null
+          title: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          description?: string | null
+          due_rule?: Json
+          id?: string
+          legal_ref?: string | null
+          recurrence?: string
+          responsible_role?: Database["public"]["Enums"]["app_role"] | null
+          title?: string
+        }
+        Relationships: []
+      }
+      compliance_tasks: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          due_at: string
+          id: string
+          notes: string | null
+          obligation_id: string
+          period_label: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_at: string
+          id?: string
+          notes?: string | null
+          obligation_id: string
+          period_label: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_at?: string
+          id?: string
+          notes?: string | null
+          obligation_id?: string
+          period_label?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_tasks_obligation_id_fkey"
+            columns: ["obligation_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_obligations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consumer_applications: {
         Row: {
           client_id: string | null
@@ -672,6 +755,7 @@ export type Database = {
           id: string
           is_estimated: boolean
           metering_point_id: string
+          quality: string
           reading_at: string
           settlement_relevant: boolean
           source: Database["public"]["Enums"]["reading_source"]
@@ -683,6 +767,7 @@ export type Database = {
           id?: string
           is_estimated?: boolean
           metering_point_id: string
+          quality?: string
           reading_at: string
           settlement_relevant?: boolean
           source?: Database["public"]["Enums"]["reading_source"]
@@ -694,6 +779,7 @@ export type Database = {
           id?: string
           is_estimated?: boolean
           metering_point_id?: string
+          quality?: string
           reading_at?: string
           settlement_relevant?: boolean
           source?: Database["public"]["Enums"]["reading_source"]
@@ -846,6 +932,27 @@ export type Database = {
         }
         Relationships: []
       }
+      eic_areas: {
+        Row: {
+          country_code: string | null
+          eic: string
+          is_default: boolean
+          name: string
+        }
+        Insert: {
+          country_code?: string | null
+          eic: string
+          is_default?: boolean
+          name: string
+        }
+        Update: {
+          country_code?: string | null
+          eic?: string
+          is_default?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -930,6 +1037,42 @@ export type Database = {
           id?: string
           token?: string
           used_at?: string | null
+        }
+        Relationships: []
+      }
+      ess_settings: {
+        Row: {
+          default_area_eic: string
+          id: boolean
+          opee_eic: string | null
+          ppee_series_id: string
+          receiver_eic: string
+          receiver_role: string
+          sender_eic: string
+          sender_role: string
+          updated_at: string
+        }
+        Insert: {
+          default_area_eic?: string
+          id?: boolean
+          opee_eic?: string | null
+          ppee_series_id?: string
+          receiver_eic?: string
+          receiver_role?: string
+          sender_eic: string
+          sender_role?: string
+          updated_at?: string
+        }
+        Update: {
+          default_area_eic?: string
+          id?: boolean
+          opee_eic?: string | null
+          ppee_series_id?: string
+          receiver_eic?: string
+          receiver_role?: string
+          sender_eic?: string
+          sender_role?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1546,8 +1689,10 @@ export type Database = {
           notes: string | null
           organization_id: string
           owner: string | null
+          pod_code: string | null
           source: string | null
           stage: string
+          tax_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1567,8 +1712,10 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           owner?: string | null
+          pod_code?: string | null
           source?: string | null
           stage?: string
+          tax_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1588,8 +1735,10 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           owner?: string | null
+          pod_code?: string | null
           source?: string | null
           stage?: string
+          tax_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1701,6 +1850,7 @@ export type Database = {
           dso_area: string | null
           dso_meter_id: string | null
           edu_code: string
+          eic_code: string | null
           eic_metering_id: string | null
           has_private_meter: boolean
           has_pv: boolean
@@ -1712,6 +1862,7 @@ export type Database = {
             | Database["public"]["Enums"]["metering_category"]
             | null
           notes: string | null
+          producer_party_eic: string | null
           prosumer_scheme: Database["public"]["Enums"]["prosumer_scheme"] | null
           pv_capacity_kw: number | null
           slp_category: Database["public"]["Enums"]["slp_category"] | null
@@ -1734,6 +1885,7 @@ export type Database = {
           dso_area?: string | null
           dso_meter_id?: string | null
           edu_code: string
+          eic_code?: string | null
           eic_metering_id?: string | null
           has_private_meter?: boolean
           has_pv?: boolean
@@ -1745,6 +1897,7 @@ export type Database = {
             | Database["public"]["Enums"]["metering_category"]
             | null
           notes?: string | null
+          producer_party_eic?: string | null
           prosumer_scheme?:
             | Database["public"]["Enums"]["prosumer_scheme"]
             | null
@@ -1769,6 +1922,7 @@ export type Database = {
           dso_area?: string | null
           dso_meter_id?: string | null
           edu_code?: string
+          eic_code?: string | null
           eic_metering_id?: string | null
           has_private_meter?: boolean
           has_pv?: boolean
@@ -1780,6 +1934,7 @@ export type Database = {
             | Database["public"]["Enums"]["metering_category"]
             | null
           notes?: string | null
+          producer_party_eic?: string | null
           prosumer_scheme?:
             | Database["public"]["Enums"]["prosumer_scheme"]
             | null
@@ -2268,6 +2423,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ppee_coefficients: {
+        Row: {
+          coefficient_pct: number
+          created_at: string
+          delivery_date: string
+          hour: number
+          is_final: boolean
+          source: string
+        }
+        Insert: {
+          coefficient_pct: number
+          created_at?: string
+          delivery_date: string
+          hour: number
+          is_final?: boolean
+          source?: string
+        }
+        Update: {
+          coefficient_pct?: number
+          created_at?: string
+          delivery_date?: string
+          hour?: number
+          is_final?: boolean
+          source?: string
+        }
+        Relationships: []
+      }
+      public_holidays: {
+        Row: {
+          holiday_date: string
+          name: string
+        }
+        Insert: {
+          holiday_date: string
+          name: string
+        }
+        Update: {
+          holiday_date?: string
+          name?: string
+        }
+        Relationships: []
       }
       referrals: {
         Row: {
@@ -3132,17 +3329,24 @@ export type Database = {
       }
       trades: {
         Row: {
+          capacity_agreement_id: string | null
           counterparty_id: string | null
           created_at: string
           created_by: string | null
           delivery_end: string
           delivery_start: string
+          ess_business_type: string | null
+          ess_series_id: string | null
           hub: string | null
           id: string
+          in_area_eic: string | null
           market: string
+          mtu_shape: Json | null
           notes: string | null
           organization_id: string
+          out_area_eic: string | null
           price_eur_mwh: number
+          schedulable: boolean
           side: string
           status: string
           total_value_eur: number | null
@@ -3153,17 +3357,24 @@ export type Database = {
           volume_mwh: number
         }
         Insert: {
+          capacity_agreement_id?: string | null
           counterparty_id?: string | null
           created_at?: string
           created_by?: string | null
           delivery_end: string
           delivery_start: string
+          ess_business_type?: string | null
+          ess_series_id?: string | null
           hub?: string | null
           id?: string
+          in_area_eic?: string | null
           market?: string
+          mtu_shape?: Json | null
           notes?: string | null
           organization_id?: string
+          out_area_eic?: string | null
           price_eur_mwh: number
+          schedulable?: boolean
           side: string
           status?: string
           total_value_eur?: number | null
@@ -3174,17 +3385,24 @@ export type Database = {
           volume_mwh: number
         }
         Update: {
+          capacity_agreement_id?: string | null
           counterparty_id?: string | null
           created_at?: string
           created_by?: string | null
           delivery_end?: string
           delivery_start?: string
+          ess_business_type?: string | null
+          ess_series_id?: string | null
           hub?: string | null
           id?: string
+          in_area_eic?: string | null
           market?: string
+          mtu_shape?: Json | null
           notes?: string | null
           organization_id?: string
+          out_area_eic?: string | null
           price_eur_mwh?: number
+          schedulable?: boolean
           side?: string
           status?: string
           total_value_eur?: number | null
@@ -3304,6 +3522,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      volume_forecasts: {
+        Row: {
+          client_id: string | null
+          consumed_to_date_mwh: number
+          created_at: string
+          forecast_mwh: number
+          id: string
+          method: string
+          month: string
+          scope: string
+          segment: Database["public"]["Enums"]["schedule_leg"] | null
+          slp_category: Database["public"]["Enums"]["slp_category"] | null
+        }
+        Insert: {
+          client_id?: string | null
+          consumed_to_date_mwh?: number
+          created_at?: string
+          forecast_mwh: number
+          id?: string
+          method?: string
+          month: string
+          scope: string
+          segment?: Database["public"]["Enums"]["schedule_leg"] | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
+        }
+        Update: {
+          client_id?: string | null
+          consumed_to_date_mwh?: number
+          created_at?: string
+          forecast_mwh?: number
+          id?: string
+          method?: string
+          month?: string
+          scope?: string
+          segment?: Database["public"]["Enums"]["schedule_leg"] | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volume_forecasts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
