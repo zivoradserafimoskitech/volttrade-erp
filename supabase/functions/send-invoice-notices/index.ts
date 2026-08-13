@@ -78,16 +78,22 @@ Deno.serve(async (req) => {
     const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authed = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
-    const { data: userRes, error: userErr } = await authed.auth.getUser();
-    if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
-    const uid = userRes.user.id;
-
     const admin = createClient(url, service);
-    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", uid);
-    const allowed = ["admin", "management", "billing_officer", "finance"];
-    if (!(roles ?? []).some((r: { role: string }) => allowed.includes(r.role))) {
-      return json({ error: "Forbidden — billing role required" }, 403);
+
+    // Automated runs (pg_cron / server-side schedulers) present the service-role
+    // key; interactive runs present a staff JWT that must carry a billing role.
+    const bearer = authHeader.slice(7).trim();
+    let uid: string | null = null;
+    if (bearer !== service) {
+      const authed = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
+      const { data: userRes, error: userErr } = await authed.auth.getUser();
+      if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
+      uid = userRes.user.id;
+      const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", uid);
+      const allowed = ["admin", "management", "billing_officer", "finance"];
+      if (!(roles ?? []).some((r: { role: string }) => allowed.includes(r.role))) {
+        return json({ error: "Forbidden — billing role required" }, 403);
+      }
     }
 
     const payload = await req.json().catch(() => ({}));
