@@ -1761,6 +1761,7 @@ export type Database = {
           dso_area: string | null
           dso_meter_id: string | null
           edu_code: string
+          eic_code: string | null
           eic_metering_id: string | null
           has_private_meter: boolean
           has_pv: boolean
@@ -1772,6 +1773,7 @@ export type Database = {
             | Database["public"]["Enums"]["metering_category"]
             | null
           notes: string | null
+          producer_party_eic: string | null
           prosumer_scheme: Database["public"]["Enums"]["prosumer_scheme"] | null
           pv_capacity_kw: number | null
           slp_category: Database["public"]["Enums"]["slp_category"] | null
@@ -1794,6 +1796,7 @@ export type Database = {
           dso_area?: string | null
           dso_meter_id?: string | null
           edu_code: string
+          eic_code?: string | null
           eic_metering_id?: string | null
           has_private_meter?: boolean
           has_pv?: boolean
@@ -1805,6 +1808,7 @@ export type Database = {
             | Database["public"]["Enums"]["metering_category"]
             | null
           notes?: string | null
+          producer_party_eic?: string | null
           prosumer_scheme?:
             | Database["public"]["Enums"]["prosumer_scheme"]
             | null
@@ -1829,6 +1833,7 @@ export type Database = {
           dso_area?: string | null
           dso_meter_id?: string | null
           edu_code?: string
+          eic_code?: string | null
           eic_metering_id?: string | null
           has_private_meter?: boolean
           has_pv?: boolean
@@ -1840,6 +1845,7 @@ export type Database = {
             | Database["public"]["Enums"]["metering_category"]
             | null
           notes?: string | null
+          producer_party_eic?: string | null
           prosumer_scheme?:
             | Database["public"]["Enums"]["prosumer_scheme"]
             | null
