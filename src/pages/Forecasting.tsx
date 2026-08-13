@@ -237,7 +237,7 @@ export default function Forecasting() {
         const projected = +(priorActual * (1 + growth / 100)).toFixed(4);
         if (projected <= 0) continue;
         rowsToUpsert.push({
-          user_id: user.id, client_id: cid, forecast_date: d,
+          client_id: cid, forecast_date: d,
           forecast_mwh: projected, method: "seasonal",
         });
       }

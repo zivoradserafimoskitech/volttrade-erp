@@ -66,7 +66,6 @@ export default function Assets() {
   async function saveAsset() {
     if (!user || !assetForm.site_id || !assetForm.asset_code) return;
     const payload: any = {
-      user_id: user.id,
       site_id: assetForm.site_id,
       asset_code: assetForm.asset_code,
       asset_type: assetForm.asset_type,

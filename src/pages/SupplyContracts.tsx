@@ -41,7 +41,6 @@ export default function SupplyContracts() {
 
   const add = async (form: FormData) => {
     const { data: created, error } = await supabase.from("supply_contracts").insert({
-      user_id: user!.id,
       contract_number: String(form.get("contract_number")),
       client_id: String(form.get("client_id")),
       tariff_id: form.get("tariff_id") || null,

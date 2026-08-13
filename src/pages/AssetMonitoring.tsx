@@ -98,7 +98,8 @@ export default function AssetMonitoring() {
   async function saveDispatch() {
     if (!user || !selectedId) return;
     const { error } = await supabase.from("asset_dispatch_schedules").insert({
-      user_id: user.id, asset_id: selectedId,
+      user_id: user.id,
+      asset_id: selectedId,
       ts_from: new Date(dispatchForm.ts_from).toISOString(),
       ts_to: new Date(dispatchForm.ts_to).toISOString(),
       setpoint_kw: Number(dispatchForm.setpoint_kw),

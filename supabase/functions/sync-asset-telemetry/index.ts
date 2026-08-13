@@ -1,183 +1,201 @@
-// Pulls BESS / PV telemetry from InfluxDB Cloud v2 and upserts into
-// public.asset_telemetry (history) + public.asset_telemetry_latest (live cache).
-// Mapping: Influx tag `asset_code` -> public.assets.external_ref (or asset_code).
+// Asset telemetry sync — BESS / PV / inverter.
+//
+// ── PHASE 3: INFLUXDB RETIRED (audit §5) ────────────────────────────────────
+//
+// This function used to query a SEPARATE InfluxDB instance. That meant the
+// same physical battery was monitored twice — once by the gateway platform
+// (which already ingests BESS and inverter telemetry via SunSpec profiles over
+// MQTT/Modbus) and once by an independent Influx pipeline — with two schemas,
+// two credentials, no reconciliation, and a standing "which number is right?"
+// question.
+//
+// It now reads the gateway's own store through
+//   GET /api/v1/devices/:id/telemetry?keys=...
+// which was added in Phase 3 precisely because /latest and /energy could not
+// serve a state-of-charge trend.
+//
+// Mapping: assets.gateway_device_id -> gateway device id.
+// (`assets.external_ref` was the InfluxDB tag and is now unused for this path.)
+//
+// Auth: service-role (pg_cron) or staff JWT — see _shared/auth.ts. The old
+// version had the same auth bug as sync-kimi-meters, so its scheduled runs had
+// been returning 401 too.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.0";
+import { authenticate, handler, json } from "../_shared/auth.ts";
+import { GatewayClient, GatewayError } from "../_shared/gateway-client.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+// Canonical gateway metric keys (contracts/devices.ts) mapped onto the ERP's
+// asset_telemetry columns. Requested per device type so we do not ask a PV
+// inverter for state of charge.
+const KEYS_BY_TYPE: Record<string, string[]> = {
+  bess: [
+    "socPercent",
+    "sohPercent",
+    "batteryPowerKw",
+    "dischargeEnergyTotalKwh",
+    "chargeEnergyTotalKwh",
+    "cellTempMaxC",
+    "bmsStatusCode",
+    "faultCode",
+  ],
+  inverter: ["activePowerKw", "energyTotalKwh", "energyTodayKwh", "statusCode", "faultCode"],
+  meter: ["activePowerKw", "energyImportKwh", "energyExportKwh"],
+  weather: ["irradianceWm2", "ambientTempC"],
 };
 
-function csvParse(text: string): Record<string, string>[] {
-  const lines = text.split(/\r?\n/).filter(l => l.length > 0 && !l.startsWith("#"));
-  if (lines.length < 2) return [];
-  const header = lines[0].split(",");
-  return lines.slice(1).map(line => {
-    const cols = line.split(",");
-    const row: Record<string, string> = {};
-    header.forEach((h, i) => (row[h] = cols[i] ?? ""));
-    return row;
-  });
+interface AssetRow {
+  id: string;
+  asset_code: string;
+  asset_type: string;
+  gateway_device_id: number | null;
+  user_id: string | null;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+Deno.serve(handler(async (req) => {
+  const auth = await authenticate(req, {
+    roles: ["admin", "management", "operations", "trading"],
+  });
+  const admin = auth.admin;
 
+  let gw: GatewayClient;
   try {
-    const INFLUX_URL = Deno.env.get("INFLUX_URL");
-    const INFLUX_ORG = Deno.env.get("INFLUX_ORG");
-    const INFLUX_BUCKET = Deno.env.get("INFLUX_ASSETS_BUCKET") ?? Deno.env.get("INFLUX_BUCKET");
-    const INFLUX_TOKEN = Deno.env.get("INFLUX_TOKEN");
-    const INFLUX_MEASUREMENT = Deno.env.get("INFLUX_ASSET_MEASUREMENT") ?? "asset_telemetry";
-
-    if (!INFLUX_URL || !INFLUX_ORG || !INFLUX_BUCKET || !INFLUX_TOKEN) {
-      return new Response(JSON.stringify({
-        ok: false,
-        error: "InfluxDB not configured. Add INFLUX_URL, INFLUX_ORG, INFLUX_BUCKET (or INFLUX_ASSETS_BUCKET), INFLUX_TOKEN.",
-      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseService = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const userClient = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !user) {
-      return new Response(JSON.stringify({ ok: false, error: "Not authenticated" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const admin = createClient(supabaseUrl, supabaseService);
-
-    let body: any = {};
-    try { body = await req.json(); } catch { /* no body */ }
-    const windowMinutes = Math.min(Math.max(Number(body.window_minutes) || 60, 5), 60 * 24 * 7);
-
-    // 1) Load assets for this user
-    const { data: assets, error: aErr } = await admin
-      .from("assets")
-      .select("id, asset_code, external_ref, asset_type")
-      .eq("user_id", user.id);
-    if (aErr) throw aErr;
-    const refToAsset = new Map<string, { id: string; type: string }>();
-    (assets ?? []).forEach((a: any) => {
-      const ref = (a.external_ref || a.asset_code || "").toString();
-      if (ref) refToAsset.set(ref, { id: a.id, type: a.asset_type });
-    });
-    const refs = Array.from(refToAsset.keys());
-    if (refs.length === 0) {
-      return new Response(JSON.stringify({ ok: true, synced: 0, message: "No assets configured." }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // 2) Flux query — last N minutes, pivot fields per asset_code, 1 minute aggregate
-    const refFilter = refs.map(c => `r.asset_code == "${c.replace(/"/g, "")}"`).join(" or ");
-    const flux = `
-from(bucket: "${INFLUX_BUCKET}")
-  |> range(start: -${windowMinutes}m)
-  |> filter(fn: (r) => r._measurement == "${INFLUX_MEASUREMENT}")
-  |> filter(fn: (r) => ${refFilter})
-  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)
-  |> pivot(rowKey:["_time","asset_code"], columnKey: ["_field"], valueColumn: "_value")
-`;
-
-    const url = `${INFLUX_URL.replace(/\/$/, "")}/api/v2/query?org=${encodeURIComponent(INFLUX_ORG)}`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${INFLUX_TOKEN}`,
-        "Content-Type": "application/vnd.flux",
-        Accept: "application/csv",
-      },
-      body: flux,
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      return new Response(JSON.stringify({ ok: false, error: `Influx query failed [${resp.status}]: ${text.slice(0, 500)}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const rows = csvParse(await resp.text());
-
-    const num = (v: string) => {
-      const n = Number(v); return isFinite(n) ? n : null;
-    };
-
-    const history: any[] = [];
-    const latestByAsset = new Map<string, any>();
-
-    for (const row of rows) {
-      const ref = row["asset_code"];
-      const t = row["_time"];
-      if (!ref || !t) continue;
-      const a = refToAsset.get(ref);
-      if (!a) continue;
-      const rec = {
-        user_id: user.id,
-        asset_id: a.id,
-        ts: t,
-        power_kw: num(row["power_kw"] ?? ""),
-        soc_pct: num(row["soc_pct"] ?? ""),
-        energy_kwh: num(row["energy_kwh"] ?? ""),
-        pv_generation_kwh: num(row["pv_generation_kwh"] ?? ""),
-        pv_irradiance_w_m2: num(row["pv_irradiance_w_m2"] ?? ""),
-        grid_kw: num(row["grid_kw"] ?? ""),
-        load_kw: num(row["load_kw"] ?? ""),
-        status: row["status"] || null,
-        alarm_code: row["alarm_code"] || null,
-        source: "influxdb",
-      };
-      history.push(rec);
-      const prev = latestByAsset.get(a.id);
-      if (!prev || new Date(rec.ts) > new Date(prev.ts)) latestByAsset.set(a.id, rec);
-    }
-
-    if (history.length === 0) {
-      return new Response(JSON.stringify({ ok: true, synced: 0, message: "Influx returned no rows." }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // 3) Upsert history (chunked) on conflict (asset_id, ts)
-    const chunkSize = 500;
-    for (let i = 0; i < history.length; i += chunkSize) {
-      const slice = history.slice(i, i + chunkSize);
-      const { error } = await admin
-        .from("asset_telemetry")
-        .upsert(slice, { onConflict: "asset_id,ts" });
-      if (error) throw error;
-    }
-
-    // 4) Upsert latest snapshot
-    const latestRows = Array.from(latestByAsset.values()).map(r => ({
-      asset_id: r.asset_id,
-      user_id: r.user_id,
-      ts: r.ts,
-      power_kw: r.power_kw,
-      soc_pct: r.soc_pct,
-      pv_generation_kwh: r.pv_generation_kwh,
-      grid_kw: r.grid_kw,
-      load_kw: r.load_kw,
-      status: r.status,
-      alarm_code: r.alarm_code,
-      updated_at: new Date().toISOString(),
-    }));
-    if (latestRows.length > 0) {
-      const { error } = await admin
-        .from("asset_telemetry_latest")
-        .upsert(latestRows, { onConflict: "asset_id" });
-      if (error) throw error;
-    }
-
-    return new Response(JSON.stringify({
-      ok: true, synced: history.length, assets: latestRows.length, window_minutes: windowMinutes,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (err: any) {
-    console.error("sync-asset-telemetry error:", err);
-    return new Response(JSON.stringify({ ok: false, error: err?.message ?? "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    gw = GatewayClient.reader();
+  } catch (err) {
+    return json({ ok: false, error: err instanceof GatewayError ? err.message : String(err) }, 500);
   }
-});
+
+  const body = await req.json().catch(() => ({}));
+  const windowMinutes = clamp(Number(body.window_minutes) || 120, 15, 44_640);
+  const bucketMinutes = clamp(Number(body.bucket_minutes) || 15, 1, 1440);
+
+  const { data: assetsRaw, error: aErr } = await admin
+    .from("assets")
+    .select("id, asset_code, asset_type, gateway_device_id, user_id")
+    .not("gateway_device_id", "is", null)
+    .eq("status", "active");
+  if (aErr) throw aErr;
+  const assets = (assetsRaw ?? []) as AssetRow[];
+
+  if (assets.length === 0) {
+    return json({
+      ok: true,
+      synced: 0,
+      message:
+        "No active assets linked to a gateway device. Set assets.gateway_device_id " +
+        "(Assets → edit → Gateway device).",
+    });
+  }
+
+  const to = new Date();
+  const from = new Date(to.getTime() - windowMinutes * 60_000);
+
+  let rowsUpserted = 0;
+  let latestUpdated = 0;
+  const failures: Array<{ asset_code: string; error: string }> = [];
+
+  for (const asset of assets) {
+    try {
+      const keys = KEYS_BY_TYPE[asset.asset_type] ?? KEYS_BY_TYPE.meter;
+      const buckets = await gw.telemetry(asset.gateway_device_id!, from, to, keys, bucketMinutes);
+
+      // Empty buckets come back explicitly with null values — skip rather than
+      // writing zeros, which downstream would read as a confirmed measurement.
+      const rows = buckets
+        .filter((b) => b.samples > 0)
+        .map((b) => {
+          const v = b.values;
+          const isBess = asset.asset_type === "bess";
+          return {
+            user_id: asset.user_id,
+            asset_id: asset.id,
+            ts: b.ts,
+            // Signed power: + discharge/generation, - charge/consumption.
+            // Matches the gateway's batteryPowerKw convention exactly.
+            power_kw: isBess ? v.batteryPowerKw ?? null : v.activePowerKw ?? null,
+            soc_pct: v.socPercent ?? null,
+            energy_kwh: isBess ? v.dischargeEnergyTotalKwh ?? null : v.energyTotalKwh ?? null,
+            pv_generation_kwh: asset.asset_type === "inverter" ? v.energyTodayKwh ?? null : null,
+            pv_irradiance_w_m2: v.irradianceWm2 ?? null,
+            status: statusOf(v),
+            alarm_code: v.faultCode != null && v.faultCode !== 0 ? String(v.faultCode) : null,
+            source: "volttrade-cloud",
+          };
+        });
+
+      for (let i = 0; i < rows.length; i += 500) {
+        const slice = rows.slice(i, i + 500);
+        const { error } = await admin
+          .from("asset_telemetry")
+          .upsert(slice, { onConflict: "asset_id,ts" });
+        if (error) throw error;
+        rowsUpserted += slice.length;
+      }
+
+      // Latest snapshot from /latest — the true instantaneous value rather
+      // than the mean of the final bucket.
+      const latest = await gw.latest(asset.gateway_device_id!);
+      if (latest.ts && latest.values) {
+        const v = latest.values as Record<string, number>;
+        const isBess = asset.asset_type === "bess";
+        const { error } = await admin.from("asset_telemetry_latest").upsert(
+          {
+            asset_id: asset.id,
+            user_id: asset.user_id,
+            ts: latest.ts,
+            power_kw: isBess ? v.batteryPowerKw ?? null : v.activePowerKw ?? null,
+            soc_pct: v.socPercent ?? null,
+            pv_generation_kwh: v.energyTodayKwh ?? null,
+            grid_kw: v.activePowerKw ?? null,
+            load_kw: null,
+            status: statusOf(v),
+            alarm_code: v.faultCode != null && v.faultCode !== 0 ? String(v.faultCode) : null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "asset_id" },
+        );
+        if (error) throw error;
+        latestUpdated++;
+      }
+    } catch (err) {
+      failures.push({
+        asset_code: asset.asset_code,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const out = {
+    ok: failures.length === 0,
+    caller: auth.kind,
+    source: "volttrade-cloud",
+    assets: assets.length,
+    rows_synced: rowsUpserted,
+    latest_updated: latestUpdated,
+    window_minutes: windowMinutes,
+    bucket_minutes: bucketMinutes,
+    failures,
+  };
+
+  await admin
+    .from("external_api_log")
+    .insert({
+      provider: "volttrade-cloud",
+      endpoint: "/api/v1/devices/:id/telemetry",
+      status: failures.length === 0 ? 200 : 207,
+      detail: out as unknown as Record<string, unknown>,
+    })
+    .then(() => undefined, () => undefined);
+
+  return json(out);
+}));
+
+function statusOf(v: Record<string, number | null>): string | null {
+  if (v.faultCode != null && v.faultCode !== 0) return "fault";
+  if (v.bmsStatusCode != null) return `bms:${v.bmsStatusCode}`;
+  if (v.statusCode != null) return `inv:${v.statusCode}`;
+  return null;
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(Math.max(n, lo), hi);
+}

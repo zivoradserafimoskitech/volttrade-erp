@@ -51,7 +51,6 @@ export default function Schedules() {
 
   const add = async (form: FormData) => {
     const { data, error } = await supabase.from("schedules").insert({
-      user_id: user!.id,
       schedule_number: String(form.get("schedule_number")),
       tso_area: String(form.get("tso_area")),
       delivery_date: String(form.get("delivery_date")),
