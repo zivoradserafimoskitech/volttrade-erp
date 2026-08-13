@@ -614,6 +614,89 @@ export type Database = {
           },
         ]
       }
+      compliance_obligations: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          description: string | null
+          due_rule: Json
+          id: string
+          legal_ref: string | null
+          recurrence: string
+          responsible_role: Database["public"]["Enums"]["app_role"] | null
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          description?: string | null
+          due_rule: Json
+          id?: string
+          legal_ref?: string | null
+          recurrence: string
+          responsible_role?: Database["public"]["Enums"]["app_role"] | null
+          title: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          description?: string | null
+          due_rule?: Json
+          id?: string
+          legal_ref?: string | null
+          recurrence?: string
+          responsible_role?: Database["public"]["Enums"]["app_role"] | null
+          title?: string
+        }
+        Relationships: []
+      }
+      compliance_tasks: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          due_at: string
+          id: string
+          notes: string | null
+          obligation_id: string
+          period_label: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_at: string
+          id?: string
+          notes?: string | null
+          obligation_id: string
+          period_label: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_at?: string
+          id?: string
+          notes?: string | null
+          obligation_id?: string
+          period_label?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_tasks_obligation_id_fkey"
+            columns: ["obligation_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_obligations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consumer_applications: {
         Row: {
           client_id: string | null
