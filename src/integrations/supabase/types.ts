@@ -672,6 +672,7 @@ export type Database = {
           id: string
           is_estimated: boolean
           metering_point_id: string
+          quality: string
           reading_at: string
           settlement_relevant: boolean
           source: Database["public"]["Enums"]["reading_source"]
@@ -683,6 +684,7 @@ export type Database = {
           id?: string
           is_estimated?: boolean
           metering_point_id: string
+          quality?: string
           reading_at: string
           settlement_relevant?: boolean
           source?: Database["public"]["Enums"]["reading_source"]
@@ -694,6 +696,7 @@ export type Database = {
           id?: string
           is_estimated?: boolean
           metering_point_id?: string
+          quality?: string
           reading_at?: string
           settlement_relevant?: boolean
           source?: Database["public"]["Enums"]["reading_source"]
