@@ -361,6 +361,47 @@ export type Database = {
           },
         ]
       }
+      billing_run_inputs: {
+        Row: {
+          billing_run_id: string
+          created_at: string
+          engine_version: string
+          id: string
+          input_hash: string
+          input_snapshot: Json
+          output_snapshot: Json
+          warnings: Json
+        }
+        Insert: {
+          billing_run_id: string
+          created_at?: string
+          engine_version: string
+          id?: string
+          input_hash: string
+          input_snapshot: Json
+          output_snapshot: Json
+          warnings?: Json
+        }
+        Update: {
+          billing_run_id?: string
+          created_at?: string
+          engine_version?: string
+          id?: string
+          input_hash?: string
+          input_snapshot?: Json
+          output_snapshot?: Json
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_run_inputs_billing_run_id_fkey"
+            columns: ["billing_run_id"]
+            isOneToOne: false
+            referencedRelation: "billing_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_runs: {
         Row: {
           created_at: string
@@ -1043,6 +1084,27 @@ export type Database = {
           },
         ]
       }
+      invoice_number_counters: {
+        Row: {
+          fiscal_year: number
+          last_number: number
+          prefix: string
+          updated_at: string
+        }
+        Insert: {
+          fiscal_year: number
+          last_number?: number
+          prefix?: string
+          updated_at?: string
+        }
+        Update: {
+          fiscal_year?: number
+          last_number?: number
+          prefix?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           billing_run_id: string | null
@@ -1055,7 +1117,8 @@ export type Database = {
           dunning_level: number
           energy_amount_eur: number
           id: string
-          invoice_number: string
+          invoice_number: string | null
+          issued_at: string | null
           last_dunning_at: string | null
           last_reminder_at: string | null
           margin_amount_eur: number
@@ -1083,7 +1146,8 @@ export type Database = {
           dunning_level?: number
           energy_amount_eur?: number
           id?: string
-          invoice_number: string
+          invoice_number?: string | null
+          issued_at?: string | null
           last_dunning_at?: string | null
           last_reminder_at?: string | null
           margin_amount_eur?: number
@@ -1111,7 +1175,8 @@ export type Database = {
           dunning_level?: number
           energy_amount_eur?: number
           id?: string
-          invoice_number?: string
+          invoice_number?: string | null
+          issued_at?: string | null
           last_dunning_at?: string | null
           last_reminder_at?: string | null
           margin_amount_eur?: number
@@ -1940,6 +2005,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      regulatory_charges: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          label: string
+          unit: string
+          valid_from: string
+          valid_to: string | null
+          value: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          label: string
+          unit: string
+          valid_from: string
+          valid_to?: string | null
+          value: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          label?: string
+          unit?: string
+          valid_from?: string
+          valid_to?: string | null
+          value?: number
+        }
+        Relationships: []
       }
       rewards_ledger: {
         Row: {
@@ -2827,6 +2925,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      allocate_invoice_number: {
+        Args: { p_fiscal_year: number }
+        Returns: string
+      }
       current_portal_client_id: { Args: never; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -2851,6 +2953,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_staff: { Args: never; Returns: boolean }
+      issue_billing_run: {
+        Args: { p_run_id: string }
+        Returns: {
+          invoice_id: string
+          invoice_number: string
+        }[]
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -2860,6 +2970,7 @@ export type Database = {
         }
         Returns: number
       }
+      next_invoice_number: { Args: never; Returns: string }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -2867,6 +2978,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      regulatory_value_for: {
+        Args: { p_code: string; p_period_start: string }
+        Returns: number
       }
     }
     Enums: {
