@@ -42,10 +42,8 @@ export default function Counterparties() {
   useEffect(() => { load(); }, [user]);
 
   const add = async (form: FormData) => {
-    let uid: string;
-    try { uid = await requireUid(); } catch (e: any) { return toast.error(e.message); }
+    try { await requireUid(); } catch (e: any) { return toast.error(e.message); }
     const { error } = await supabase.from("counterparties").insert({
-      user_id: uid,
       legal_name: String(form.get("legal_name")),
       short_name: form.get("short_name") || null,
       country_code: form.get("country_code") || null,

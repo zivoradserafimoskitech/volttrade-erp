@@ -49,7 +49,6 @@ export default function Assets() {
   async function saveSite() {
     if (!user || !siteForm.name) return;
     const payload = {
-      user_id: user.id,
       name: siteForm.name,
       address: siteForm.address || null,
       country: siteForm.country || null,

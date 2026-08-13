@@ -216,7 +216,7 @@ export default function Forecasting() {
       if (error) toast.error(error.message);
     } else {
       const { error } = await supabase.from("forecasts").insert({
-        user_id: user.id, client_id: clientId, forecast_date: date, forecast_mwh: value, method,
+        client_id: clientId, forecast_date: date, forecast_mwh: value, method,
       });
       if (error) toast.error(error.message);
     }
