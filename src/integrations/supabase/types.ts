@@ -2272,6 +2272,21 @@ export type Database = {
           },
         ]
       }
+      public_holidays: {
+        Row: {
+          holiday_date: string
+          name: string
+        }
+        Insert: {
+          holiday_date: string
+          name: string
+        }
+        Update: {
+          holiday_date?: string
+          name?: string
+        }
+        Relationships: []
+      }
       referrals: {
         Row: {
           code: string
@@ -3307,6 +3322,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      volume_forecasts: {
+        Row: {
+          client_id: string | null
+          consumed_to_date_mwh: number
+          created_at: string
+          forecast_mwh: number
+          id: string
+          method: string
+          month: string
+          scope: string
+          segment: Database["public"]["Enums"]["schedule_leg"] | null
+          slp_category: Database["public"]["Enums"]["slp_category"] | null
+        }
+        Insert: {
+          client_id?: string | null
+          consumed_to_date_mwh?: number
+          created_at?: string
+          forecast_mwh: number
+          id?: string
+          method?: string
+          month: string
+          scope: string
+          segment?: Database["public"]["Enums"]["schedule_leg"] | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
+        }
+        Update: {
+          client_id?: string | null
+          consumed_to_date_mwh?: number
+          created_at?: string
+          forecast_mwh?: number
+          id?: string
+          method?: string
+          month?: string
+          scope?: string
+          segment?: Database["public"]["Enums"]["schedule_leg"] | null
+          slp_category?: Database["public"]["Enums"]["slp_category"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volume_forecasts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
