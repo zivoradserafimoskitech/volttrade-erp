@@ -48,7 +48,10 @@ export default function UsersAdmin() {
     });
     setInviting(false);
     if (error || (data as any)?.error) return toast.error((data as any)?.error ?? error?.message ?? "Invite failed");
-    toast.success(`Invited ${inviteEmail} as ${inviteRole}`);
+    const kind = (data as any)?.email_kind;
+    if (kind === "recovery") toast.success(`${inviteEmail} already had an account — role set to ${inviteRole} and a password-reset email was sent.`);
+    else if (kind === "invite") toast.success(`Invited ${inviteEmail} as ${inviteRole}`);
+    else toast.warning(`Role ${inviteRole} assigned to ${inviteEmail}, but no email could be sent.`);
     setInviteEmail(""); load(); refreshRoles();
   };
   const openReset = (uid: string) => { setResetUserId(uid); setResetOpen(true); };
