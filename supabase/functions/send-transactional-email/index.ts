@@ -55,6 +55,8 @@ Deno.serve(async (req) => {
   let idempotencyKey: string
   let messageId: string
   let templateData: Record<string, any> = {}
+  let fromEmail: string | null = null
+  let replyTo: string | null = null
   try {
     const body = await req.json()
     templateName = body.templateName || body.template_name
@@ -64,6 +66,15 @@ Deno.serve(async (req) => {
     if (body.templateData && typeof body.templateData === 'object') {
       templateData = body.templateData
     }
+    const rawFrom = (body.fromEmail || body.from_email || '').toString().trim().toLowerCase()
+    // Only addresses on the verified domain may be used as the From: header —
+    // anything else would fail SPF/DKIM and damage sender reputation.
+    if (rawFrom && /^[a-z0-9._%+-]+@[a-z0-9.-]+$/.test(rawFrom)) {
+      const domain = rawFrom.split('@')[1]
+      if (domain === FROM_DOMAIN || domain === SENDER_DOMAIN) fromEmail = rawFrom
+    }
+    const rawReply = (body.replyTo || body.reply_to || '').toString().trim()
+    if (rawReply && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rawReply)) replyTo = rawReply
   } catch {
     return new Response(
       JSON.stringify({ error: 'Invalid JSON in request body' }),
