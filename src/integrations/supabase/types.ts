@@ -1782,6 +1782,44 @@ export type Database = {
         }
         Relationships: []
       }
+      meter_load_profiles: {
+        Row: {
+          day_type: string
+          hour: number
+          metering_point_id: string
+          sample_days: number
+          season: string
+          share: number
+          updated_at: string
+        }
+        Insert: {
+          day_type: string
+          hour: number
+          metering_point_id: string
+          sample_days: number
+          season: string
+          share: number
+          updated_at?: string
+        }
+        Update: {
+          day_type?: string
+          hour?: number
+          metering_point_id?: string
+          sample_days?: number
+          season?: string
+          share?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meter_load_profiles_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meter_readings: {
         Row: {
           created_at: string
