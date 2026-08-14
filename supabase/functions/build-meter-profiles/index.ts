@@ -12,7 +12,6 @@
 //   6. store with sample_days = number of days in that bucket
 //
 // Zero meters with a curve is a valid, expected result at the start.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.0";
 import { authenticate, handler, json } from "../_shared/auth.ts";
 import { seasonOf, dayTypeOf } from "../_shared/calendar.ts";
 
