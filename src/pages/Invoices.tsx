@@ -207,11 +207,15 @@ export default function Invoices() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" title="Send invoice" disabled={busy !== null}
+                      <Button size="icon" variant="ghost"
+                        title={inv.status === "draft" ? "Draft — issue the billing run to allocate an invoice number" : "Send invoice"}
+                        disabled={busy !== null || inv.status === "draft"}
                         onClick={() => sendNotices("invoice", [inv.id], `inv-${inv.id}`)}><Send className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" title="Payment reminder" disabled={busy !== null}
+                      <Button size="icon" variant="ghost" title="Payment reminder"
+                        disabled={busy !== null || inv.status === "draft"}
                         onClick={() => sendNotices("reminder", [inv.id], `rem-${inv.id}`)}><BellRing className="h-4 w-4 text-amber-500" /></Button>
-                      <Button size="icon" variant="ghost" title="Final notice" disabled={busy !== null}
+                      <Button size="icon" variant="ghost" title="Final notice"
+                        disabled={busy !== null || inv.status === "draft"}
                         onClick={() => sendNotices("dunning", [inv.id], `dun-${inv.id}`)}><AlertTriangle className="h-4 w-4 text-destructive" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => exportPdf(inv)}><FileDown className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={async () => { await supabase.from("invoices").delete().eq("id", inv.id); load(); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>

@@ -153,6 +153,20 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Drafts have no allocated invoice_number yet (numbers are issued by
+      // issue_billing_run). Sending one would deliver a notice with a blank
+      // number and the follow-up status update would violate the
+      // invoices_number_when_issued constraint, so refuse up front.
+      if (inv.status === "draft" || !inv.invoice_number) {
+        skipped++;
+        results.push({
+          invoice: inv.invoice_number ?? inv.id,
+          status: "skipped",
+          detail: "Invoice is still a draft — issue the billing run first to allocate an invoice number.",
+        });
+        continue;
+      }
+
       const lang = langFor(client.country_code, langOverride);
       const dueDate = inv.due_date ?? inv.period_end;
       const days = dueDate ? Math.max(0, Math.floor((today.getTime() - new Date(dueDate).getTime()) / 86400000)) : 0;
@@ -242,7 +256,6 @@ Deno.serve(async (req) => {
         if (kind === "invoice") {
           patch.sent_at = inv.sent_at ?? nowISO;
           patch.sent_count = 1 + Number((inv as { sent_count?: number }).sent_count ?? 0);
-          if (inv.status === "draft") patch.status = "issued";
         } else if (kind === "reminder") {
           patch.last_reminder_at = nowISO;
           patch.reminder_count = Number(inv.reminder_count ?? 0) + 1;
@@ -250,7 +263,13 @@ Deno.serve(async (req) => {
           patch.last_dunning_at = nowISO;
           patch.dunning_level = level;
         }
-        await admin.from("invoices").update(patch).eq("id", inv.id);
+        const { error: updErr } = await admin.from("invoices").update(patch).eq("id", inv.id);
+        if (updErr) {
+          console.error("invoice send bookkeeping failed", inv.invoice_number, updErr);
+          skipped++;
+          results.push({ invoice: inv.invoice_number, status: "failed", detail: `delivered but not recorded: ${updErr.message}` });
+          continue;
+        }
         processed++;
         results.push({ invoice: inv.invoice_number, status: "sent" });
       } else {
