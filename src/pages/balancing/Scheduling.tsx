@@ -495,6 +495,40 @@ export default function Scheduling() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle>Measured leg — shaping method per metering point</CardTitle>
+          <CardDescription>
+            Own curve activates at {MIN_DAYS_OWN} measured days (3–9 days = thin sample). Until then the meter uses its SLP
+            category — correct and expected, not an error. See Data Readiness for progress per meter.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>Metering point</TableHead><TableHead>Method</TableHead>
+              <TableHead>SLP category</TableHead>
+              <TableHead className="text-right">Sample days</TableHead>
+              <TableHead className="text-right">Day MWh</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {!measuredPlan.length && <TableRow><TableCell colSpan={5} className="text-muted-foreground">No active MEASURED metering points.</TableCell></TableRow>}
+              {measuredPlan.map(p => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">{p.edu}</TableCell>
+                  <TableCell>
+                    <Badge variant={p.method === "own_profile" ? "default" : "secondary"}>{p.method}</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{p.category ?? "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.sampleDays || "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.dayMwh.toFixed(3)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
       <Dialog open={ppeeOpen} onOpenChange={setPpeeOpen}>
         <DialogContent>
           <DialogHeader>
