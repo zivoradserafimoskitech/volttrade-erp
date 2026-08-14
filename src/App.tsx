@@ -51,6 +51,7 @@ import Scheduling from "./pages/balancing/Scheduling";
 import LivePosition from "./pages/balancing/LivePosition";
 import ImbalanceAllocation from "./pages/balancing/ImbalanceAllocation";
 import ForecastAccuracy from "./pages/balancing/ForecastAccuracy";
+import DataReadiness from "./pages/balancing/DataReadiness";
 import Settlement from "./pages/balancing/Settlement";
 import Onboarding from "./pages/supply/Onboarding";
 import Switching from "./pages/supply/Switching";
@@ -127,6 +128,7 @@ const App = () => (
             <Route path="/balancing/live" element={<LivePosition />} />
             <Route path="/balancing/allocation" element={<ImbalanceAllocation />} />
             <Route path="/balancing/accuracy" element={<ForecastAccuracy />} />
+            <Route path="/balancing/readiness" element={<DataReadiness />} />
             <Route path="/balancing/settlement" element={<Settlement />} />
             <Route path="/supply/onboarding" element={<Onboarding />} />
             <Route path="/supply/switching" element={<Switching />} />
