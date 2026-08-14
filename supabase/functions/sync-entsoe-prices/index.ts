@@ -25,29 +25,57 @@ function ymdHm(d: Date) {
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}`;
 }
 
-// Naive XML parser for ENTSO-E Publication_MarketDocument day-ahead prices.
-// Extracts <TimeSeries> -> <Period> with <timeInterval><start>/<end> and <Point><position>/<price.amount>.
+// Parser for ENTSO-E Publication_MarketDocument (A44 day-ahead prices), REST API v2.
+// Handles PT15M/PT30M/PT60M resolutions and curveType A03 (variable-sized blocks:
+// a missing position means the previous price stays valid until the next position).
+// Sub-hourly points are averaged into hourly delivery slots.
 function parsePrices(xml: string): { delivery_at: string; price_eur_mwh: number }[] {
-  const out: { delivery_at: string; price_eur_mwh: number }[] = [];
+  const buckets = new Map<string, { sum: number; n: number }>();
   const periodRe = /<Period>([\s\S]*?)<\/Period>/g;
   let m: RegExpExecArray | null;
   while ((m = periodRe.exec(xml))) {
     const body = m[1];
     const start = body.match(/<timeInterval>[\s\S]*?<start>([^<]+)<\/start>/)?.[1];
+    const end = body.match(/<timeInterval>[\s\S]*?<end>([^<]+)<\/end>/)?.[1];
     const resolution = body.match(/<resolution>([^<]+)<\/resolution>/)?.[1] ?? "PT60M";
     if (!start) continue;
     const stepMin = resolution.includes("15") ? 15 : resolution.includes("30") ? 30 : 60;
     const startDate = new Date(start);
+    const endDate = end ? new Date(end) : null;
+    const maxPos = endDate
+      ? Math.round((endDate.getTime() - startDate.getTime()) / (stepMin * 60_000))
+      : 0;
+
+    const points: { pos: number; price: number }[] = [];
     const pointRe = /<Point>\s*<position>(\d+)<\/position>\s*<price\.amount>([-\d.]+)<\/price\.amount>\s*<\/Point>/g;
     let p: RegExpExecArray | null;
     while ((p = pointRe.exec(body))) {
-      const pos = parseInt(p[1], 10);
-      const price = parseFloat(p[2]);
-      const t = new Date(startDate.getTime() + (pos - 1) * stepMin * 60_000);
-      out.push({ delivery_at: t.toISOString(), price_eur_mwh: price });
+      points.push({ pos: parseInt(p[1], 10), price: parseFloat(p[2]) });
+    }
+    if (points.length === 0) continue;
+    points.sort((a, b) => a.pos - b.pos);
+    const last = maxPos > 0 ? maxPos : points[points.length - 1].pos;
+
+    for (let i = 0; i < points.length; i++) {
+      const from = points[i].pos;
+      const to = (points[i + 1]?.pos ?? last + 1) - 1; // A03 gap fill
+      for (let pos = from; pos <= to; pos++) {
+        const t = new Date(startDate.getTime() + (pos - 1) * stepMin * 60_000);
+        const hour = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), t.getUTCHours()));
+        const key = hour.toISOString();
+        const b = buckets.get(key) ?? { sum: 0, n: 0 };
+        b.sum += points[i].price;
+        b.n += 1;
+        buckets.set(key, b);
+      }
     }
   }
-  return out;
+  return [...buckets.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([delivery_at, v]) => ({
+      delivery_at,
+      price_eur_mwh: Math.round((v.sum / v.n) * 100) / 100,
+    }));
 }
 
 Deno.serve(async (req) => {
