@@ -55,6 +55,16 @@ $$);
 
 -- Inspect: select * from cron.job;   Remove: select cron.unschedule('<name>');
 
+-- Weekly, Monday 03:00 UTC: rebuild the per-meter hourly load curves for
+-- MEASURED (>40 kW) points. Safe to run with zero data — it just reports that
+-- nothing has enough history yet.
+select cron.schedule('build-meter-profiles', '0 3 * * 1', $$
+  select net.http_post(
+    url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/build-meter-profiles',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{}'::jsonb);
+$$);
+
 -- Test phase: ELEX day-ahead (twice daily, well under the 50/day cap)
 select cron.schedule('sync-elex-prices', '15 13,15 * * *', $$
   select net.http_post(

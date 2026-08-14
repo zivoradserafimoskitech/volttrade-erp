@@ -28,6 +28,10 @@ project_id = "volttrade-erp"
     verify_jwt = true
   [functions.forecast-volumes]
     verify_jwt = true
+  [functions.build-meter-profiles]
+    # Builds the per-meter hourly load curve for MEASURED points. Staff JWT or
+    # service-role (weekly cron). Writes meter_load_profiles only.
+    verify_jwt = true
   [functions.import-dso-reads]
     # P1-12: was verify_jwt=false; it performs its own Bearer + role check, so the platform gate is now enabled as defence in depth.
     verify_jwt = true

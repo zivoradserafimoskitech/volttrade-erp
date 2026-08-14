@@ -49,6 +49,7 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/balancing/settlement", label: "Imbalance Settlement", icon: GitMerge },
     { to: "/balancing/allocation", label: "Imbalance Allocation", icon: Scale },
     { to: "/balancing/accuracy", label: "Forecast Accuracy", icon: Compass },
+    { to: "/balancing/readiness", label: "Data Readiness", icon: Gauge },
     { to: "/compliance", label: "Regulatory Deadlines", icon: ShieldCheck },
   ]},
   { title: "Supply Operations", items: [
