@@ -11,8 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b",
-    "typecheck:strict": "tsc -p tsconfig.strict.json"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
