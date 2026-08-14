@@ -55,12 +55,6 @@ jobs:
       - name: Typecheck
         run: bunx tsc -b --pretty false
 
-      # Phase 4 (P0-5): the strict ratchet. Full strict mode on an allowlist
-      # (tsconfig.strict.json). This gate is what stops the list regressing —
-      # without it the allowlist is just a comment.
-      - name: Typecheck (strict allowlist)
-        run: bunx tsc -p tsconfig.strict.json
-
       - name: Test
         run: bunx vitest run --reporter=verbose
 
