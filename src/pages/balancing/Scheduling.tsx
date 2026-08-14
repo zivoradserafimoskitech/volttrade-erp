@@ -14,7 +14,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { buildEssMessage, tradeQuantities, classifyTrade, downloadXml, scheduleWindow, type EssSeries } from "@/lib/essSchedule";
 import { toast } from "@/hooks/use-toast";
 import { shape24h, SlpCategory, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarClock, Lock, Send, Activity, Download, FileCode, Sun, Percent } from "lucide-react";
+
+/**
+ * MEASURED leg — never a synthetic shape. Each MEASURED metering point is
+ * shaped by the best curve available to it, in this order:
+ *   own_profile       sample_days >= 10  — the meter's own measured curve
+ *   own_profile_thin  sample_days 3–9    — own curve, thin sample, flagged
+ *   slp_fallback      no curve, has SLP category
+ *   flat_fallback     nothing else       — 1/24
+ * From day one everything is slp_fallback; meters switch over on their own as
+ * build-meter-profiles accumulates days. The method used is always displayed.
+ */
+const MIN_DAYS_OWN = 10;
+type MeasuredMeter = {
+  id: string; edu_code: string; slp_category: SlpCategory | null; connected_power_kw: number | null;
+};
+type MeasuredPlan = {
+  id: string; edu: string; method: "own_profile" | "own_profile_thin" | "slp_fallback" | "flat_fallback";
+  sampleDays: number; dayMwh: number; shape: number[]; category: SlpCategory | null;
+};
 
 export default function Scheduling() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -27,6 +47,9 @@ export default function Scheduling() {
   const [version, setVersion] = useState(1);
   const [gateClosed, setGateClosed] = useState<string | null>(null);
   const [pvHourly, setPvHourly] = useState<number[] | null>(null); // MWh per hour from pv_forecasts
+  const [measuredMeters, setMeasuredMeters] = useState<MeasuredMeter[]>([]);
+  // key: `${metering_point_id}|${season}|${day_type}` → { shares, sampleDays }
+  const [meterCurves, setMeterCurves] = useState<Map<string, { shares: number[]; sampleDays: number }>>(new Map());
 
   async function loadPvForecast() {
     const dayStart = `${date}T00:00:00Z`;
@@ -283,6 +306,65 @@ export default function Scheduling() {
 
   useEffect(() => { supabase.from("balance_groups").select("id,name").then(({ data }) => { setGroups(data ?? []); if (data?.[0]) setBg(data[0].id); }); loadSlpFromDb(supabase); loadHolidays(supabase); }, []);
 
+  // MEASURED metering points + whatever own-curves exist for them
+  useEffect(() => {
+    (async () => {
+      const [{ data: mps }, { data: curves }] = await Promise.all([
+        (supabase.from as any)("metering_points")
+          .select("id, edu_code, slp_category, connected_power_kw")
+          .eq("status", "active").eq("metering_category", "MEASURED"),
+        (supabase.from as any)("meter_load_profiles").select("metering_point_id, season, day_type, hour, share, sample_days"),
+      ]);
+      setMeasuredMeters((mps ?? []) as MeasuredMeter[]);
+      const map = new Map<string, { shares: number[]; sampleDays: number }>();
+      for (const c of ((curves ?? []) as any[])) {
+        const key = `${c.metering_point_id}|${c.season}|${c.day_type}`;
+        let e = map.get(key);
+        if (!e) { e = { shares: Array.from({ length: 24 }, () => 0), sampleDays: Number(c.sample_days || 0) }; map.set(key, e); }
+        e.shares[Number(c.hour)] = Number(c.share || 0);
+        e.sampleDays = Number(c.sample_days || 0);
+      }
+      setMeterCurves(map);
+    })();
+  }, []);
+
+  // Per-meter plan for the selected day: daily volume × the meter's own curve.
+  const measuredPlan = useMemo<MeasuredPlan[]>(() => {
+    const d = new Date(date + "T00:00:00");
+    const season = seasonOf(d), dt = dayTypeOf(d);
+    const flat = Array.from({ length: 24 }, () => 1 / 24);
+    if (!measuredMeters.length) {
+      return measuredMwh > 0
+        ? [{ id: "unassigned", edu: "Unassigned MEASURED volume", method: "flat_fallback", sampleDays: 0, dayMwh: measuredMwh, shape: flat, category: null }]
+        : [];
+    }
+    const weight = (m: MeasuredMeter) => Number(m.connected_power_kw || 0) || 1;
+    const totalW = measuredMeters.reduce((s, m) => s + weight(m), 0) || 1;
+    return measuredMeters.map(m => {
+      const own = meterCurves.get(`${m.id}|${season}|${dt}`);
+      let method: MeasuredPlan["method"]; let shape: number[]; let sampleDays = own?.sampleDays ?? 0;
+      if (own && own.shares.some(v => v > 0) && sampleDays >= 3) {
+        method = sampleDays >= MIN_DAYS_OWN ? "own_profile" : "own_profile_thin";
+        const sum = own.shares.reduce((a, b) => a + b, 0) || 1;
+        shape = own.shares.map(v => v / sum);
+      } else if (m.slp_category) {
+        method = "slp_fallback";
+        shape = shape24h(m.slp_category, season, dt);
+        sampleDays = 0;
+      } else {
+        method = "flat_fallback"; shape = flat; sampleDays = 0;
+      }
+      return { id: m.id, edu: m.edu_code, method, sampleDays, dayMwh: measuredMwh * weight(m) / totalW, shape, category: m.slp_category };
+    });
+  }, [date, measuredMeters, meterCurves, measuredMwh]);
+
+  // MEASURED leg per hour = Σ (meter day volume × meter curve[hour])
+  const measuredByHour = useMemo(() => {
+    const out = Array.from({ length: 24 }, () => 0);
+    for (const p of measuredPlan) for (let h = 0; h < 24; h++) out[h] += p.dayMwh * (p.shape[h] ?? 0);
+    return out;
+  }, [measuredPlan]);
+
   // Bridge: daily client forecasts → MTU nomination inputs.
   // Splits the day's total forecast into PROFILED/MEASURED legs using
   // metering_points.metering_category weighted by connected_power_kw.
@@ -319,13 +401,12 @@ export default function Scheduling() {
       const solar = h < 6 || h > 20 ? 0 : Math.sin(((h - 6) / 14) * Math.PI);
       const pvMwh = pvHourly ? pvHourly[h] / 4 : (pvKwp * solar) / 1000 / 4;
       const profiled = profiledMwh * share;
-      // measured: stable + small peaks
-      const m = (Math.exp(-Math.pow((h - 10) / 3, 2)) + Math.exp(-Math.pow((h - 19) / 3, 2))) ;
-      const measured = (measuredMwh / 24) * (1 + 0.3 * m);
+      // measured: real per-meter curves (own → SLP → flat), never a synthetic shape
+      const measured = measuredByHour[h] / 4;
       const nop = profiled + measured - pvMwh;
-      return { mtu, label: `${String(Math.floor(mtu / 4)).padStart(2, "0")}:${String((mtu % 4) * 15).padStart(2, "0")}`, profiled: +profiled.toFixed(4), measured: +(measured / 4).toFixed(4), pv: +pvMwh.toFixed(4), nop: +nop.toFixed(4) };
+      return { mtu, label: `${String(Math.floor(mtu / 4)).padStart(2, "0")}:${String((mtu % 4) * 15).padStart(2, "0")}`, profiled: +profiled.toFixed(4), measured: +measured.toFixed(4), pv: +pvMwh.toFixed(4), nop: +nop.toFixed(4) };
     });
-  }, [date, profiledMwh, measuredMwh, pvKwp, profileCat, pvHourly]);
+  }, [date, profiledMwh, measuredByHour, pvKwp, profileCat, pvHourly]);
 
   const totals = {
     profiled: rows.reduce((s, r) => s + r.profiled, 0),
