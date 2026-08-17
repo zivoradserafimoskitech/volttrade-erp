@@ -29,7 +29,13 @@ const SOURCES = [
   { value: "entsoe:AT", group: "ENTSO-E Transparency", label: "Austria — APG" },
   { value: "entsoe:DE_LU", group: "ENTSO-E Transparency", label: "Germany / Luxembourg" },
   { value: "elex", group: "Exchanges & providers", label: "ELEX — MK day-ahead exchange" },
-  { value: "provider:elecz", group: "Exchanges & providers", label: "Elecz (MK)" },
+  { value: "provider:elecz:MK", group: "Exchanges & providers", label: "Elecz — North Macedonia" },
+  { value: "provider:elecz:RS", group: "Exchanges & providers", label: "Elecz — Serbia" },
+  { value: "provider:elecz:HU", group: "Exchanges & providers", label: "Elecz — Hungary" },
+  { value: "provider:elecz:GR", group: "Exchanges & providers", label: "Elecz — Greece" },
+  { value: "provider:elecz:RO", group: "Exchanges & providers", label: "Elecz — Romania" },
+  { value: "provider:elecz:BA", group: "Exchanges & providers", label: "Elecz — Bosnia & Herzegovina" },
+  { value: "provider:elecz:ME", group: "Exchanges & providers", label: "Elecz — Montenegro" },
   { value: "provider:stekker", group: "Exchanges & providers", label: "Stekker" },
   { value: "provider:eex", group: "Exchanges & providers", label: "EEX" },
 ];
@@ -61,13 +67,13 @@ export default function Market() {
 
   const [elexSyncing, setElexSyncing] = useState(false);
   const [provSyncing, setProvSyncing] = useState(false);
-  const syncProviderNamed = async (provider: string) => {
+  const syncProviderNamed = async (provider: string, provZone = "MK") => {
     setProvSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-price-providers", { body: { provider, zone: "MK" } });
+      const { data, error } = await supabase.functions.invoke("sync-price-providers", { body: { provider, zone: provZone } });
       if (error) throw error;
       if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "Sync failed");
-      toast.success(`${provider.toUpperCase()}: ${(data as any).rows} prices · ${(data as any).calls_used_today}/${(data as any).cap} calls today`);
+      toast.success(`${provider.toUpperCase()} ${provZone}: ${(data as any).rows} prices · ${(data as any).calls_used_today}/${(data as any).cap} calls today`);
       load();
     } catch (e: any) {
       toast.error(e?.message ?? `${provider} sync failed`);
@@ -100,7 +106,10 @@ export default function Market() {
   const runSync = async () => {
     if (source.startsWith("entsoe:")) { setZone(source.slice(7)); await syncEntsoeZone(source.slice(7)); }
     else if (source === "elex") await syncElex(false);
-    else await syncProviderNamed(source.slice(9));
+    else {
+      const [, name, provZone] = source.split(":");
+      await syncProviderNamed(name, provZone ?? "MK");
+    }
   };
 
   const add = async (form: FormData) => {
