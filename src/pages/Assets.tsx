@@ -204,6 +204,11 @@ export default function Assets() {
                     <div><Label>Energy (kWh)</Label><Input type="number" value={assetForm.nameplate_energy_kwh} onChange={e => setAssetForm({ ...assetForm, nameplate_energy_kwh: e.target.value })} placeholder="BESS only" /></div>
                     <div><Label>PV DC (kWp)</Label><Input type="number" value={assetForm.pv_dc_kwp} onChange={e => setAssetForm({ ...assetForm, pv_dc_kwp: e.target.value })} placeholder="PV only" /></div>
                   </div>
+                  <div>
+                    <Label>Gateway device ID (optional)</Label>
+                    <Input type="number" value={assetForm.gateway_device_id ?? ""} onChange={e => setAssetForm({ ...assetForm, gateway_device_id: e.target.value })} placeholder="Numeric device ID from VoltTrade Cloud gateway" />
+                    <p className="text-xs text-muted-foreground mt-1">Links the asset to live telemetry and EMS plan push.</p>
+                  </div>
                 </div>
                 <DialogFooter><Button onClick={saveAsset}>Save</Button></DialogFooter>
               </DialogContent>
@@ -211,7 +216,7 @@ export default function Assets() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Type</TableHead><TableHead>Site</TableHead><TableHead>Vendor / Model</TableHead><TableHead className="text-right">Power kW</TableHead><TableHead className="text-right">Energy kWh</TableHead><TableHead className="text-right">PV kWp</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Type</TableHead><TableHead>Site</TableHead><TableHead>Vendor / Model</TableHead><TableHead className="text-right">Power kW</TableHead><TableHead className="text-right">Energy kWh</TableHead><TableHead className="text-right">PV kWp</TableHead><TableHead>Gateway</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {assets.map(a => {
                   const site = sites.find(s => s.id === a.site_id);
@@ -224,16 +229,40 @@ export default function Assets() {
                       <TableCell className="text-right">{a.nameplate_power_kw ?? "—"}</TableCell>
                       <TableCell className="text-right">{a.nameplate_energy_kwh ?? "—"}</TableCell>
                       <TableCell className="text-right">{a.pv_dc_kwp ?? "—"}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="gap-1 h-7 px-2" onClick={() => openLink(a)}>
+                          {a.gateway_device_id != null
+                            ? <Badge variant="outline" className="gap-1"><Radio className="h-3 w-3" />#{a.gateway_device_id}</Badge>
+                            : <span className="text-muted-foreground flex items-center gap-1 text-xs"><Link2 className="h-3 w-3" />Link</span>}
+                        </Button>
+                      </TableCell>
                       <TableCell><Badge variant={a.status === "active" ? "default" : "secondary"}>{a.status}</Badge></TableCell>
                     </TableRow>
                   );
                 })}
-                {!loading && assets.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No assets yet</TableCell></TableRow>}
+                {!loading && assets.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No assets yet</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!linkAsset} onOpenChange={o => !o && setLinkAsset(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Gateway device link — {linkAsset?.asset_code}</DialogTitle></DialogHeader>
+          <div className="grid gap-2">
+            <Label>Device ID</Label>
+            <Input type="number" value={linkValue} onChange={e => setLinkValue(e.target.value)} placeholder="e.g. 1042" />
+            <p className="text-xs text-muted-foreground">
+              Once linked, telemetry sync pulls SoC / power / alarms for this asset and EMS dispatch plans are pushed to the device. Leave empty to unlink.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkAsset(null)}>Cancel</Button>
+            <Button onClick={saveLink} disabled={linkSaving}>{linkSaving ? "Saving…" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ErpLayout>
   );
 }
