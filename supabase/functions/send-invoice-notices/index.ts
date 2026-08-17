@@ -1,10 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { authenticate, handler, json } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const PAGE = 500;
 
 type Kind = "invoice" | "reminder" | "dunning";
 type Lang = "mk" | "sq" | "en";
@@ -64,38 +60,18 @@ function langFor(country?: string | null, override?: string): Lang {
   return "en";
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+// Automated runs (pg_cron / server-side schedulers) present the service-role
+// key; interactive runs present a staff JWT that must carry a billing role.
+// _shared/auth.ts distinguishes the two — the previous auth.getUser() path
+// 401'd on every scheduled run because a service-role JWT has no `sub`.
+Deno.serve(handler(async (req) => {
+  const auth = await authenticate(req, {
+    roles: ["admin", "management", "billing_officer", "finance"],
+  });
+  const admin = auth.admin;
+  const uid = auth.userId;
 
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
-
-    const url = Deno.env.get("SUPABASE_URL")!;
-    const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const admin = createClient(url, service);
-
-    // Automated runs (pg_cron / server-side schedulers) present the service-role
-    // key; interactive runs present a staff JWT that must carry a billing role.
-    const bearer = authHeader.slice(7).trim();
-    let uid: string | null = null;
-    if (bearer !== service) {
-      const authed = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
-      const { data: userRes, error: userErr } = await authed.auth.getUser();
-      if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
-      uid = userRes.user.id;
-      const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", uid);
-      const allowed = ["admin", "management", "billing_officer", "finance"];
-      if (!(roles ?? []).some((r: { role: string }) => allowed.includes(r.role))) {
-        return json({ error: "Forbidden — billing role required" }, 403);
-      }
-    }
-
     const payload = await req.json().catch(() => ({}));
     const kind: Kind = ["invoice", "reminder", "dunning"].includes(payload?.kind) ? payload.kind : "invoice";
     const langOverride: string = typeof payload?.language === "string" ? payload.language : "auto";
@@ -113,31 +89,46 @@ Deno.serve(async (req) => {
     const today = new Date();
     const todayISO = today.toISOString().slice(0, 10);
 
-    let q = admin
-      .from("invoices")
-      .select("id, invoice_number, client_id, total_eur, paid_amount_eur, currency, due_date, period_end, status, sent_at, dunning_level, reminder_count")
-      .order("created_at", { ascending: true });
+    // Paginated fetch — a large dunning run easily exceeds PostgREST's
+    // default row cap, which would silently drop invoices from the batch.
+    type Inv = Record<string, any>;
+    const invoices: Inv[] = [];
+    for (let from = 0; ; from += PAGE) {
+      let q = admin
+        .from("invoices")
+        .select("id, invoice_number, client_id, total_eur, paid_amount_eur, currency, due_date, period_end, status, sent_at, sent_count, dunning_level, reminder_count")
+        .order("created_at", { ascending: true })
+        .range(from, from + PAGE - 1);
 
-    if (invoiceIds) {
-      q = q.in("id", invoiceIds);
-    } else if (kind === "invoice") {
-      // Auto-send: every invoice that has never been delivered to the customer.
-      q = q.is("sent_at", null).neq("status", "draft");
-    } else {
-      // Reminders / dunning target unpaid invoices past their due date.
-      q = q.neq("status", "paid").not("due_date", "is", null).lt("due_date", todayISO);
+      if (invoiceIds) {
+        q = q.in("id", invoiceIds);
+      } else if (kind === "invoice") {
+        // Auto-send: every invoice that has never been delivered to the customer.
+        q = q.is("sent_at", null).neq("status", "draft");
+      } else {
+        // Reminders / dunning target unpaid invoices past their due date.
+        q = q.neq("status", "paid").not("due_date", "is", null).lt("due_date", todayISO);
+      }
+
+      const { data: page, error: invErr } = await q;
+      if (invErr) return json({ error: invErr.message }, 500);
+      invoices.push(...(page ?? []));
+      if (!page || page.length < PAGE) break;
     }
-
-    const { data: invoices, error: invErr } = await q;
-    if (invErr) return json({ error: invErr.message }, 500);
-    if (!invoices?.length) return json({ processed: 0, skipped: 0, results: [] });
+    if (!invoices.length) return json({ processed: 0, skipped: 0, results: [] });
 
     const clientIds = [...new Set(invoices.map((i) => i.client_id))];
-    const { data: clients } = await admin
-      .from("clients")
-      .select("id, company_name, contact_email, country_code, portal_user_id")
-      .in("id", clientIds);
-    const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
+    const clientById = new Map<string, Record<string, any>>();
+    for (let i = 0; i < clientIds.length; i += PAGE) {
+      const chunk = clientIds.slice(i, i + PAGE);
+      const { data: clients, error: cErr } = await admin
+        .from("clients")
+        .select("id, company_name, contact_email, country_code, portal_user_id")
+        .in("id", chunk)
+        .range(0, chunk.length - 1);
+      if (cErr) return json({ error: cErr.message }, 500);
+      for (const c of clients ?? []) clientById.set(c.id, c);
+    }
 
     let processed = 0;
     let skipped = 0;
@@ -283,4 +274,4 @@ Deno.serve(async (req) => {
     console.error("send-invoice-notices failed:", e);
     return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
   }
-});
+}));

@@ -11,10 +11,7 @@
 //             EEX_URL template + EEX_ID + EEX_PASSWORD (Basic auth).
 // Writes market_prices with source = provider name (upsert on delivery_at,source).
 // TEST-PHASE CAP: 50 outbound calls per provider per UTC day via external_api_log.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const json = (b: unknown, status = 200) =>
-  new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
+import { authenticate, handler, json } from "../_shared/auth.ts";
 
 const DAILY_CAP = 50;
 const dig = (obj: any, path: string) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
@@ -25,18 +22,13 @@ const findArray = (obj: any, depth = 0): any[] | null => {
   return null;
 };
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return json({ ok: true });
+// AuthN/AuthZ via _shared/auth.ts — staff JWTs need one of the listed roles,
+// pg_cron authenticates with the service-role key (no `sub`, so the old
+// auth.getUser() path 401'd on every scheduled run).
+Deno.serve(handler(async (req) => {
+  const auth = await authenticate(req, { roles: ["admin", "operations", "trader"] });
+  const admin = auth.admin;
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) return json({ ok: false, error: "Unauthorized" }, 401);
-    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-    const { data: u } = await userClient.auth.getUser();
-    if (!u?.user) return json({ ok: false, error: "Unauthorized" }, 401);
-    const supabaseAdmin_ROLECHECK = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: allowed } = await supabaseAdmin_ROLECHECK.rpc("has_any_role", { _user_id: u.user.id, _roles: ["admin", "operations", "trader"] });
-    if (!allowed) return json({ ok: false, error: "Forbidden" }, 403);
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const body = await req.json().catch(() => ({}));
     const provider = String(body.provider ?? "elecz").toLowerCase();
     if (!["elecz", "stekker", "eex"].includes(provider)) {
@@ -146,8 +138,8 @@ Deno.serve(async (req) => {
     const unique = [...seen.values()];
     const { error } = await admin.from("market_prices").upsert(unique, { onConflict: "delivery_at,source" });
     if (error) throw error;
-    return json({ ok: true, provider, rows: unique.length, ...meta, calls_used_today: used, cap: DAILY_CAP });
+    return json({ ok: true, provider, caller: auth.kind, rows: unique.length, ...meta, calls_used_today: used, cap: DAILY_CAP });
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message ?? e) });
   }
-});
+}));

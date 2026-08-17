@@ -1,10 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-};
+import { authenticate, handler, json as jsonResponse } from "../_shared/auth.ts";
 
 // ENTSO-E bidding zone EICs
 const ZONES: Record<string, string> = {
@@ -78,43 +72,22 @@ function parsePrices(xml: string): { delivery_at: string; price_eur_mwh: number 
     }));
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+// AuthN/AuthZ via _shared/auth.ts: an interactive staff JWT must hold one of the
+// listed roles; pg_cron presents the service-role key and is recognised as an
+// automated caller (a service-role JWT has no `sub`, so auth.getUser() 401'd).
+Deno.serve(handler(async (req) => {
+  const auth = await authenticate(req, { roles: ["admin", "operations", "management"] });
+  const supabase = auth.admin;
 
-  try {
-    // AuthN + AuthZ: require a signed-in admin/operations user, OR a shared cron secret header
-    const cronSecret = Deno.env.get("CRON_SHARED_SECRET");
-    const providedCron = req.headers.get("x-cron-secret");
-    const isCron = !!cronSecret && providedCron === cronSecret;
-    if (!isCron) {
-      const authHeader = req.headers.get("Authorization") ?? "";
-      if (!authHeader.startsWith("Bearer ")) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const userClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY")!,
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      const { data: userData } = await userClient.auth.getUser();
-      if (!userData?.user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const supabaseAdmin_ROLECHECK = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      const { data: allowed } = await supabaseAdmin_ROLECHECK.rpc("has_any_role", { _user_id: userData.user.id, _roles: ["admin", "operations", "management"] });
-      if (!allowed) {
-        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-    }
+  const token = Deno.env.get("ENTSOE_API_TOKEN");
+  if (!token) {
+    return jsonResponse(
+      { error: "ENTSOE_API_TOKEN not configured. Get a free token from transparency.entsoe.eu and add it as a secret." },
+      400,
+    );
+  }
 
-    const token = Deno.env.get("ENTSOE_API_TOKEN");
-    if (!token) {
-      return new Response(
-        JSON.stringify({ error: "ENTSOE_API_TOKEN not configured. Get a free token from transparency.entsoe.eu and add it as a secret." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+  {
     let zone = "HU";
     let days = 2; // default: yesterday + today + tomorrow window
     if (req.method === "POST") {
@@ -147,24 +120,13 @@ Deno.serve(async (req) => {
     const res = await fetch(apiUrl);
     const xml = await res.text();
     if (!res.ok) {
-      return new Response(
-        JSON.stringify({ error: `ENTSO-E ${res.status}`, detail: xml.slice(0, 500) }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: `ENTSO-E ${res.status}`, detail: xml.slice(0, 500) }, 502);
     }
 
     const prices = parsePrices(xml);
     if (prices.length === 0) {
-      return new Response(
-        JSON.stringify({ inserted: 0, zone, note: "No prices in response window" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ inserted: 0, zone, note: "No prices in response window" });
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     // Zone-tagged source so multiple zones/providers coexist:
     // source = 'entsoe-mk', 'entsoe-hu', ... Upsert per (delivery_at, source) —
@@ -174,20 +136,9 @@ Deno.serve(async (req) => {
     const tagged = prices.map((r: any) => ({ ...r, source: `entsoe-${zone.toLowerCase()}` }));
     const { error } = await supabase.from("market_prices").upsert(tagged, { onConflict: "delivery_at,source" });
     if (error) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: error.message }, 500);
     }
 
-    return new Response(
-      JSON.stringify({ inserted: prices.length, zone, from: startIso, to: endIso }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ error: String((e as Error).message ?? e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ inserted: prices.length, zone, caller: auth.kind, from: startIso, to: endIso });
   }
-});
+}));
