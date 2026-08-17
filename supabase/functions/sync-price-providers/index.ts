@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
     let meta: Record<string, unknown> = {};
 
     if (provider === "elecz") {
-      const zone = String(body.zone ?? Deno.env.get("ELECZ_ZONE") ?? "MK");
+      const zone = String(body.zone ?? Deno.env.get("ELECZ_ZONE") ?? "MK").toUpperCase();
+      const src = `elecz-${zone.toLowerCase()}`;
       // full ranked hourly set for today+tomorrow
       const r = await logged(`https://elecz.com/signal/cheapest-hours?zone=${encodeURIComponent(zone)}&hours=48`, { headers: { Accept: "application/json" } });
       if (!r.ok) return json({ ok: false, error: `elecz responded ${r.status}` });
@@ -74,9 +75,9 @@ Deno.serve(async (req) => {
         const tRaw = it.hour ?? it.time ?? it.timestamp;
         const priceCt = Number(it.price);
         if (!tRaw || !isFinite(priceCt) || isNaN(Date.parse(tRaw))) continue;
-        rows.push({ delivery_at: new Date(tRaw).toISOString(), price_eur_mwh: +(priceCt * 10).toFixed(2), source: "elecz" });
+        rows.push({ delivery_at: new Date(tRaw).toISOString(), price_eur_mwh: +(priceCt * 10).toFixed(2), source: src });
       }
-      meta = { zone, unit, data_complete: p?.data_complete ?? null };
+      meta = { zone, source: src, unit, data_complete: p?.data_complete ?? null };
       // current spot as well (fills the current hour even if not among "cheapest")
       if (guard()) {
         const rs = await logged(`https://elecz.com/signal/spot?zone=${encodeURIComponent(zone)}`, { headers: { Accept: "application/json" } });
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
           const v = Number(sp?.price);
           if (isFinite(v) && sp?.timestamp && !sp?.fallback) {
             const ts = new Date(sp.timestamp); ts.setUTCMinutes(0, 0, 0);
-            rows.push({ delivery_at: ts.toISOString(), price_eur_mwh: +(v * 10).toFixed(2), source: "elecz" });
+            rows.push({ delivery_at: ts.toISOString(), price_eur_mwh: +(v * 10).toFixed(2), source: src });
           }
         }
       }
