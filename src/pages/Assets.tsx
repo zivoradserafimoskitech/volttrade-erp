@@ -11,13 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { Plus, Battery, Sun, Zap, MapPin } from "lucide-react";
+import { Plus, Battery, Sun, Zap, MapPin, Radio, Link2 } from "lucide-react";
 
 type Site = { id: string; name: string; address: string | null; country: string | null; metering_point_id: string | null };
 type Asset = {
   id: string; site_id: string; asset_code: string; asset_type: "bess" | "pv" | "hybrid";
   vendor: string | null; model: string | null; nameplate_power_kw: number | null;
   nameplate_energy_kwh: number | null; pv_dc_kwp: number | null; external_ref: string | null; status: string;
+  gateway_device_id: string | null;
 };
 type Meter = { id: string; edu_code: string };
 
@@ -31,6 +32,9 @@ export default function Assets() {
   const [assetOpen, setAssetOpen] = useState(false);
   const [siteForm, setSiteForm] = useState<any>({ name: "", address: "", country: "", metering_point_id: "" });
   const [assetForm, setAssetForm] = useState<any>({ site_id: "", asset_code: "", asset_type: "bess", vendor: "", model: "", nameplate_power_kw: "", nameplate_energy_kwh: "", pv_dc_kwp: "", external_ref: "" });
+  const [linkAsset, setLinkAsset] = useState<Asset | null>(null);
+  const [linkValue, setLinkValue] = useState("");
+  const [linkSaving, setLinkSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -80,6 +84,25 @@ export default function Assets() {
     toast.success("Asset added");
     setAssetOpen(false);
     setAssetForm({ site_id: "", asset_code: "", asset_type: "bess", vendor: "", model: "", nameplate_power_kw: "", nameplate_energy_kwh: "", pv_dc_kwp: "", external_ref: "" });
+    load();
+  }
+
+  function openLink(a: Asset) {
+    setLinkAsset(a);
+    setLinkValue(a.gateway_device_id ?? "");
+  }
+
+  async function saveLink() {
+    if (!linkAsset) return;
+    setLinkSaving(true);
+    const { error } = await supabase
+      .from("assets")
+      .update({ gateway_device_id: linkValue.trim() || null })
+      .eq("id", linkAsset.id);
+    setLinkSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(linkValue.trim() ? "Gateway device linked" : "Gateway link removed");
+    setLinkAsset(null);
     load();
   }
 
