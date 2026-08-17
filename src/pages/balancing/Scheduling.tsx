@@ -13,7 +13,7 @@ import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, C
 import { supabase } from "@/integrations/supabase/client";
 import { buildEssMessage, tradeQuantities, classifyTrade, downloadXml, scheduleWindow, type EssSeries } from "@/lib/essSchedule";
 import { toast } from "@/hooks/use-toast";
-import { shape24h, SlpCategory, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
+import { shape24h, SlpCategory, SLP_CATEGORIES, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarClock, Lock, Send, Activity, Download, FileCode, Sun, Percent } from "lucide-react";
 
@@ -476,6 +476,9 @@ export default function Scheduling() {
   }, [date, profiledMeters, volFc, clientForecast, meterAvg30, profiledMwh, profileCat]);
 
   const uncategorised = useMemo(() => profiledPlan.filter(p => !p.categorised), [profiledPlan]);
+  const smartCount = useMemo(() => profiledPlan.filter(p => p.volumeSource.startsWith("smart")).length, [profiledPlan]);
+  const clientFcCount = useMemo(() => profiledPlan.filter(p => p.volumeSource === "client_forecast").length, [profiledPlan]);
+  const manualCount = useMemo(() => profiledPlan.filter(p => p.volumeSource === "manual_total" || p.volumeSource === "manual").length, [profiledPlan]);
 
   // PROFILED leg per hour = Σ (metering point volume × its category curve)
   const profiledByHour = useMemo(() => {
