@@ -59,6 +59,8 @@ interface AssetRow {
   asset_type: string;
   nameplate_power_kw: number | null;
   gateway_device_id: number | null;
+  soc_min_pct: number | null;
+  soc_max_pct: number | null;
 }
 
 Deno.serve(handler(async (req) => {
@@ -87,7 +89,7 @@ Deno.serve(handler(async (req) => {
   // ── Assets that are actually linked to a gateway device ────────────────
   const { data: assetsRaw, error: aErr } = await admin
     .from("assets")
-    .select("id, asset_code, asset_type, nameplate_power_kw, gateway_device_id")
+    .select("id, asset_code, asset_type, nameplate_power_kw, gateway_device_id, soc_min_pct, soc_max_pct")
     .not("gateway_device_id", "is", null)
     .eq("status", "active");
   if (aErr) throw aErr;
