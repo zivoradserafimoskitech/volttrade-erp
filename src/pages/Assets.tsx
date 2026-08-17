@@ -78,12 +78,13 @@ export default function Assets() {
       nameplate_energy_kwh: assetForm.nameplate_energy_kwh ? Number(assetForm.nameplate_energy_kwh) : null,
       pv_dc_kwp: assetForm.pv_dc_kwp ? Number(assetForm.pv_dc_kwp) : null,
       external_ref: assetForm.external_ref || null,
+      gateway_device_id: assetForm.gateway_device_id ? Number(assetForm.gateway_device_id) : null,
     };
     const { error } = await supabase.from("assets").insert(payload);
     if (error) return toast.error(error.message);
     toast.success("Asset added");
     setAssetOpen(false);
-    setAssetForm({ site_id: "", asset_code: "", asset_type: "bess", vendor: "", model: "", nameplate_power_kw: "", nameplate_energy_kwh: "", pv_dc_kwp: "", external_ref: "" });
+    setAssetForm({ site_id: "", asset_code: "", asset_type: "bess", vendor: "", model: "", nameplate_power_kw: "", nameplate_energy_kwh: "", pv_dc_kwp: "", external_ref: "", gateway_device_id: "" });
     load();
   }
 
