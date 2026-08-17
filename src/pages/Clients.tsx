@@ -119,7 +119,7 @@ export default function Clients() {
   return (
     <ErpLayout title="Client Management (CRM)" subtitle="Business clients, contracts and metering points (EDU)"
       actions={
-        <Dialog open={openClient} onOpenChange={setOpenClient}>
+        <Dialog open={openClient} onOpenChange={(o) => { setOpenClient(o); if (!o) { setPickedTariff(""); setOverride(false); } }}>
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />Add client</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New client</DialogTitle></DialogHeader>
@@ -129,18 +129,53 @@ export default function Clients() {
               <Field name="contact_name" label="Contact name" />
               <Field name="contact_email" label="Email" type="email" />
               <Field name="contact_phone" label="Phone" />
-              <div className="space-y-2">
-                <Label>Contract type</Label>
-                <Select name="contract_type" defaultValue="fixed">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+              <div className="space-y-2 col-span-2">
+                <Label>Tariff</Label>
+                <Select value={pickedTariff} onValueChange={setPickedTariff}>
+                  <SelectTrigger><SelectValue placeholder={tariffs.length ? "Select a tariff product" : "No tariffs yet — create one first"} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="fixed">Fixed price</SelectItem>
-                    <SelectItem value="market">Market-indexed</SelectItem>
+                    {tariffs.map(t => <SelectItem key={t.id} value={t.id}>{t.code} — {t.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {pickedTariff ? (
+                  <p className="text-xs text-muted-foreground">
+                    {(() => {
+                      const inh = tariffEnergy(tariffs.find(t => t.id === pickedTariff));
+                      return inh.price != null
+                        ? `Inherited: fixed price ${fmtNum(inh.price)} €/MWh${inh.margin != null ? ` · margin ${fmtNum(inh.margin)} €/MWh` : ""}`
+                        : "Inherited: market-indexed (no fixed energy component)";
+                    })()}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No tariff selected — enter pricing manually below. <a href="/tariffs" className="underline text-primary">Manage tariffs →</a>
+                  </p>
+                )}
               </div>
-              <Field name="fixed_price_eur_mwh" label="Fixed price (€/MWh)" type="number" step="0.01" />
-              <Field name="margin_eur_mwh" label="Margin (€/MWh)" type="number" step="0.01" defaultValue="3.50" />
+              {pickedTariff && (
+                <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 col-span-2">
+                  <Label className="text-xs">Custom negotiated pricing (override tariff)</Label>
+                  <Switch checked={override} onCheckedChange={setOverride} />
+                </div>
+              )}
+              {(!pickedTariff || override) && (
+                <>
+                  {!pickedTariff && (
+                    <div className="space-y-2">
+                      <Label>Contract type</Label>
+                      <Select name="contract_type" defaultValue="fixed">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="fixed">Fixed price</SelectItem>
+                          <SelectItem value="market">Market-indexed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <Field name="fixed_price_eur_mwh" label="Fixed price (€/MWh)" type="number" step="0.01" />
+                  <Field name="margin_eur_mwh" label="Margin (€/MWh)" type="number" step="0.01" defaultValue="3.50" />
+                </>
+              )}
               <DialogFooter className="col-span-2"><Button type="submit" style={{ background: "var(--gradient-primary)" }}>Save client</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -157,6 +192,7 @@ export default function Clients() {
                 <TableHead>Tax ID</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Contract</TableHead>
+                <TableHead>Tariff</TableHead>
                 <TableHead className="text-right">Margin (€/MWh)</TableHead>
                 <TableHead>EDUs</TableHead>
                 <TableHead></TableHead>
