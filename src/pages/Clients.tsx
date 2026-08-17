@@ -207,6 +207,11 @@ export default function Clients() {
                     <TableCell className="text-muted-foreground">{c.tax_id ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{c.contact_name ?? "—"}<div className="text-xs">{c.contact_email}</div></TableCell>
                     <TableCell><Badge variant={c.contract_type === "fixed" ? "secondary" : "default"} className={c.contract_type === "market" ? "bg-accent/20 text-accent border-accent/30" : ""}>{c.contract_type === "fixed" ? `Fixed ${c.fixed_price_eur_mwh ?? "?"} €` : "Market"}</Badge></TableCell>
+                    <TableCell className="text-xs">
+                      {c.tariff_id
+                        ? <span className="flex items-center gap-1">{tariffs.find(t => t.id === c.tariff_id)?.code ?? "—"}{c.price_override && <Badge variant="outline" className="text-[10px]">custom</Badge>}</span>
+                        : <span className="text-muted-foreground">manual</span>}
+                    </TableCell>
                     <TableCell className="text-right">{fmtNum(c.margin_eur_mwh)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -270,7 +275,7 @@ export default function Clients() {
                 );
               })}
               {clients.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">No clients yet. Click "Add client" to get started.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-10">No clients yet. Click "Add client" to get started.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
