@@ -619,6 +619,7 @@ export default function Scheduling() {
     <ErpLayout title="Scheduling & Nomination" subtitle="Profiled (SLP) + Measured + PV legs · NOP per MTU"
       actions={<>
         <Button size="sm" variant="outline" onClick={loadFromForecast}><Download className="h-4 w-4 mr-1" />Load from forecast</Button>
+        <Button size="sm" variant="outline" onClick={syncVolumeForecast}><Activity className="h-4 w-4 mr-1" />Volume forecast{volFc.size ? ` ✓ ${volFc.size}` : ""}</Button>
         <Button size="sm" variant="outline" onClick={() => setPpeeOpen(true)}><Percent className="h-4 w-4 mr-1" />ППЕЕ %</Button>
         <Button size="sm" variant="outline" onClick={exportTps}><FileCode className="h-4 w-4 mr-1" />Export TPS</Button>
         {plants.length > 0 && (
@@ -652,7 +653,23 @@ export default function Scheduling() {
           <Field label="Profiled MWh / day"><Input type="number" value={profiledMwh} onChange={e => setProfiledMwh(+e.target.value)} /></Field>
           <Field label="Measured MWh / day"><Input type="number" value={measuredMwh} onChange={e => setMeasuredMwh(+e.target.value)} /></Field>
           <Field label="PV kWp"><Input type="number" value={pvKwp} onChange={e => setPvKwp(+e.target.value)} /></Field>
+          <Field label="Fallback SLP category (only for points without one)">
+            <Select value={profileCat} onValueChange={v => setProfileCat(v as SlpCategory)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{SLP_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
           <Field label="Version"><Input type="number" value={version} onChange={e => setVersion(+e.target.value)} /></Field>
+          <div className="md:col-span-6 text-xs text-muted-foreground">
+            Profiled leg is shaped per metering point by its own SLP category, then summed. Weight scale:{" "}
+            <Badge variant="secondary">{weightBasis.replace(/_/g, " ")}</Badge>
+            {uncategorised.length > 0 && (
+              <span className="ml-2 text-destructive">
+                {uncategorised.length} metering point{uncategorised.length > 1 ? "s" : ""} without an SLP category — using the fallback:{" "}
+                {uncategorised.slice(0, 8).map(u => u.edu).join(", ")}{uncategorised.length > 8 ? "…" : ""}
+              </span>
+            )}
+          </div>
           {gateClosed && <div className="md:col-span-6 text-xs text-muted-foreground">Last gate closure: <Badge variant="secondary">{new Date(gateClosed).toLocaleString()}</Badge></div>}
         </CardContent>
       </Card>
@@ -673,6 +690,74 @@ export default function Scheduling() {
               <Line type="monotone" dataKey="nop" name="NOP" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle>Portfolio mix — profiled leg</CardTitle>
+          <CardDescription>
+            Each metering point is shaped by the curve of its own category before aggregation. If this shows one category
+            while the portfolio is mixed, the categories are not set on the metering points.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>SLP category</TableHead><TableHead className="text-right">Metering points</TableHead>
+              <TableHead className="text-right">MWh / day</TableHead><TableHead className="text-right">% of profiled</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {!categoryMix.length && <TableRow><TableCell colSpan={4} className="text-muted-foreground">No active PROFILED metering points — the manual total is shaped by the fallback category.</TableCell></TableRow>}
+              {categoryMix.map(c => (
+                <TableRow key={c.category}>
+                  <TableCell className="font-medium">{c.category.replace(/_/g, " ")}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.points}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.mwh.toFixed(3)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.pct.toFixed(1)}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle>Where each leg came from</CardTitle>
+          <CardDescription>Check before publishing — a forecast without provenance cannot be defended when the imbalance arrives.</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow><TableHead>Leg</TableHead><TableHead>Method</TableHead><TableHead>Note</TableHead></TableRow></TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-medium">PROFILED</TableCell>
+                <TableCell>per metering point · SLP by category</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {profiledPlan.length - uncategorised.length} of {profiledPlan.length} points with own category · {categoryMix.length} categories ·
+                  volume: {smartCount} smart meter, {clientFcCount} client forecast, {manualCount} manual split
+                </TableCell>
+              </TableRow>
+              {uncategorised.length > 0 && (
+                <TableRow>
+                  <TableCell className="font-medium">PROFILED (unclassified)</TableCell>
+                  <TableCell><Badge variant="destructive">fallback category</Badge></TableCell>
+                  <TableCell className="text-xs">{uncategorised.length} metering points shaped as {profileCat.replace(/_/g, " ")}</TableCell>
+                </TableRow>
+              )}
+              <TableRow>
+                <TableCell className="font-medium">MEASURED</TableCell>
+                <TableCell>own measured curve → SLP → flat</TableCell>
+                <TableCell className="text-xs text-muted-foreground">See the per-meter table below.</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">PV</TableCell>
+                <TableCell>{pvHourly ? "pv_forecasts (weather-based)" : "clear-sky sinusoid"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{pvHourly ? "Forecast rows found for this date." : "No forecast rows for this date — synthetic fallback."}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
