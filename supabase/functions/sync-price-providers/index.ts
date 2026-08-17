@@ -138,8 +138,8 @@ Deno.serve(handler(async (req) => {
     const unique = [...seen.values()];
     const { error } = await admin.from("market_prices").upsert(unique, { onConflict: "delivery_at,source" });
     if (error) throw error;
-    return json({ ok: true, provider, rows: unique.length, ...meta, calls_used_today: used, cap: DAILY_CAP });
+    return json({ ok: true, provider, caller: auth.kind, rows: unique.length, ...meta, calls_used_today: used, cap: DAILY_CAP });
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message ?? e) });
   }
-});
+}));
