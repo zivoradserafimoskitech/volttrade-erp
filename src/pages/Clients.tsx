@@ -15,15 +15,30 @@ import { Plus, Trash2, Zap, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
 
-type Client = { id: string; company_name: string; tax_id: string | null; contact_name: string | null; contact_email: string | null; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; status: string };
+type Client = { id: string; company_name: string; tax_id: string | null; contact_name: string | null; contact_email: string | null; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; status: string; tariff_id?: string | null; price_override?: boolean };
 type Edu = { id: string; client_id: string; edu_code: string; address: string | null; voltage_level: string | null; annual_consumption_mwh: number | null; has_pv?: boolean; pv_capacity_kw?: number | null };
 type SlpProfile = { code: string; name: string };
+type Tariff = { id: string; code: string; name: string; components: any; status?: string | null };
+
+// Base energy price (€/MWh) carried by a tariff, if any. No energy component ⇒ market-indexed.
+function tariffEnergy(t?: Tariff | null): { price: number | null; margin: number | null } {
+  const comps = Array.isArray(t?.components) ? (t!.components as any[]) : [];
+  const energy = comps.find((c: any) => c?.type === "energy");
+  const marginComp = comps.find((c: any) => c?.type === "margin");
+  return {
+    price: energy && energy.value != null ? Number(energy.value) : null,
+    margin: marginComp && marginComp.value != null ? Number(marginComp.value) : null,
+  };
+}
 
 export default function Clients() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [edus, setEdus] = useState<Edu[]>([]);
   const [slpProfiles, setSlpProfiles] = useState<SlpProfile[]>([]);
+  const [tariffs, setTariffs] = useState<Tariff[]>([]);
+  const [pickedTariff, setPickedTariff] = useState<string>("");
+  const [override, setOverride] = useState(false);
   const [eduCategory, setEduCategory] = useState<string>("smart_hourly");
   const [eduHasPv, setEduHasPv] = useState<boolean>(false);
   const [openClient, setOpenClient] = useState(false);
@@ -34,26 +49,41 @@ export default function Clients() {
     const { data: cs } = await supabase.from("clients").select("*").order("company_name");
     const { data: es } = await supabase.from("metering_points").select("*").order("edu_code");
     const { data: sp } = await supabase.from("slp_profiles").select("code,name").order("name");
+    const { data: tf } = await supabase.from("tariffs").select("id,code,name,components,status").order("code");
     setClients((cs as any) ?? []);
     setEdus((es as any) ?? []);
     setSlpProfiles((sp as any) ?? []);
+    setTariffs((tf as any) ?? []);
   };
   useEffect(() => { load(); }, [user]);
 
   const addClient = async (form: FormData) => {
+    const tariff = tariffs.find(t => t.id === pickedTariff) ?? null;
+    const inherited = tariffEnergy(tariff);
+    const contractType = tariff
+      ? (inherited.price != null ? "fixed" : "market")
+      : String(form.get("contract_type") || "fixed");
+    const price = override || !tariff
+      ? (form.get("fixed_price_eur_mwh") ? Number(form.get("fixed_price_eur_mwh")) : null)
+      : inherited.price;
+    const margin = override || !tariff
+      ? Number(form.get("margin_eur_mwh") || 3.5)
+      : Number(inherited.margin ?? form.get("margin_eur_mwh") ?? 3.5);
     const payload: any = {
       company_name: form.get("company_name"),
       tax_id: form.get("tax_id") || null,
       contact_name: form.get("contact_name") || null,
       contact_email: form.get("contact_email") || null,
       contact_phone: form.get("contact_phone") || null,
-      contract_type: form.get("contract_type"),
-      fixed_price_eur_mwh: form.get("fixed_price_eur_mwh") ? Number(form.get("fixed_price_eur_mwh")) : null,
-      margin_eur_mwh: Number(form.get("margin_eur_mwh") || 3.5),
+      contract_type: contractType,
+      tariff_id: tariff?.id ?? null,
+      price_override: tariff ? override : true,
+      fixed_price_eur_mwh: contractType === "market" && !override ? null : price,
+      margin_eur_mwh: margin,
     };
     const { error } = await supabase.from("clients").insert(payload);
     if (error) return toast.error(error.message);
-    toast.success("Client added"); setOpenClient(false); load();
+    toast.success("Client added"); setOpenClient(false); setPickedTariff(""); setOverride(false); load();
   };
 
   const addEdu = async (form: FormData, client_id: string) => {
@@ -89,7 +119,7 @@ export default function Clients() {
   return (
     <ErpLayout title="Client Management (CRM)" subtitle="Business clients, contracts and metering points (EDU)"
       actions={
-        <Dialog open={openClient} onOpenChange={setOpenClient}>
+        <Dialog open={openClient} onOpenChange={(o) => { setOpenClient(o); if (!o) { setPickedTariff(""); setOverride(false); } }}>
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />Add client</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New client</DialogTitle></DialogHeader>
@@ -99,18 +129,53 @@ export default function Clients() {
               <Field name="contact_name" label="Contact name" />
               <Field name="contact_email" label="Email" type="email" />
               <Field name="contact_phone" label="Phone" />
-              <div className="space-y-2">
-                <Label>Contract type</Label>
-                <Select name="contract_type" defaultValue="fixed">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+              <div className="space-y-2 col-span-2">
+                <Label>Tariff</Label>
+                <Select value={pickedTariff} onValueChange={setPickedTariff}>
+                  <SelectTrigger><SelectValue placeholder={tariffs.length ? "Select a tariff product" : "No tariffs yet — create one first"} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="fixed">Fixed price</SelectItem>
-                    <SelectItem value="market">Market-indexed</SelectItem>
+                    {tariffs.map(t => <SelectItem key={t.id} value={t.id}>{t.code} — {t.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {pickedTariff ? (
+                  <p className="text-xs text-muted-foreground">
+                    {(() => {
+                      const inh = tariffEnergy(tariffs.find(t => t.id === pickedTariff));
+                      return inh.price != null
+                        ? `Inherited: fixed price ${fmtNum(inh.price)} €/MWh${inh.margin != null ? ` · margin ${fmtNum(inh.margin)} €/MWh` : ""}`
+                        : "Inherited: market-indexed (no fixed energy component)";
+                    })()}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No tariff selected — enter pricing manually below. <a href="/tariffs" className="underline text-primary">Manage tariffs →</a>
+                  </p>
+                )}
               </div>
-              <Field name="fixed_price_eur_mwh" label="Fixed price (€/MWh)" type="number" step="0.01" />
-              <Field name="margin_eur_mwh" label="Margin (€/MWh)" type="number" step="0.01" defaultValue="3.50" />
+              {pickedTariff && (
+                <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 col-span-2">
+                  <Label className="text-xs">Custom negotiated pricing (override tariff)</Label>
+                  <Switch checked={override} onCheckedChange={setOverride} />
+                </div>
+              )}
+              {(!pickedTariff || override) && (
+                <>
+                  {!pickedTariff && (
+                    <div className="space-y-2">
+                      <Label>Contract type</Label>
+                      <Select name="contract_type" defaultValue="fixed">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="fixed">Fixed price</SelectItem>
+                          <SelectItem value="market">Market-indexed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <Field name="fixed_price_eur_mwh" label="Fixed price (€/MWh)" type="number" step="0.01" />
+                  <Field name="margin_eur_mwh" label="Margin (€/MWh)" type="number" step="0.01" defaultValue="3.50" />
+                </>
+              )}
               <DialogFooter className="col-span-2"><Button type="submit" style={{ background: "var(--gradient-primary)" }}>Save client</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -127,6 +192,7 @@ export default function Clients() {
                 <TableHead>Tax ID</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Contract</TableHead>
+                <TableHead>Tariff</TableHead>
                 <TableHead className="text-right">Margin (€/MWh)</TableHead>
                 <TableHead>EDUs</TableHead>
                 <TableHead></TableHead>
@@ -141,6 +207,11 @@ export default function Clients() {
                     <TableCell className="text-muted-foreground">{c.tax_id ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{c.contact_name ?? "—"}<div className="text-xs">{c.contact_email}</div></TableCell>
                     <TableCell><Badge variant={c.contract_type === "fixed" ? "secondary" : "default"} className={c.contract_type === "market" ? "bg-accent/20 text-accent border-accent/30" : ""}>{c.contract_type === "fixed" ? `Fixed ${c.fixed_price_eur_mwh ?? "?"} €` : "Market"}</Badge></TableCell>
+                    <TableCell className="text-xs">
+                      {c.tariff_id
+                        ? <span className="flex items-center gap-1">{tariffs.find(t => t.id === c.tariff_id)?.code ?? "—"}{c.price_override && <Badge variant="outline" className="text-[10px]">custom</Badge>}</span>
+                        : <span className="text-muted-foreground">manual</span>}
+                    </TableCell>
                     <TableCell className="text-right">{fmtNum(c.margin_eur_mwh)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -204,7 +275,7 @@ export default function Clients() {
                 );
               })}
               {clients.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">No clients yet. Click "Add client" to get started.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-10">No clients yet. Click "Add client" to get started.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
