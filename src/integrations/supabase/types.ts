@@ -646,7 +646,9 @@ export type Database = {
           organization_id: string
           payment_terms_days: number
           portal_user_id: string | null
+          price_override: boolean
           status: string
+          tariff_id: string | null
           tax_id: string | null
           updated_at: string
         }
@@ -670,7 +672,9 @@ export type Database = {
           organization_id?: string
           payment_terms_days?: number
           portal_user_id?: string | null
+          price_override?: boolean
           status?: string
+          tariff_id?: string | null
           tax_id?: string | null
           updated_at?: string
         }
@@ -694,7 +698,9 @@ export type Database = {
           organization_id?: string
           payment_terms_days?: number
           portal_user_id?: string | null
+          price_override?: boolean
           status?: string
+          tariff_id?: string | null
           tax_id?: string | null
           updated_at?: string
         }
@@ -711,6 +717,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_tariff_id_fkey"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
             referencedColumns: ["id"]
           },
         ]
