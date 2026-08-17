@@ -274,4 +274,4 @@ Deno.serve(handler(async (req) => {
     console.error("send-invoice-notices failed:", e);
     return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
   }
-});
+}));
