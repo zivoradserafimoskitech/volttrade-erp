@@ -36,6 +36,30 @@ type MeasuredPlan = {
   sampleDays: number; dayMwh: number; shape: number[]; category: SlpCategory | null;
 };
 
+/**
+ * PROFILED leg — shape FIRST, then sum. Every metering point is multiplied by
+ * the SLP curve of ITS OWN category and only then aggregated. Summing first and
+ * applying one hand-picked curve to the total is a systematic error whenever the
+ * portfolio mixes categories.
+ *
+ * Volume per metering point, in order of preference:
+ *   smart_meter / smart_meter_thin / dso_history  — volume_forecast_daily
+ *   client_forecast                                — daily client forecast, split by weight
+ *   manual_total                                   — the manual "Profiled MWh/day" field, split by weight
+ * Weight scale: measured 30-day average → connected power → equal.
+ */
+type ProfiledMeter = {
+  id: string; edu_code: string; client_id: string | null;
+  slp_category: SlpCategory | null; connected_power_kw: number | null;
+};
+type VolumeSource = "smart_meter" | "smart_meter_thin" | "dso_history" | "manual" | "client_forecast" | "manual_total";
+type ProfiledPlan = {
+  id: string; edu: string; category: SlpCategory; categorised: boolean;
+  volumeSource: VolumeSource; sampleDays: number; calibration: number;
+  dayMwh: number; shape: number[];
+};
+type WeightBasis = "measured_30d" | "connected_power" | "equal";
+
 export default function Scheduling() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [bg, setBg] = useState<string>("");
@@ -48,6 +72,14 @@ export default function Scheduling() {
   const [gateClosed, setGateClosed] = useState<string | null>(null);
   const [pvHourly, setPvHourly] = useState<number[] | null>(null); // MWh per hour from pv_forecasts
   const [measuredMeters, setMeasuredMeters] = useState<MeasuredMeter[]>([]);
+  const [profiledMeters, setProfiledMeters] = useState<ProfiledMeter[]>([]);
+  // metering_point_id → average measured MWh/day over the last 30 days
+  const [meterAvg30, setMeterAvg30] = useState<Map<string, number>>(new Map());
+  const [weightBasis, setWeightBasis] = useState<WeightBasis>("connected_power");
+  // metering_point_id → daily volume forecast for the selected date
+  const [volFc, setVolFc] = useState<Map<string, { mwh: number; method: VolumeSource; sampleDays: number; calibration: number }>>(new Map());
+  // client_id → daily forecast MWh (from the Forecasting module)
+  const [clientForecast, setClientForecast] = useState<Map<string, number>>(new Map());
   // key: `${metering_point_id}|${season}|${day_type}` → { shares, sampleDays }
   const [meterCurves, setMeterCurves] = useState<Map<string, { shares: number[]; sampleDays: number }>>(new Map());
 
