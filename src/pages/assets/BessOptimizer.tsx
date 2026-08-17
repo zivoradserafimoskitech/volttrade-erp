@@ -190,10 +190,10 @@ export default function BessOptimizer() {
         {result && (
           <>
             <div className="grid gap-4 md:grid-cols-4">
-              <StatCard title="Net value" value={`€ ${result.net_eur.toFixed(2)}`} icon={Euro} description={`Revenue € ${result.gross_revenue_eur.toFixed(2)} − charge € ${result.charge_cost_eur.toFixed(2)}`} />
-              <StatCard title="Degradation cost" value={`€ ${result.degradation_eur.toFixed(2)}`} icon={Battery} description="Wear priced into every MWh of throughput" />
-              <StatCard title="Cycles used" value={result.cycles_used.toFixed(2)} icon={RotateCw} description={`Start SoC ${result.start_soc_pct.toFixed(0)}%${result.start_soc_at ? ` @ ${new Date(result.start_soc_at).toLocaleTimeString()}` : ""}`} />
-              <StatCard title="Dispatch rows" value={String(result.dispatch_rows_written)} icon={Play} description={result.dispatch_rows_written ? "Written as planned arbitrage" : "Dry run / backtest — nothing written"} />
+              <StatCard label="Net value" value={`€ ${result.net_eur.toFixed(2)}`} icon={Euro} description={`Revenue € ${result.gross_revenue_eur.toFixed(2)} − charge € ${result.charge_cost_eur.toFixed(2)}`} />
+              <StatCard label="Degradation cost" value={`€ ${result.degradation_eur.toFixed(2)}`} icon={Battery} hint="Wear priced into every MWh of throughput" />
+              <StatCard label="Cycles used" value={result.cycles_used.toFixed(2)} icon={RotateCw} description={`Start SoC ${result.start_soc_pct.toFixed(0)}%${result.start_soc_at ? ` @ ${new Date(result.start_soc_at).toLocaleTimeString()}` : ""}`} />
+              <StatCard label="Dispatch rows" value={String(result.dispatch_rows_written)} icon={Play} description={result.dispatch_rows_written ? "Written as planned arbitrage" : "Dry run / backtest — nothing written"} />
             </div>
 
             <Card className="border-border/60">

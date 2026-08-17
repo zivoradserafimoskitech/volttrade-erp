@@ -106,10 +106,10 @@ export default function SmartMeterHealth() {
     <ErpLayout title="Smart Meter Health" subtitle="Private smart-meter coverage, calibration against official readings, and daily volume forecast provenance">
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-4">
-          <StatCard title="Meters with smart data" value={`${withSmart} / ${rows.length}`} icon={Activity} description="≥ 14 days of PRIVATE_SMART readings in 60 days" />
-          <StatCard title="Calibrated" value={String(calibrated)} icon={Gauge} description="Official ÷ private over whole months" />
-          <StatCard title="Drifting > 15%" value={String(drifting.length)} icon={AlertTriangle} description="Check meter placement or CT ratio" />
-          <StatCard title="Forecast from smart meter" value={`${covered} / ${rows.length}`} icon={Play} description="Tomorrow's daily volume, rest on fallbacks" />
+          <StatCard label="Meters with smart data" value={`${withSmart} / ${rows.length}`} icon={Activity} hint="≥ 14 days of PRIVATE_SMART readings in 60 days" />
+          <StatCard label="Calibrated" value={String(calibrated)} icon={Gauge} hint="Official ÷ private over whole months" />
+          <StatCard label="Drifting > 15%" value={String(drifting.length)} icon={AlertTriangle} description="Check meter placement or CT ratio" />
+          <StatCard label="Forecast from smart meter" value={`${covered} / ${rows.length}`} icon={Play} hint="Tomorrow's daily volume, rest on fallbacks" />
         </div>
 
         <Card className="border-border/60">
