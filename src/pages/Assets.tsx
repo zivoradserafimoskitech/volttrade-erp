@@ -11,13 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { Plus, Battery, Sun, Zap, MapPin } from "lucide-react";
+import { Plus, Battery, Sun, Zap, MapPin, Radio, Link2 } from "lucide-react";
 
 type Site = { id: string; name: string; address: string | null; country: string | null; metering_point_id: string | null };
 type Asset = {
   id: string; site_id: string; asset_code: string; asset_type: "bess" | "pv" | "hybrid";
   vendor: string | null; model: string | null; nameplate_power_kw: number | null;
   nameplate_energy_kwh: number | null; pv_dc_kwp: number | null; external_ref: string | null; status: string;
+  gateway_device_id: number | null;
 };
 type Meter = { id: string; edu_code: string };
 
@@ -31,6 +32,9 @@ export default function Assets() {
   const [assetOpen, setAssetOpen] = useState(false);
   const [siteForm, setSiteForm] = useState<any>({ name: "", address: "", country: "", metering_point_id: "" });
   const [assetForm, setAssetForm] = useState<any>({ site_id: "", asset_code: "", asset_type: "bess", vendor: "", model: "", nameplate_power_kw: "", nameplate_energy_kwh: "", pv_dc_kwp: "", external_ref: "" });
+  const [linkAsset, setLinkAsset] = useState<Asset | null>(null);
+  const [linkValue, setLinkValue] = useState("");
+  const [linkSaving, setLinkSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -74,12 +78,34 @@ export default function Assets() {
       nameplate_energy_kwh: assetForm.nameplate_energy_kwh ? Number(assetForm.nameplate_energy_kwh) : null,
       pv_dc_kwp: assetForm.pv_dc_kwp ? Number(assetForm.pv_dc_kwp) : null,
       external_ref: assetForm.external_ref || null,
+      gateway_device_id: assetForm.gateway_device_id ? Number(assetForm.gateway_device_id) : null,
     };
     const { error } = await supabase.from("assets").insert(payload);
     if (error) return toast.error(error.message);
     toast.success("Asset added");
     setAssetOpen(false);
-    setAssetForm({ site_id: "", asset_code: "", asset_type: "bess", vendor: "", model: "", nameplate_power_kw: "", nameplate_energy_kwh: "", pv_dc_kwp: "", external_ref: "" });
+    setAssetForm({ site_id: "", asset_code: "", asset_type: "bess", vendor: "", model: "", nameplate_power_kw: "", nameplate_energy_kwh: "", pv_dc_kwp: "", external_ref: "", gateway_device_id: "" });
+    load();
+  }
+
+  function openLink(a: Asset) {
+    setLinkAsset(a);
+    setLinkValue(a.gateway_device_id != null ? String(a.gateway_device_id) : "");
+  }
+
+  async function saveLink() {
+    if (!linkAsset) return;
+    const raw = linkValue.trim();
+    if (raw && !/^\d+$/.test(raw)) return toast.error("Device ID must be a number");
+    setLinkSaving(true);
+    const { error } = await supabase
+      .from("assets")
+      .update({ gateway_device_id: raw ? Number(raw) : null })
+      .eq("id", linkAsset.id);
+    setLinkSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(raw ? "Gateway device linked" : "Gateway link removed");
+    setLinkAsset(null);
     load();
   }
 
@@ -179,6 +205,11 @@ export default function Assets() {
                     <div><Label>Energy (kWh)</Label><Input type="number" value={assetForm.nameplate_energy_kwh} onChange={e => setAssetForm({ ...assetForm, nameplate_energy_kwh: e.target.value })} placeholder="BESS only" /></div>
                     <div><Label>PV DC (kWp)</Label><Input type="number" value={assetForm.pv_dc_kwp} onChange={e => setAssetForm({ ...assetForm, pv_dc_kwp: e.target.value })} placeholder="PV only" /></div>
                   </div>
+                  <div>
+                    <Label>Gateway device ID (optional)</Label>
+                    <Input type="number" value={assetForm.gateway_device_id ?? ""} onChange={e => setAssetForm({ ...assetForm, gateway_device_id: e.target.value })} placeholder="Numeric device ID from VoltTrade Cloud gateway" />
+                    <p className="text-xs text-muted-foreground mt-1">Links the asset to live telemetry and EMS plan push.</p>
+                  </div>
                 </div>
                 <DialogFooter><Button onClick={saveAsset}>Save</Button></DialogFooter>
               </DialogContent>
@@ -186,7 +217,7 @@ export default function Assets() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Type</TableHead><TableHead>Site</TableHead><TableHead>Vendor / Model</TableHead><TableHead className="text-right">Power kW</TableHead><TableHead className="text-right">Energy kWh</TableHead><TableHead className="text-right">PV kWp</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Type</TableHead><TableHead>Site</TableHead><TableHead>Vendor / Model</TableHead><TableHead className="text-right">Power kW</TableHead><TableHead className="text-right">Energy kWh</TableHead><TableHead className="text-right">PV kWp</TableHead><TableHead>Gateway</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {assets.map(a => {
                   const site = sites.find(s => s.id === a.site_id);
@@ -199,16 +230,40 @@ export default function Assets() {
                       <TableCell className="text-right">{a.nameplate_power_kw ?? "—"}</TableCell>
                       <TableCell className="text-right">{a.nameplate_energy_kwh ?? "—"}</TableCell>
                       <TableCell className="text-right">{a.pv_dc_kwp ?? "—"}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="gap-1 h-7 px-2" onClick={() => openLink(a)}>
+                          {a.gateway_device_id != null
+                            ? <Badge variant="outline" className="gap-1"><Radio className="h-3 w-3" />#{a.gateway_device_id}</Badge>
+                            : <span className="text-muted-foreground flex items-center gap-1 text-xs"><Link2 className="h-3 w-3" />Link</span>}
+                        </Button>
+                      </TableCell>
                       <TableCell><Badge variant={a.status === "active" ? "default" : "secondary"}>{a.status}</Badge></TableCell>
                     </TableRow>
                   );
                 })}
-                {!loading && assets.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No assets yet</TableCell></TableRow>}
+                {!loading && assets.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No assets yet</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!linkAsset} onOpenChange={o => !o && setLinkAsset(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Gateway device link — {linkAsset?.asset_code}</DialogTitle></DialogHeader>
+          <div className="grid gap-2">
+            <Label>Device ID</Label>
+            <Input type="number" value={linkValue} onChange={e => setLinkValue(e.target.value)} placeholder="e.g. 1042" />
+            <p className="text-xs text-muted-foreground">
+              Once linked, telemetry sync pulls SoC / power / alarms for this asset and EMS dispatch plans are pushed to the device. Leave empty to unlink.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkAsset(null)}>Cancel</Button>
+            <Button onClick={saveLink} disabled={linkSaving}>{linkSaving ? "Saving…" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ErpLayout>
   );
 }
