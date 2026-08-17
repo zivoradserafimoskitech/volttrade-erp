@@ -1,8 +1,9 @@
 import { ReactNode, useState } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell, Grid3x3 } from "lucide-react";
+import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell, Grid3x3, Sun, Moon } from "lucide-react";
 
 // Primary tabs — bottom bar on mobile (A1-style), sidebar on desktop.
 const primary = [
@@ -31,30 +32,54 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
   if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/auth" replace />;
   const previewMode = (() => { try { return sessionStorage.getItem('viewAsCustomer') === '1'; } catch { return false; } })();
+  const { theme, toggleTheme } = useTheme();
+  const portalTokens =
+    theme === "dark"
+      ? {
+          // Ember palette scoped to the portal — overrides shadcn semantic tokens
+          // so all child cards, charts and accents inherit the Vatra identity.
+          ["--background" as any]: "24 18% 8%",
+          ["--foreground" as any]: "30 25% 92%",
+          ["--card" as any]: "24 18% 11%",
+          ["--card-foreground" as any]: "30 25% 92%",
+          ["--popover" as any]: "24 18% 11%",
+          ["--popover-foreground" as any]: "30 25% 92%",
+          ["--primary" as any]: "18 100% 58%",
+          ["--primary-foreground" as any]: "24 30% 8%",
+          ["--secondary" as any]: "24 14% 16%",
+          ["--secondary-foreground" as any]: "30 25% 92%",
+          ["--muted" as any]: "24 12% 14%",
+          ["--muted-foreground" as any]: "30 12% 65%",
+          ["--accent" as any]: "18 90% 52%",
+          ["--accent-foreground" as any]: "24 30% 8%",
+          ["--border" as any]: "24 14% 20%",
+          ["--input" as any]: "24 14% 20%",
+          ["--ring" as any]: "18 100% 58%",
+        }
+      : {
+          // Light Vatra palette — warm off-white with the same ember accent
+          ["--background" as any]: "30 30% 97%",
+          ["--foreground" as any]: "24 25% 15%",
+          ["--card" as any]: "30 25% 100%",
+          ["--card-foreground" as any]: "24 25% 15%",
+          ["--popover" as any]: "30 25% 100%",
+          ["--popover-foreground" as any]: "24 25% 15%",
+          ["--primary" as any]: "18 100% 50%",
+          ["--primary-foreground" as any]: "0 0% 100%",
+          ["--secondary" as any]: "30 20% 94%",
+          ["--secondary-foreground" as any]: "24 25% 15%",
+          ["--muted" as any]: "30 15% 92%",
+          ["--muted-foreground" as any]: "24 12% 45%",
+          ["--accent" as any]: "18 90% 52%",
+          ["--accent-foreground" as any]: "0 0% 100%",
+          ["--border" as any]: "30 20% 88%",
+          ["--input" as any]: "30 20% 90%",
+          ["--ring" as any]: "18 100% 50%",
+        };
   return (
     <div
       className="vatra-portal min-h-screen flex flex-col bg-background"
-      style={{
-        // Ember palette scoped to the portal — overrides shadcn semantic tokens
-        // so all child cards, charts and accents inherit the Vatra identity.
-        ["--background" as any]: "24 18% 8%",
-        ["--foreground" as any]: "30 25% 92%",
-        ["--card" as any]: "24 18% 11%",
-        ["--card-foreground" as any]: "30 25% 92%",
-        ["--popover" as any]: "24 18% 11%",
-        ["--popover-foreground" as any]: "30 25% 92%",
-        ["--primary" as any]: "18 100% 58%",
-        ["--primary-foreground" as any]: "24 30% 8%",
-        ["--secondary" as any]: "24 14% 16%",
-        ["--secondary-foreground" as any]: "30 25% 92%",
-        ["--muted" as any]: "24 12% 14%",
-        ["--muted-foreground" as any]: "30 12% 65%",
-        ["--accent" as any]: "18 90% 52%",
-        ["--accent-foreground" as any]: "24 30% 8%",
-        ["--border" as any]: "24 14% 20%",
-        ["--input" as any]: "24 14% 20%",
-        ["--ring" as any]: "18 100% 58%",
-      }}
+      style={portalTokens}
     >
       {previewMode && (
         <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-700 dark:text-amber-300 px-4 md:px-8 py-2 text-xs flex items-center justify-between gap-3">
@@ -78,6 +103,9 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
           <NavLink to="/portal/notifications" className="p-2 rounded-lg hover:bg-secondary" aria-label="Известувања">
             <Bell className="h-5 w-5" />
           </NavLink>
+          <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-secondary" aria-label={theme === "dark" ? "Switch to light" : "Switch to dark"}>
+            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
           <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate("/auth"); }} className="hidden md:inline-flex">
             <LogOut className="h-4 w-4 mr-2" />Одјава
           </Button>

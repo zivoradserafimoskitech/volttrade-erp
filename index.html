@@ -20,6 +20,12 @@
     <meta name="twitter:image" content="https://volttrade.app/og-image.png" />
     <meta name="twitter:title" content="VoltTrade ERP" />
     <meta name="twitter:description" content="ERP for electricity trading and supply companies." />
+    <script>
+      (function () {
+        const theme = localStorage.getItem('volttrade-theme') || 'dark';
+        document.documentElement.classList.add(theme);
+      })();
+    </script>
 
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#18140F" />
