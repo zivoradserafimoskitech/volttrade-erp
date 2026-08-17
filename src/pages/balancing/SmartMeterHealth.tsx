@@ -108,7 +108,7 @@ export default function SmartMeterHealth() {
         <div className="grid gap-4 md:grid-cols-4">
           <StatCard label="Meters with smart data" value={`${withSmart} / ${rows.length}`} icon={Activity} hint="≥ 14 days of PRIVATE_SMART readings in 60 days" />
           <StatCard label="Calibrated" value={String(calibrated)} icon={Gauge} hint="Official ÷ private over whole months" />
-          <StatCard label="Drifting > 15%" value={String(drifting.length)} icon={AlertTriangle} description="Check meter placement or CT ratio" />
+          <StatCard label="Drifting > 15%" value={String(drifting.length)} icon={AlertTriangle} hint="Check meter placement or CT ratio" />
           <StatCard label="Forecast from smart meter" value={`${covered} / ${rows.length}`} icon={Play} hint="Tomorrow's daily volume, rest on fallbacks" />
         </div>
 
