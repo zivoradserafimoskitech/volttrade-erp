@@ -15,15 +15,30 @@ import { Plus, Trash2, Zap, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
 
-type Client = { id: string; company_name: string; tax_id: string | null; contact_name: string | null; contact_email: string | null; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; status: string };
+type Client = { id: string; company_name: string; tax_id: string | null; contact_name: string | null; contact_email: string | null; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; status: string; tariff_id?: string | null; price_override?: boolean };
 type Edu = { id: string; client_id: string; edu_code: string; address: string | null; voltage_level: string | null; annual_consumption_mwh: number | null; has_pv?: boolean; pv_capacity_kw?: number | null };
 type SlpProfile = { code: string; name: string };
+type Tariff = { id: string; code: string; name: string; components: any; status?: string | null };
+
+// Base energy price (€/MWh) carried by a tariff, if any. No energy component ⇒ market-indexed.
+function tariffEnergy(t?: Tariff | null): { price: number | null; margin: number | null } {
+  const comps = Array.isArray(t?.components) ? (t!.components as any[]) : [];
+  const energy = comps.find((c: any) => c?.type === "energy");
+  const marginComp = comps.find((c: any) => c?.type === "margin");
+  return {
+    price: energy && energy.value != null ? Number(energy.value) : null,
+    margin: marginComp && marginComp.value != null ? Number(marginComp.value) : null,
+  };
+}
 
 export default function Clients() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [edus, setEdus] = useState<Edu[]>([]);
   const [slpProfiles, setSlpProfiles] = useState<SlpProfile[]>([]);
+  const [tariffs, setTariffs] = useState<Tariff[]>([]);
+  const [pickedTariff, setPickedTariff] = useState<string>("");
+  const [override, setOverride] = useState(false);
   const [eduCategory, setEduCategory] = useState<string>("smart_hourly");
   const [eduHasPv, setEduHasPv] = useState<boolean>(false);
   const [openClient, setOpenClient] = useState(false);
@@ -34,26 +49,41 @@ export default function Clients() {
     const { data: cs } = await supabase.from("clients").select("*").order("company_name");
     const { data: es } = await supabase.from("metering_points").select("*").order("edu_code");
     const { data: sp } = await supabase.from("slp_profiles").select("code,name").order("name");
+    const { data: tf } = await supabase.from("tariffs").select("id,code,name,components,status").order("code");
     setClients((cs as any) ?? []);
     setEdus((es as any) ?? []);
     setSlpProfiles((sp as any) ?? []);
+    setTariffs((tf as any) ?? []);
   };
   useEffect(() => { load(); }, [user]);
 
   const addClient = async (form: FormData) => {
+    const tariff = tariffs.find(t => t.id === pickedTariff) ?? null;
+    const inherited = tariffEnergy(tariff);
+    const contractType = tariff
+      ? (inherited.price != null ? "fixed" : "market")
+      : String(form.get("contract_type") || "fixed");
+    const price = override || !tariff
+      ? (form.get("fixed_price_eur_mwh") ? Number(form.get("fixed_price_eur_mwh")) : null)
+      : inherited.price;
+    const margin = override || !tariff
+      ? Number(form.get("margin_eur_mwh") || 3.5)
+      : Number(inherited.margin ?? form.get("margin_eur_mwh") ?? 3.5);
     const payload: any = {
       company_name: form.get("company_name"),
       tax_id: form.get("tax_id") || null,
       contact_name: form.get("contact_name") || null,
       contact_email: form.get("contact_email") || null,
       contact_phone: form.get("contact_phone") || null,
-      contract_type: form.get("contract_type"),
-      fixed_price_eur_mwh: form.get("fixed_price_eur_mwh") ? Number(form.get("fixed_price_eur_mwh")) : null,
-      margin_eur_mwh: Number(form.get("margin_eur_mwh") || 3.5),
+      contract_type: contractType,
+      tariff_id: tariff?.id ?? null,
+      price_override: tariff ? override : true,
+      fixed_price_eur_mwh: contractType === "market" && !override ? null : price,
+      margin_eur_mwh: margin,
     };
     const { error } = await supabase.from("clients").insert(payload);
     if (error) return toast.error(error.message);
-    toast.success("Client added"); setOpenClient(false); load();
+    toast.success("Client added"); setOpenClient(false); setPickedTariff(""); setOverride(false); load();
   };
 
   const addEdu = async (form: FormData, client_id: string) => {
