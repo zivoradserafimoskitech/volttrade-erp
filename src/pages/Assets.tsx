@@ -18,7 +18,7 @@ type Asset = {
   id: string; site_id: string; asset_code: string; asset_type: "bess" | "pv" | "hybrid";
   vendor: string | null; model: string | null; nameplate_power_kw: number | null;
   nameplate_energy_kwh: number | null; pv_dc_kwp: number | null; external_ref: string | null; status: string;
-  gateway_device_id: string | null;
+  gateway_device_id: number | null;
 };
 type Meter = { id: string; edu_code: string };
 
@@ -89,19 +89,21 @@ export default function Assets() {
 
   function openLink(a: Asset) {
     setLinkAsset(a);
-    setLinkValue(a.gateway_device_id ?? "");
+    setLinkValue(a.gateway_device_id != null ? String(a.gateway_device_id) : "");
   }
 
   async function saveLink() {
     if (!linkAsset) return;
+    const raw = linkValue.trim();
+    if (raw && !/^\d+$/.test(raw)) return toast.error("Device ID must be a number");
     setLinkSaving(true);
     const { error } = await supabase
       .from("assets")
-      .update({ gateway_device_id: linkValue.trim() || null })
+      .update({ gateway_device_id: raw ? Number(raw) : null })
       .eq("id", linkAsset.id);
     setLinkSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(linkValue.trim() ? "Gateway device linked" : "Gateway link removed");
+    toast.success(raw ? "Gateway device linked" : "Gateway link removed");
     setLinkAsset(null);
     load();
   }
