@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell, Grid3x3, Sun, Moon } from "lucide-react";
 
