@@ -13,7 +13,7 @@ import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, C
 import { supabase } from "@/integrations/supabase/client";
 import { buildEssMessage, tradeQuantities, classifyTrade, downloadXml, scheduleWindow, type EssSeries } from "@/lib/essSchedule";
 import { toast } from "@/hooks/use-toast";
-import { shape24h, SlpCategory, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
+import { shape24h, SlpCategory, SLP_CATEGORIES, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarClock, Lock, Send, Activity, Download, FileCode, Sun, Percent } from "lucide-react";
 
@@ -36,6 +36,30 @@ type MeasuredPlan = {
   sampleDays: number; dayMwh: number; shape: number[]; category: SlpCategory | null;
 };
 
+/**
+ * PROFILED leg — shape FIRST, then sum. Every metering point is multiplied by
+ * the SLP curve of ITS OWN category and only then aggregated. Summing first and
+ * applying one hand-picked curve to the total is a systematic error whenever the
+ * portfolio mixes categories.
+ *
+ * Volume per metering point, in order of preference:
+ *   smart_meter / smart_meter_thin / dso_history  — volume_forecast_daily
+ *   client_forecast                                — daily client forecast, split by weight
+ *   manual_total                                   — the manual "Profiled MWh/day" field, split by weight
+ * Weight scale: measured 30-day average → connected power → equal.
+ */
+type ProfiledMeter = {
+  id: string; edu_code: string; client_id: string | null;
+  slp_category: SlpCategory | null; connected_power_kw: number | null;
+};
+type VolumeSource = "smart_meter" | "smart_meter_thin" | "dso_history" | "manual" | "client_forecast" | "manual_total";
+type ProfiledPlan = {
+  id: string; edu: string; category: SlpCategory; categorised: boolean;
+  volumeSource: VolumeSource; sampleDays: number; calibration: number;
+  dayMwh: number; shape: number[];
+};
+type WeightBasis = "measured_30d" | "connected_power" | "equal";
+
 export default function Scheduling() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [bg, setBg] = useState<string>("");
@@ -48,6 +72,14 @@ export default function Scheduling() {
   const [gateClosed, setGateClosed] = useState<string | null>(null);
   const [pvHourly, setPvHourly] = useState<number[] | null>(null); // MWh per hour from pv_forecasts
   const [measuredMeters, setMeasuredMeters] = useState<MeasuredMeter[]>([]);
+  const [profiledMeters, setProfiledMeters] = useState<ProfiledMeter[]>([]);
+  // metering_point_id → average measured MWh/day over the last 30 days
+  const [meterAvg30, setMeterAvg30] = useState<Map<string, number>>(new Map());
+  const [weightBasis, setWeightBasis] = useState<WeightBasis>("connected_power");
+  // metering_point_id → daily volume forecast for the selected date
+  const [volFc, setVolFc] = useState<Map<string, { mwh: number; method: VolumeSource; sampleDays: number; calibration: number }>>(new Map());
+  // client_id → daily forecast MWh (from the Forecasting module)
+  const [clientForecast, setClientForecast] = useState<Map<string, number>>(new Map());
   // key: `${metering_point_id}|${season}|${day_type}` → { shares, sampleDays }
   const [meterCurves, setMeterCurves] = useState<Map<string, { shares: number[]; sampleDays: number }>>(new Map());
 
@@ -328,6 +360,152 @@ export default function Scheduling() {
     })();
   }, []);
 
+  // PROFILED metering points + a weight scale based on real measured volume
+  useEffect(() => {
+    (async () => {
+      const { data: mps } = await (supabase.from as any)("metering_points")
+        .select("id, edu_code, client_id, slp_category, connected_power_kw")
+        .eq("status", "active").eq("metering_category", "PROFILED");
+      const list = ((mps ?? []) as ProfiledMeter[]);
+      setProfiledMeters(list);
+
+      // 30-day measured average per metering point (paginated — a plain query
+      // silently stops at 1000 rows and would skew every weight).
+      const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+      const sums = new Map<string, { mwh: number; days: Set<string> }>();
+      const ids = list.map(m => m.id);
+      for (let c = 0; c < ids.length; c += 100) {
+        const chunk = ids.slice(c, c + 100);
+        for (let from = 0; ; from += 1000) {
+          const { data } = await (supabase.from as any)("consumption_readings")
+            .select("metering_point_id, reading_at, actual_mwh, quality")
+            .in("metering_point_id", chunk).gte("reading_at", since)
+            .order("reading_at").range(from, from + 999);
+          const rows = (data ?? []) as any[];
+          for (const r of rows) {
+            if (r.quality === "flagged") continue;
+            const e = sums.get(r.metering_point_id) ?? { mwh: 0, days: new Set<string>() };
+            e.mwh += Number(r.actual_mwh || 0); e.days.add(String(r.reading_at).slice(0, 10));
+            sums.set(r.metering_point_id, e);
+          }
+          if (rows.length < 1000) break;
+        }
+      }
+      const avg = new Map<string, number>();
+      for (const [id, e] of sums) if (e.days.size > 0 && e.mwh > 0) avg.set(id, e.mwh / e.days.size);
+      setMeterAvg30(avg);
+      setWeightBasis(avg.size ? "measured_30d" : (list.some(m => Number(m.connected_power_kw || 0) > 0) ? "connected_power" : "equal"));
+    })();
+  }, []);
+
+  // Daily volume forecast per metering point for the selected date
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase.from as any)("volume_forecast_daily")
+        .select("metering_point_id, forecast_mwh, method, sample_days, calibration")
+        .eq("forecast_date", date);
+      const m = new Map<string, { mwh: number; method: VolumeSource; sampleDays: number; calibration: number }>();
+      for (const r of ((data ?? []) as any[])) {
+        m.set(r.metering_point_id, {
+          mwh: Number(r.forecast_mwh || 0), method: r.method as VolumeSource,
+          sampleDays: Number(r.sample_days || 0), calibration: Number(r.calibration || 1),
+        });
+      }
+      setVolFc(m);
+    })();
+  }, [date]);
+
+  async function syncVolumeForecast() {
+    const { data, error } = await supabase.functions.invoke("forecast-volume-daily", { body: { horizon_days: 7 } });
+    if (error || !(data as any)?.ok) {
+      toast({ title: "Volume forecast failed", description: error?.message ?? (data as any)?.error, variant: "destructive" });
+      return;
+    }
+    const d = data as any;
+    toast({ title: `Volume forecast: ${d.forecast_rows} rows`, description: `${d.meters} profiled meters · ${Object.entries(d.methods ?? {}).map(([k, v]) => `${k}: ${v}`).join(" · ")}` });
+    setDate(dt => dt); // refetch below via effect
+    const { data: rows } = await (supabase.from as any)("volume_forecast_daily")
+      .select("metering_point_id, forecast_mwh, method, sample_days, calibration").eq("forecast_date", date);
+    const m = new Map<string, { mwh: number; method: VolumeSource; sampleDays: number; calibration: number }>();
+    for (const r of ((rows ?? []) as any[])) m.set(r.metering_point_id, { mwh: Number(r.forecast_mwh || 0), method: r.method, sampleDays: Number(r.sample_days || 0), calibration: Number(r.calibration || 1) });
+    setVolFc(m);
+  }
+
+  const meterWeight = (m: { id: string; connected_power_kw: number | null }) => {
+    const measured = meterAvg30.get(m.id);
+    if (measured && measured > 0) return measured;
+    const p = Number(m.connected_power_kw || 0);
+    return p > 0 ? p : 1;
+  };
+
+  // Shape per metering point, then sum. Never the other way round.
+  const profiledPlan = useMemo<ProfiledPlan[]>(() => {
+    const d = new Date(date + "T00:00:00");
+    const season = seasonOf(d), dt = dayTypeOf(d);
+    if (!profiledMeters.length) return [];
+
+    // client → total weight of its profiled points (for splitting a client forecast)
+    const clientWeight = new Map<string, number>();
+    for (const m of profiledMeters) {
+      if (!m.client_id) continue;
+      clientWeight.set(m.client_id, (clientWeight.get(m.client_id) ?? 0) + meterWeight(m));
+    }
+    const totalWeight = profiledMeters.reduce((s, m) => s + meterWeight(m), 0) || 1;
+    // volume left to distribute from the manual field, for meters with no other source
+    const covered = profiledMeters.filter(m => volFc.has(m.id) || (m.client_id && clientForecast.has(m.client_id)));
+    const uncoveredWeight = profiledMeters.filter(m => !covered.includes(m)).reduce((s, m) => s + meterWeight(m), 0);
+
+    return profiledMeters.map(m => {
+      const v = volFc.get(m.id);
+      let dayMwh = 0, volumeSource: VolumeSource = "manual_total", sampleDays = 0, calibration = 1;
+      if (v) {
+        dayMwh = v.mwh; volumeSource = v.method; sampleDays = v.sampleDays; calibration = v.calibration;
+      } else if (m.client_id && clientForecast.has(m.client_id)) {
+        const cw = clientWeight.get(m.client_id) || 1;
+        dayMwh = (clientForecast.get(m.client_id) ?? 0) * meterWeight(m) / cw;
+        volumeSource = "client_forecast";
+      } else {
+        const base = covered.length ? uncoveredWeight : totalWeight;
+        dayMwh = base > 0 ? profiledMwh * meterWeight(m) / base : 0;
+        volumeSource = "manual_total";
+      }
+      const categorised = !!m.slp_category;
+      const category = (m.slp_category ?? profileCat) as SlpCategory;
+      return { id: m.id, edu: m.edu_code, category, categorised, volumeSource, sampleDays, calibration, dayMwh, shape: shape24h(category, season, dt) };
+    });
+  }, [date, profiledMeters, volFc, clientForecast, meterAvg30, profiledMwh, profileCat]);
+
+  const uncategorised = useMemo(() => profiledPlan.filter(p => !p.categorised), [profiledPlan]);
+  const smartCount = useMemo(() => profiledPlan.filter(p => p.volumeSource.startsWith("smart")).length, [profiledPlan]);
+  const clientFcCount = useMemo(() => profiledPlan.filter(p => p.volumeSource === "client_forecast").length, [profiledPlan]);
+  const manualCount = useMemo(() => profiledPlan.filter(p => p.volumeSource === "manual_total" || p.volumeSource === "manual").length, [profiledPlan]);
+
+  // PROFILED leg per hour = Σ (metering point volume × its category curve)
+  const profiledByHour = useMemo(() => {
+    const d = new Date(date + "T00:00:00");
+    if (!profiledPlan.length) {
+      // No profiled metering points at all — single curve on the manual total.
+      const shape = shape24h(profileCat, seasonOf(d), dayTypeOf(d));
+      return shape.map(s => profiledMwh * s);
+    }
+    const out = Array.from({ length: 24 }, () => 0);
+    for (const p of profiledPlan) for (let h = 0; h < 24; h++) out[h] += p.dayMwh * (p.shape[h] ?? 0);
+    return out;
+  }, [profiledPlan, profiledMwh, profileCat, date]);
+
+  // Portfolio mix — the sanity check before publishing
+  const categoryMix = useMemo(() => {
+    const m = new Map<string, { points: number; mwh: number }>();
+    for (const p of profiledPlan) {
+      const e = m.get(p.category) ?? { points: 0, mwh: 0 };
+      e.points += 1; e.mwh += p.dayMwh; m.set(p.category, e);
+    }
+    const total = Array.from(m.values()).reduce((s, e) => s + e.mwh, 0) || 1;
+    return Array.from(m.entries())
+      .map(([category, e]) => ({ category, ...e, pct: (e.mwh / total) * 100 }))
+      .sort((a, b) => b.mwh - a.mwh);
+  }, [profiledPlan]);
+
   // Per-meter plan for the selected day: daily volume × the meter's own curve.
   const measuredPlan = useMemo<MeasuredPlan[]>(() => {
     const d = new Date(date + "T00:00:00");
@@ -371,42 +549,47 @@ export default function Scheduling() {
   async function loadFromForecast() {
     const [{ data: fc }, { data: cps }] = await Promise.all([
       supabase.from("forecasts").select("client_id, forecast_mwh").eq("forecast_date", date),
-      (supabase.from as any)("metering_points").select("client_id, metering_category, connected_power_kw").eq("status", "active"),
+      (supabase.from as any)("metering_points").select("id, client_id, metering_category, connected_power_kw").eq("status", "active"),
     ]);
     if (!fc?.length) { toast({ title: "No forecasts for this date", description: "Create daily forecasts in Forecasting first.", variant: "destructive" }); return; }
     const total = fc.reduce((s, r: any) => s + Number(r.forecast_mwh || 0), 0);
+    // Split each client's day between the legs using the same weight scale as
+    // the shaping: measured 30-day average, then connected power, then equal.
     let prof = 0, meas = 0;
+    const perClient = new Map<string, number>();
     for (const r of fc as any[]) {
       const clientCps = (cps ?? []).filter((c: any) => c.client_id === r.client_id);
-      if (!clientCps.length) { prof += Number(r.forecast_mwh || 0); continue; } // unclassified → profiled
-      const w = (cat: string) => clientCps.filter((c: any) => c.metering_category === cat).reduce((s: number, c: any) => s + Number(c.connected_power_kw || 1), 0);
+      const mwh = Number(r.forecast_mwh || 0);
+      if (!clientCps.length) { prof += mwh; perClient.set(r.client_id, (perClient.get(r.client_id) ?? 0) + mwh); continue; }
+      const w = (cat: string) => clientCps.filter((c: any) => c.metering_category === cat)
+        .reduce((s: number, c: any) => s + meterWeight(c), 0);
       const wp = w("PROFILED"), wm = w("MEASURED"), ws = wp + wm || 1;
-      prof += Number(r.forecast_mwh || 0) * wp / ws;
-      meas += Number(r.forecast_mwh || 0) * wm / ws;
+      const p = mwh * wp / ws;
+      prof += p; meas += mwh * wm / ws;
+      if (p > 0) perClient.set(r.client_id, (perClient.get(r.client_id) ?? 0) + p);
     }
+    setClientForecast(perClient);
     setProfiledMwh(+prof.toFixed(3));
     setMeasuredMwh(+meas.toFixed(3));
-    toast({ title: `Forecast loaded: ${total.toFixed(1)} MWh`, description: `Profiled ${prof.toFixed(1)} / Measured ${meas.toFixed(1)} — adjust before publishing if needed.` });
+    toast({ title: `Forecast loaded: ${total.toFixed(1)} MWh`, description: `Profiled ${prof.toFixed(1)} / Measured ${meas.toFixed(1)} · weights: ${weightBasis.replace("_", " ")}` });
   }
 
   const rows = useMemo(() => {
-    const d = new Date(date + "T00:00:00");
-    const shape = shape24h(profileCat, seasonOf(d), dayTypeOf(d));
     // expand to 96 MTU (15min) by replicating hourly share / 4
     return Array.from({ length: 96 }, (_, mtu) => {
       const h = Math.floor(mtu / 4);
-      const share = shape[h] / 4;
       // PV: real forecast (weather-based, per-site calibrated) when available;
       // clear-sky sinusoid only as fallback for dates without forecast rows.
       const solar = h < 6 || h > 20 ? 0 : Math.sin(((h - 6) / 14) * Math.PI);
       const pvMwh = pvHourly ? pvHourly[h] / 4 : (pvKwp * solar) / 1000 / 4;
-      const profiled = profiledMwh * share;
+      // profiled: per metering point, each shaped by its own SLP category
+      const profiled = profiledByHour[h] / 4;
       // measured: real per-meter curves (own → SLP → flat), never a synthetic shape
       const measured = measuredByHour[h] / 4;
       const nop = profiled + measured - pvMwh;
       return { mtu, label: `${String(Math.floor(mtu / 4)).padStart(2, "0")}:${String((mtu % 4) * 15).padStart(2, "0")}`, profiled: +profiled.toFixed(4), measured: +measured.toFixed(4), pv: +pvMwh.toFixed(4), nop: +nop.toFixed(4) };
     });
-  }, [date, profiledMwh, measuredByHour, pvKwp, profileCat, pvHourly]);
+  }, [date, profiledByHour, measuredByHour, pvKwp, pvHourly]);
 
   const totals = {
     profiled: rows.reduce((s, r) => s + r.profiled, 0),
@@ -439,6 +622,7 @@ export default function Scheduling() {
     <ErpLayout title="Scheduling & Nomination" subtitle="Profiled (SLP) + Measured + PV legs · NOP per MTU"
       actions={<>
         <Button size="sm" variant="outline" onClick={loadFromForecast}><Download className="h-4 w-4 mr-1" />Load from forecast</Button>
+        <Button size="sm" variant="outline" onClick={syncVolumeForecast}><Activity className="h-4 w-4 mr-1" />Volume forecast{volFc.size ? ` ✓ ${volFc.size}` : ""}</Button>
         <Button size="sm" variant="outline" onClick={() => setPpeeOpen(true)}><Percent className="h-4 w-4 mr-1" />ППЕЕ %</Button>
         <Button size="sm" variant="outline" onClick={exportTps}><FileCode className="h-4 w-4 mr-1" />Export TPS</Button>
         {plants.length > 0 && (
@@ -472,7 +656,23 @@ export default function Scheduling() {
           <Field label="Profiled MWh / day"><Input type="number" value={profiledMwh} onChange={e => setProfiledMwh(+e.target.value)} /></Field>
           <Field label="Measured MWh / day"><Input type="number" value={measuredMwh} onChange={e => setMeasuredMwh(+e.target.value)} /></Field>
           <Field label="PV kWp"><Input type="number" value={pvKwp} onChange={e => setPvKwp(+e.target.value)} /></Field>
+          <Field label="Fallback SLP category (only for points without one)">
+            <Select value={profileCat} onValueChange={v => setProfileCat(v as SlpCategory)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{SLP_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
           <Field label="Version"><Input type="number" value={version} onChange={e => setVersion(+e.target.value)} /></Field>
+          <div className="md:col-span-6 text-xs text-muted-foreground">
+            Profiled leg is shaped per metering point by its own SLP category, then summed. Weight scale:{" "}
+            <Badge variant="secondary">{weightBasis.replace(/_/g, " ")}</Badge>
+            {uncategorised.length > 0 && (
+              <span className="ml-2 text-destructive">
+                {uncategorised.length} metering point{uncategorised.length > 1 ? "s" : ""} without an SLP category — using the fallback:{" "}
+                {uncategorised.slice(0, 8).map(u => u.edu).join(", ")}{uncategorised.length > 8 ? "…" : ""}
+              </span>
+            )}
+          </div>
           {gateClosed && <div className="md:col-span-6 text-xs text-muted-foreground">Last gate closure: <Badge variant="secondary">{new Date(gateClosed).toLocaleString()}</Badge></div>}
         </CardContent>
       </Card>
@@ -493,6 +693,74 @@ export default function Scheduling() {
               <Line type="monotone" dataKey="nop" name="NOP" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle>Portfolio mix — profiled leg</CardTitle>
+          <CardDescription>
+            Each metering point is shaped by the curve of its own category before aggregation. If this shows one category
+            while the portfolio is mixed, the categories are not set on the metering points.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>SLP category</TableHead><TableHead className="text-right">Metering points</TableHead>
+              <TableHead className="text-right">MWh / day</TableHead><TableHead className="text-right">% of profiled</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {!categoryMix.length && <TableRow><TableCell colSpan={4} className="text-muted-foreground">No active PROFILED metering points — the manual total is shaped by the fallback category.</TableCell></TableRow>}
+              {categoryMix.map(c => (
+                <TableRow key={c.category}>
+                  <TableCell className="font-medium">{c.category.replace(/_/g, " ")}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.points}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.mwh.toFixed(3)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.pct.toFixed(1)}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle>Where each leg came from</CardTitle>
+          <CardDescription>Check before publishing — a forecast without provenance cannot be defended when the imbalance arrives.</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow><TableHead>Leg</TableHead><TableHead>Method</TableHead><TableHead>Note</TableHead></TableRow></TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-medium">PROFILED</TableCell>
+                <TableCell>per metering point · SLP by category</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {profiledPlan.length - uncategorised.length} of {profiledPlan.length} points with own category · {categoryMix.length} categories ·
+                  volume: {smartCount} smart meter, {clientFcCount} client forecast, {manualCount} manual split
+                </TableCell>
+              </TableRow>
+              {uncategorised.length > 0 && (
+                <TableRow>
+                  <TableCell className="font-medium">PROFILED (unclassified)</TableCell>
+                  <TableCell><Badge variant="destructive">fallback category</Badge></TableCell>
+                  <TableCell className="text-xs">{uncategorised.length} metering points shaped as {profileCat.replace(/_/g, " ")}</TableCell>
+                </TableRow>
+              )}
+              <TableRow>
+                <TableCell className="font-medium">MEASURED</TableCell>
+                <TableCell>own measured curve → SLP → flat</TableCell>
+                <TableCell className="text-xs text-muted-foreground">See the per-meter table below.</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">PV</TableCell>
+                <TableCell>{pvHourly ? "pv_forecasts (weather-based)" : "clear-sky sinusoid"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{pvHourly ? "Forecast rows found for this date." : "No forecast rows for this date — synthetic fallback."}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

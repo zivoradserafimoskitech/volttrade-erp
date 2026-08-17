@@ -36,6 +36,7 @@ const groups: { title: string; items: Item[] }[] = [
   ]},
   { title: "Assets", items: [
     { to: "/assets", label: "Sites & Assets", icon: Battery },
+    { to: "/assets/optimizer", label: "BESS Optimizer", icon: Battery },
     { to: "/asset-monitoring", label: "Monitoring", icon: Sun },
     { to: "/pv-monitoring", label: "PV Plants", icon: Sun },
     { to: "/smart-meter", label: "Smart Meter", icon: Radio },
@@ -50,6 +51,7 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/balancing/allocation", label: "Imbalance Allocation", icon: Scale },
     { to: "/balancing/accuracy", label: "Forecast Accuracy", icon: Compass },
     { to: "/balancing/readiness", label: "Data Readiness", icon: Gauge },
+    { to: "/balancing/smart-meter-health", label: "Smart Meter Health", icon: Radio },
     { to: "/compliance", label: "Regulatory Deadlines", icon: ShieldCheck },
   ]},
   { title: "Supply Operations", items: [
