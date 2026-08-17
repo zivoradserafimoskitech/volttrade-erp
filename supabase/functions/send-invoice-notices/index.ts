@@ -1,10 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { authenticate, handler, json } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const PAGE = 500;
 
 type Kind = "invoice" | "reminder" | "dunning";
 type Lang = "mk" | "sq" | "en";
