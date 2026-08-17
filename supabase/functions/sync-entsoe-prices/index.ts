@@ -1,4 +1,4 @@
-import { authenticate, corsHeaders, handler, json as jsonResponse } from "../_shared/auth.ts";
+import { authenticate, handler, json as jsonResponse } from "../_shared/auth.ts";
 
 // ENTSO-E bidding zone EICs
 const ZONES: Record<string, string> = {
