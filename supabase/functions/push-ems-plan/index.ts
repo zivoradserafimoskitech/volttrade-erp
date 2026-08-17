@@ -91,7 +91,8 @@ Deno.serve(handler(async (req) => {
     .from("assets")
     .select("id, asset_code, asset_type, nameplate_power_kw, gateway_device_id, soc_min_pct, soc_max_pct")
     .not("gateway_device_id", "is", null)
-    .eq("status", "active");
+    .eq("status", "active")
+    .range(0, 999);
   if (aErr) throw aErr;
   const assets = (assetsRaw ?? []) as AssetRow[];
   if (assets.length === 0) {
@@ -115,7 +116,8 @@ Deno.serve(handler(async (req) => {
     .in("status", ["planned", "sent"])
     .lt("ts_from", horizonEnd.toISOString())
     .gte("ts_to", now.toISOString())
-    .order("ts_from", { ascending: true });
+    .order("ts_from", { ascending: true })
+    .range(0, 9999);
   if (dErr) throw dErr;
   const dispatch = (dispatchRaw ?? []) as DispatchRow[];
 
@@ -212,6 +214,11 @@ Deno.serve(handler(async (req) => {
         validTo,
         source: `volttrade-erp:${rows[0].mode}`,
         setpoints,
+        // Energy guard rails travel with the plan: the optimizer respects these
+        // when planning, but without them in the PUT body the plant has no
+        // fallback if reality drifts from the schedule.
+        minSoc: asset.soc_min_pct,
+        maxSoc: asset.soc_max_pct,
       });
 
       await admin
