@@ -229,58 +229,88 @@ export type Database = {
         Row: {
           asset_code: string
           asset_type: Database["public"]["Enums"]["asset_type"]
+          charge_efficiency: number
           created_at: string
           created_by: string | null
+          degradation_eur_per_mwh: number | null
+          discharge_efficiency: number
           external_ref: string | null
           gateway_device_id: number | null
+          grid_export_limit_kw: number | null
+          grid_import_limit_kw: number | null
           id: string
           install_date: string | null
+          max_cycles_per_day: number
           model: string | null
           nameplate_energy_kwh: number | null
           nameplate_power_kw: number | null
           organization_id: string
           pv_dc_kwp: number | null
           site_id: string
+          soc_max_pct: number
+          soc_min_pct: number
+          soc_terminal_pct: number
           status: string
           updated_at: string
+          usable_energy_kwh: number | null
           vendor: string | null
         }
         Insert: {
           asset_code: string
           asset_type: Database["public"]["Enums"]["asset_type"]
+          charge_efficiency?: number
           created_at?: string
           created_by?: string | null
+          degradation_eur_per_mwh?: number | null
+          discharge_efficiency?: number
           external_ref?: string | null
           gateway_device_id?: number | null
+          grid_export_limit_kw?: number | null
+          grid_import_limit_kw?: number | null
           id?: string
           install_date?: string | null
+          max_cycles_per_day?: number
           model?: string | null
           nameplate_energy_kwh?: number | null
           nameplate_power_kw?: number | null
           organization_id?: string
           pv_dc_kwp?: number | null
           site_id: string
+          soc_max_pct?: number
+          soc_min_pct?: number
+          soc_terminal_pct?: number
           status?: string
           updated_at?: string
+          usable_energy_kwh?: number | null
           vendor?: string | null
         }
         Update: {
           asset_code?: string
           asset_type?: Database["public"]["Enums"]["asset_type"]
+          charge_efficiency?: number
           created_at?: string
           created_by?: string | null
+          degradation_eur_per_mwh?: number | null
+          discharge_efficiency?: number
           external_ref?: string | null
           gateway_device_id?: number | null
+          grid_export_limit_kw?: number | null
+          grid_import_limit_kw?: number | null
           id?: string
           install_date?: string | null
+          max_cycles_per_day?: number
           model?: string | null
           nameplate_energy_kwh?: number | null
           nameplate_power_kw?: number | null
           organization_id?: string
           pv_dc_kwp?: number | null
           site_id?: string
+          soc_max_pct?: number
+          soc_min_pct?: number
+          soc_terminal_pct?: number
           status?: string
           updated_at?: string
+          usable_energy_kwh?: number | null
           vendor?: string | null
         }
         Relationships: [
@@ -420,6 +450,77 @@ export type Database = {
             columns: ["balance_group_id"]
             isOneToOne: false
             referencedRelation: "balance_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bess_optimizer_runs: {
+        Row: {
+          asset_id: string
+          backtest: boolean
+          binding_constraint: string | null
+          created_at: string
+          created_by: string | null
+          cycles_used: number | null
+          degradation_cost_eur: number | null
+          expected_revenue_eur: number | null
+          horizon_end: string
+          horizon_start: string
+          id: string
+          mode: string
+          net_value_eur: number | null
+          periods: number
+          plan: Json | null
+          prices: Json | null
+          start_soc_at: string | null
+          start_soc_kwh: number | null
+        }
+        Insert: {
+          asset_id: string
+          backtest?: boolean
+          binding_constraint?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycles_used?: number | null
+          degradation_cost_eur?: number | null
+          expected_revenue_eur?: number | null
+          horizon_end: string
+          horizon_start: string
+          id?: string
+          mode?: string
+          net_value_eur?: number | null
+          periods: number
+          plan?: Json | null
+          prices?: Json | null
+          start_soc_at?: string | null
+          start_soc_kwh?: number | null
+        }
+        Update: {
+          asset_id?: string
+          backtest?: boolean
+          binding_constraint?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycles_used?: number | null
+          degradation_cost_eur?: number | null
+          expected_revenue_eur?: number | null
+          horizon_end?: string
+          horizon_start?: string
+          id?: string
+          mode?: string
+          net_value_eur?: number | null
+          periods?: number
+          plan?: Json | null
+          prices?: Json | null
+          start_soc_at?: string | null
+          start_soc_kwh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bess_optimizer_runs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
             referencedColumns: ["id"]
           },
         ]
@@ -1878,6 +1979,8 @@ export type Database = {
           address: string | null
           annual_consumption_mwh: number | null
           balance_group_id: string | null
+          calibration_months: number
+          calibration_updated_at: string | null
           capacity_kw: number | null
           client_id: string
           connected_power_kw: number | null
@@ -1910,6 +2013,7 @@ export type Database = {
           pv_tilt_deg: number | null
           slp_category: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code: string | null
+          smart_meter_calibration: number
           status: string
           tariff_type: string | null
           voltage_level: string | null
@@ -1918,6 +2022,8 @@ export type Database = {
           address?: string | null
           annual_consumption_mwh?: number | null
           balance_group_id?: string | null
+          calibration_months?: number
+          calibration_updated_at?: string | null
           capacity_kw?: number | null
           client_id: string
           connected_power_kw?: number | null
@@ -1952,6 +2058,7 @@ export type Database = {
           pv_tilt_deg?: number | null
           slp_category?: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code?: string | null
+          smart_meter_calibration?: number
           status?: string
           tariff_type?: string | null
           voltage_level?: string | null
@@ -1960,6 +2067,8 @@ export type Database = {
           address?: string | null
           annual_consumption_mwh?: number | null
           balance_group_id?: string | null
+          calibration_months?: number
+          calibration_updated_at?: string | null
           capacity_kw?: number | null
           client_id?: string
           connected_power_kw?: number | null
@@ -1994,6 +2103,7 @@ export type Database = {
           pv_tilt_deg?: number | null
           slp_category?: Database["public"]["Enums"]["slp_category"] | null
           slp_profile_code?: string | null
+          smart_meter_calibration?: number
           status?: string
           tariff_type?: string | null
           voltage_level?: string | null
@@ -3616,6 +3726,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      volume_forecast_daily: {
+        Row: {
+          calibration: number
+          created_at: string
+          day_type: string
+          forecast_date: string
+          forecast_mwh: number
+          metering_point_id: string
+          method: string
+          sample_days: number
+        }
+        Insert: {
+          calibration?: number
+          created_at?: string
+          day_type: string
+          forecast_date: string
+          forecast_mwh: number
+          metering_point_id: string
+          method: string
+          sample_days?: number
+        }
+        Update: {
+          calibration?: number
+          created_at?: string
+          day_type?: string
+          forecast_date?: string
+          forecast_mwh?: number
+          metering_point_id?: string
+          method?: string
+          sample_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volume_forecast_daily_metering_point_id_fkey"
+            columns: ["metering_point_id"]
+            isOneToOne: false
+            referencedRelation: "metering_points"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       volume_forecasts: {
         Row: {
