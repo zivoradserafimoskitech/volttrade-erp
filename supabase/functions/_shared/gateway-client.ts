@@ -240,7 +240,15 @@ export class GatewayClient {
    */
   async pushEmsPlan(
     deviceId: number,
-    plan: { validFrom: Date; validTo: Date; source: string; setpoints: PlanSetpoint[] },
+    plan: {
+      validFrom: Date;
+      validTo: Date;
+      source: string;
+      setpoints: PlanSetpoint[];
+      /** State-of-charge guard rails (%), enforced plant-side if the plan drifts. */
+      minSoc?: number | null;
+      maxSoc?: number | null;
+    },
   ): Promise<{ planId: number; status: string; superseded: number }> {
     return await this.request(`/devices/${deviceId}/ems-plan`, {
       method: "PUT",
@@ -249,6 +257,8 @@ export class GatewayClient {
         validTo: plan.validTo.toISOString(),
         source: plan.source.slice(0, 64),
         setpoints: plan.setpoints,
+        ...(plan.minSoc != null && Number.isFinite(plan.minSoc) ? { minSoc: plan.minSoc } : {}),
+        ...(plan.maxSoc != null && Number.isFinite(plan.maxSoc) ? { maxSoc: plan.maxSoc } : {}),
       }),
     });
   }
