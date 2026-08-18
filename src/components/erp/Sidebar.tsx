@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass, Handshake, Eye, UserCheck } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 
 type Item = { to: string; label: string; icon: any; end?: boolean; roles?: AppRole[] };
@@ -70,6 +71,7 @@ const groups: { title: string; items: Item[] }[] = [
 
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const { user, signOut, hasRole, roles } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   return (
     <aside className={`${mobile ? "flex" : "hidden md:flex"} w-full md:w-64 flex-col border-r border-border bg-sidebar overflow-y-auto h-full`}>
@@ -88,7 +90,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           if (visible.length === 0) return null;
           return (
             <div key={g.title} className="space-y-1">
-              <div className="px-3 text-[10px] uppercase tracking-widest text-muted-foreground/70">{g.title}</div>
+              <div className="px-3 text-[10px] uppercase tracking-widest text-muted-foreground/70">{t(g.title)}</div>
               {visible.map(({ to, label, icon: Icon, end }) => (
                 <NavLink key={to} to={to} end={end}
                   className={({ isActive }) =>
@@ -96,7 +98,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                       isActive ? "bg-sidebar-accent text-sidebar-primary font-medium shadow-sm"
                               : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
                     }`}>
-                  <Icon className="h-4 w-4" />{label}
+                  <Icon className="h-4 w-4" />{t(label)}
                 </NavLink>
               ))}
             </div>
@@ -115,10 +117,10 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             window.open('/portal', '_blank', 'noopener');
           }}
         >
-          <Eye className="h-4 w-4 mr-2" /> View as customer
+          <Eye className="h-4 w-4 mr-2" /> {t("View as customer")}
         </Button>
         <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground" onClick={async () => { await signOut(); navigate("/auth"); }}>
-          <LogOut className="h-4 w-4 mr-2" /> Sign out
+          <LogOut className="h-4 w-4 mr-2" /> {t("Sign out")}
         </Button>
       </div>
     </aside>
