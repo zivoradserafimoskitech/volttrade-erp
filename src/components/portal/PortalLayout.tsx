@@ -2,26 +2,28 @@ import { ReactNode, useState } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell, Grid3x3, Sun, Moon } from "lucide-react";
 
 // Primary tabs — bottom bar on mobile (A1-style), sidebar on desktop.
 const primary = [
-  { to: "/portal", label: "Дома", icon: LayoutDashboard, end: true as boolean | undefined },
-  { to: "/portal/invoices", label: "Сметки", icon: Receipt },
-  { to: "/portal/hourly", label: "Потрошувачка", icon: Activity },
-  { to: "/portal/profile", label: "Профил", icon: User },
+  { to: "/portal", label: "Home", icon: LayoutDashboard, end: true as boolean | undefined },
+  { to: "/portal/invoices", label: "Invoices", icon: Receipt },
+  { to: "/portal/hourly", label: "Consumption", icon: Activity },
+  { to: "/portal/profile", label: "Profile", icon: User },
 ];
 // Secondary — "Повеќе" sheet on mobile, listed in sidebar on desktop.
 const secondary = [
-  { to: "/portal/edus", label: "Мои мерни места", icon: MapPin },
-  { to: "/portal/tariffs", label: "Тарифи", icon: Zap },
-  { to: "/portal/savings", label: "Заштеди", icon: Sparkles },
-  { to: "/portal/ev", label: "ЕВ полнење", icon: Car },
-  { to: "/portal/refer", label: "Препорачај", icon: Gift },
-  { to: "/portal/ppa", label: "Мои PPA", icon: Handshake },
-  { to: "/portal/readings", label: "Внеси отчит", icon: Gauge },
-  { to: "/portal/notifications", label: "Известувања", icon: Bell },
+  { to: "/portal/edus", label: "My supply points", icon: MapPin },
+  { to: "/portal/tariffs", label: "Tariffs", icon: Zap },
+  { to: "/portal/savings", label: "Savings", icon: Sparkles },
+  { to: "/portal/ev", label: "EV charging", icon: Car },
+  { to: "/portal/refer", label: "Refer", icon: Gift },
+  { to: "/portal/ppa", label: "My PPA", icon: Handshake },
+  { to: "/portal/readings", label: "Submit reading", icon: Gauge },
+  { to: "/portal/notifications", label: "Notifications", icon: Bell },
 ];
 const items: { to: string; label: string; icon: any; end?: boolean }[] = [...primary, ...secondary];
 
@@ -30,7 +32,8 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
+  const { t } = useI18n();
+  if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">{t("Loading…")}</div>;
   if (!user) return <Navigate to="/auth" replace />;
   const previewMode = (() => { try { return sessionStorage.getItem('viewAsCustomer') === '1'; } catch { return false; } })();
   const portalTokens =
@@ -96,18 +99,19 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
             <div className="font-semibold tracking-tight text-lg leading-none" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               vatra<span style={{ color: "#FF6B2C" }}>.</span>
             </div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Your energy</div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{t("Your energy")}</div>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <NavLink to="/portal/notifications" className="p-2 rounded-lg hover:bg-secondary" aria-label="Известувања">
+          <LanguageToggle />
+          <NavLink to="/portal/notifications" className="p-2 rounded-lg hover:bg-secondary" aria-label={t("Notifications")}>
             <Bell className="h-5 w-5" />
           </NavLink>
-          <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-secondary" aria-label={theme === "dark" ? "Switch to light" : "Switch to dark"}>
+          <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-secondary" aria-label={t(theme === "dark" ? "Switch to light" : "Switch to dark")}>
             {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
           <Button variant="ghost" size="sm" onClick={async () => { await signOut(); navigate("/auth"); }} className="hidden md:inline-flex">
-            <LogOut className="h-4 w-4 mr-2" />Одјава
+            <LogOut className="h-4 w-4 mr-2" />{t("Sign out")}
           </Button>
         </div>
       </header>
@@ -118,18 +122,18 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
           {items.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={(end as boolean) ?? false} className={({ isActive }) =>
               `flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-sm transition-colors ${isActive ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-              <Icon className="h-4 w-4 shrink-0" />{label}
+              <Icon className="h-4 w-4 shrink-0" />{t(label)}
             </NavLink>
           ))}
           <button onClick={async () => { await signOut(); navigate("/auth"); }}
             className="flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground mt-auto">
-            <LogOut className="h-4 w-4" />Одјава
+            <LogOut className="h-4 w-4" />{t("Sign out")}
           </button>
         </aside>
 
         {/* ── Content ── */}
         <main className="flex-1 min-w-0 p-4 md:p-6 pb-24 md:pb-6 space-y-4">
-          {title && <h1 className="text-xl md:text-2xl font-semibold tracking-tight">{title}</h1>}
+          {title && <h1 className="text-xl md:text-2xl font-semibold tracking-tight">{t(title)}</h1>}
           {children}
         </main>
       </div>
@@ -140,12 +144,12 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
           {primary.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={(end as boolean) ?? false} className={({ isActive }) =>
               `flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] ${isActive ? "text-primary" : "text-muted-foreground"}`}>
-              <Icon className="h-5 w-5" />{label}
+              <Icon className="h-5 w-5" />{t(label)}
             </NavLink>
           ))}
           <button onClick={() => setMoreOpen(true)}
             className={`flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] ${moreOpen ? "text-primary" : "text-muted-foreground"}`}>
-            <Grid3x3 className="h-5 w-5" />Повеќе
+            <Grid3x3 className="h-5 w-5" />{t("More")}
           </button>
         </div>
       </nav>
@@ -160,12 +164,12 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
                 <NavLink key={to} to={to} onClick={() => setMoreOpen(false)}
                   className="flex flex-col items-center gap-2 p-3 rounded-xl bg-secondary/60 text-center">
                   <Icon className="h-5 w-5 text-primary" />
-                  <span className="text-[11px] leading-tight">{label}</span>
+                  <span className="text-[11px] leading-tight">{t(label)}</span>
                 </NavLink>
               ))}
             </div>
             <Button variant="ghost" className="w-full mt-3" onClick={async () => { await signOut(); navigate("/auth"); }}>
-              <LogOut className="h-4 w-4 mr-2" />Одјава
+              <LogOut className="h-4 w-4 mr-2" />{t("Sign out")}
             </Button>
           </div>
         </div>
