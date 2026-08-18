@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Zap } from "lucide-react";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 export default function AuthPage() {
   const { user } = useAuth();
@@ -40,6 +41,7 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen grid place-items-center p-4" style={{ background: "var(--gradient-surface)" }}>
       <div className="w-full max-w-md">
+        <div className="flex justify-end mb-2"><LanguageToggle /></div>
         <div className="flex items-center gap-3 justify-center mb-6">
           <div className="h-11 w-11 rounded-xl grid place-items-center" style={{ background: "var(--gradient-primary)" }}>
             <Zap className="h-6 w-6 text-primary-foreground" />
