@@ -29,10 +29,10 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/auth" replace />;
   const previewMode = (() => { try { return sessionStorage.getItem('viewAsCustomer') === '1'; } catch { return false; } })();
-  const { theme, toggleTheme } = useTheme();
   const portalTokens =
     theme === "dark"
       ? {
