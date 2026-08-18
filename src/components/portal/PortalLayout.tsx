@@ -2,26 +2,28 @@ import { ReactNode, useState } from "react";
 import { Navigate, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, MapPin, Receipt, Gauge, User, LogOut, Handshake, Eye, ArrowLeft, Activity, Zap, Sparkles, Gift, Car, Bell, Grid3x3, Sun, Moon } from "lucide-react";
 
 // Primary tabs — bottom bar on mobile (A1-style), sidebar on desktop.
 const primary = [
-  { to: "/portal", label: "Дома", icon: LayoutDashboard, end: true as boolean | undefined },
-  { to: "/portal/invoices", label: "Сметки", icon: Receipt },
-  { to: "/portal/hourly", label: "Потрошувачка", icon: Activity },
-  { to: "/portal/profile", label: "Профил", icon: User },
+  { to: "/portal", label: "Home", icon: LayoutDashboard, end: true as boolean | undefined },
+  { to: "/portal/invoices", label: "Invoices", icon: Receipt },
+  { to: "/portal/hourly", label: "Consumption", icon: Activity },
+  { to: "/portal/profile", label: "Profile", icon: User },
 ];
 // Secondary — "Повеќе" sheet on mobile, listed in sidebar on desktop.
 const secondary = [
-  { to: "/portal/edus", label: "Мои мерни места", icon: MapPin },
-  { to: "/portal/tariffs", label: "Тарифи", icon: Zap },
-  { to: "/portal/savings", label: "Заштеди", icon: Sparkles },
-  { to: "/portal/ev", label: "ЕВ полнење", icon: Car },
-  { to: "/portal/refer", label: "Препорачај", icon: Gift },
-  { to: "/portal/ppa", label: "Мои PPA", icon: Handshake },
-  { to: "/portal/readings", label: "Внеси отчит", icon: Gauge },
-  { to: "/portal/notifications", label: "Известувања", icon: Bell },
+  { to: "/portal/edus", label: "My supply points", icon: MapPin },
+  { to: "/portal/tariffs", label: "Tariffs", icon: Zap },
+  { to: "/portal/savings", label: "Savings", icon: Sparkles },
+  { to: "/portal/ev", label: "EV charging", icon: Car },
+  { to: "/portal/refer", label: "Refer", icon: Gift },
+  { to: "/portal/ppa", label: "My PPA", icon: Handshake },
+  { to: "/portal/readings", label: "Submit reading", icon: Gauge },
+  { to: "/portal/notifications", label: "Notifications", icon: Bell },
 ];
 const items: { to: string; label: string; icon: any; end?: boolean }[] = [...primary, ...secondary];
 
@@ -30,7 +32,8 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
+  const { t } = useI18n();
+  if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">{t("Loading…")}</div>;
   if (!user) return <Navigate to="/auth" replace />;
   const previewMode = (() => { try { return sessionStorage.getItem('viewAsCustomer') === '1'; } catch { return false; } })();
   const portalTokens =
