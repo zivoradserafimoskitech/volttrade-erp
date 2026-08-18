@@ -2,6 +2,8 @@ import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sidebar } from "./Sidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,8 @@ export function ErpLayout({ children, title, subtitle, actions }: { children: Re
   const { user, loading, needsMfa } = useAuth();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
+  const { t } = useI18n();
+  if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">{t("Loading…")}</div>;
   if (!user) return <Navigate to="/auth" replace />;
   if (needsMfa && location.pathname !== "/2fa") return <Navigate to="/2fa" replace />;
 
@@ -23,7 +26,7 @@ export function ErpLayout({ children, title, subtitle, actions }: { children: Re
           <div className="flex items-center gap-3 min-w-0">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden shrink-0" aria-label="Open menu">
+                <Button variant="ghost" size="icon" className="md:hidden shrink-0" aria-label={t("Open menu")}>
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
@@ -32,12 +35,13 @@ export function ErpLayout({ children, title, subtitle, actions }: { children: Re
               </SheetContent>
             </Sheet>
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold tracking-tight truncate">{title}</h1>
+              <h1 className="text-lg font-semibold tracking-tight truncate">{t(title)}</h1>
               {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light" : "Switch to dark"}>
+            <LanguageToggle />
+            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={t(theme === "dark" ? "Switch to light" : "Switch to dark")}>
               {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
             {actions}
