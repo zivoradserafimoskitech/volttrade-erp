@@ -86,7 +86,7 @@ export default function SupplyPoints() {
         <CardContent className="p-0">
           <Table>
             <TableHeader><TableRow>
-              <TableHead>EDU / POD</TableHead><TableHead>Customer</TableHead><TableHead>DSO</TableHead><TableHead>Voltage</TableHead><TableHead className="text-right">Capacity</TableHead><TableHead className="text-right">Annual MWh</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+              <TableHead>EDU / POD</TableHead><TableHead>Customer</TableHead><TableHead>DSO</TableHead><TableHead>Voltage</TableHead><TableHead className="text-right">Capacity</TableHead><TableHead className="text-right">Annual MWh</TableHead><TableHead>Lat / Long</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {filtered.map(m => {
