@@ -83,7 +83,7 @@ export default function ConsumerManager() {
     const { error } = await supabase.from("metering_points").insert(payload);
     if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Saved" });
-    setOpen(false); setDraft({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active" });
+    setOpen(false); setDraft({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active", pv_tilt_deg: 30, pv_azimuth_deg: 180, pv_calibration: 1 });
     load();
   }
 
