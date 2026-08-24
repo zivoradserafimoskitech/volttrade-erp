@@ -40,6 +40,8 @@ export default function SupplyPoints() {
       capacity_kw: form.get("capacity_kw") ? Number(form.get("capacity_kw")) : null,
       connection_type: form.get("connection_type") as string || null,
       meter_id: form.get("meter_id") as string || null,
+      latitude: form.get("latitude") ? Number(form.get("latitude")) : null,
+      longitude: form.get("longitude") ? Number(form.get("longitude")) : null,
       status: 'active',
     } as any);
     if (error) return toast.error(error.message);
