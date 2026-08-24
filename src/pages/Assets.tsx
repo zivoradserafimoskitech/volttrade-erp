@@ -242,6 +242,7 @@ export default function Assets() {
                       <TableCell className="font-medium">{s.name}</TableCell>
                       <TableCell>{s.country || "—"}</TableCell>
                       <TableCell>{s.address || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.latitude != null && s.longitude != null ? `${Number(s.latitude).toFixed(4)}, ${Number(s.longitude).toFixed(4)}` : "—"}</TableCell>
                       <TableCell>{mp ? <Badge variant="outline">BTM · {mp.edu_code}</Badge> : <Badge variant="secondary">Standalone</Badge>}</TableCell>
                       <TableCell>{count}</TableCell>
                     </TableRow>
