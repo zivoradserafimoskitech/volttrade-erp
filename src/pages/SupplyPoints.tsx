@@ -23,7 +23,7 @@ export default function SupplyPoints() {
   const [filter, setFilter] = useState("");
 
   const load = async () => {
-    const { data: ms } = await supabase.from("metering_points").select("*").order("edu_code");
+    const { data: ms } = await supabase.from("metering_points").select("*, latitude, longitude").order("edu_code");
     const { data: cs } = await supabase.from("clients").select("id,company_name").order("company_name");
     setMps(ms ?? []); setClients((cs as any) ?? []);
   };
