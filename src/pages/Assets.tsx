@@ -212,6 +212,10 @@ export default function Assets() {
                     <div><Label>Country</Label><Input value={siteForm.country} onChange={e => setSiteForm({ ...siteForm, country: e.target.value })} /></div>
                     <div><Label>Address</Label><Input value={siteForm.address} onChange={e => setSiteForm({ ...siteForm, address: e.target.value })} /></div>
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><Label>Latitude</Label><Input type="number" step="0.000001" value={siteForm.latitude} onChange={e => setSiteForm({ ...siteForm, latitude: e.target.value })} placeholder="41.9981" /></div>
+                    <div><Label>Longitude</Label><Input type="number" step="0.000001" value={siteForm.longitude} onChange={e => setSiteForm({ ...siteForm, longitude: e.target.value })} placeholder="21.4254" /></div>
+                  </div>
                   <div>
                     <Label>Linked metering point (optional, BTM)</Label>
                     <Select value={siteForm.metering_point_id} onValueChange={v => setSiteForm({ ...siteForm, metering_point_id: v })}>
