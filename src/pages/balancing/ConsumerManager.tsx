@@ -173,7 +173,7 @@ export default function ConsumerManager() {
           <Table>
             <TableHeader><TableRow>
               <TableHead>EIC</TableHead><TableHead>Category</TableHead><TableHead>SLP</TableHead><TableHead>Type</TableHead>
-              <TableHead>kW</TableHead><TableHead>Voltage</TableHead><TableHead>Prosumer</TableHead><TableHead>Private meter</TableHead><TableHead>Status</TableHead>
+              <TableHead>kW</TableHead><TableHead>Voltage</TableHead><TableHead>Lat/Long</TableHead><TableHead>Prosumer</TableHead><TableHead>Private meter</TableHead><TableHead>Status</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {filtered.map(r => (
