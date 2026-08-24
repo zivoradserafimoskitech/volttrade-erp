@@ -26,7 +26,7 @@ export default function ConsumerManager() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterPro, setFilterPro] = useState<string>("all");
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<any>({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active" });
+  const [draft, setDraft] = useState<any>({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active", pv_tilt_deg: 30, pv_azimuth_deg: 180, pv_calibration: 1 });
 
   async function load() {
     const [{ data: cps }, { data: bgs }] = await Promise.all([
@@ -74,11 +74,16 @@ export default function ConsumerManager() {
       has_pv: !!draft.is_prosumer,
       prosumer_scheme: draft.is_prosumer ? (draft.prosumer_scheme ?? null) : null,
       status: draft.status ?? "active",
+      latitude: draft.latitude ? Number(draft.latitude) : null,
+      longitude: draft.longitude ? Number(draft.longitude) : null,
+      pv_tilt_deg: draft.pv_tilt_deg ? Number(draft.pv_tilt_deg) : 30,
+      pv_azimuth_deg: draft.pv_azimuth_deg ? Number(draft.pv_azimuth_deg) : 180,
+      pv_calibration: draft.pv_calibration ? Number(draft.pv_calibration) : 1,
     };
     const { error } = await supabase.from("metering_points").insert(payload);
     if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Saved" });
-    setOpen(false); setDraft({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active" });
+    setOpen(false); setDraft({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active", pv_tilt_deg: 30, pv_azimuth_deg: 180, pv_calibration: 1 });
     load();
   }
 
@@ -116,6 +121,8 @@ export default function ConsumerManager() {
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>{groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
               </Select></Field>
+              <Field label="Latitude"><Input type="number" step="0.000001" value={draft.latitude ?? ""} onChange={e => setDraft({ ...draft, latitude: e.target.value })} placeholder="41.9981" /></Field>
+              <Field label="Longitude"><Input type="number" step="0.000001" value={draft.longitude ?? ""} onChange={e => setDraft({ ...draft, longitude: e.target.value })} placeholder="21.4254" /></Field>
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <Label className="text-xs">Has private smart meter</Label>
                 <Switch checked={draft.has_private_meter} onCheckedChange={v => setDraft({ ...draft, has_private_meter: v })} />
@@ -130,6 +137,9 @@ export default function ConsumerManager() {
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent><SelectItem value="NET_METERING">Net metering</SelectItem><SelectItem value="NET_BILLING">Net billing</SelectItem></SelectContent>
                 </Select></Field>
+                <Field label="PV tilt °"><Input type="number" value={draft.pv_tilt_deg ?? ""} onChange={e => setDraft({ ...draft, pv_tilt_deg: +e.target.value })} placeholder="30" /></Field>
+                <Field label="PV azimuth °"><Input type="number" value={draft.pv_azimuth_deg ?? ""} onChange={e => setDraft({ ...draft, pv_azimuth_deg: +e.target.value })} placeholder="180" /></Field>
+                <Field label="PV calibration"><Input type="number" step="0.01" value={draft.pv_calibration ?? ""} onChange={e => setDraft({ ...draft, pv_calibration: +e.target.value })} placeholder="1.0" /></Field>
               </>}
             </div>
             <DialogFooter><Button onClick={save}>Save</Button></DialogFooter>
@@ -163,7 +173,7 @@ export default function ConsumerManager() {
           <Table>
             <TableHeader><TableRow>
               <TableHead>EIC</TableHead><TableHead>Category</TableHead><TableHead>SLP</TableHead><TableHead>Type</TableHead>
-              <TableHead>kW</TableHead><TableHead>Voltage</TableHead><TableHead>Prosumer</TableHead><TableHead>Private meter</TableHead><TableHead>Status</TableHead>
+              <TableHead>kW</TableHead><TableHead>Voltage</TableHead><TableHead>Lat/Long</TableHead><TableHead>Prosumer</TableHead><TableHead>Private meter</TableHead><TableHead>Status</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {filtered.map(r => (
@@ -174,12 +184,13 @@ export default function ConsumerManager() {
                   <TableCell>{r.consumer_type}</TableCell>
                   <TableCell className="tabular-nums">{r.connection_power_kw ?? "—"}</TableCell>
                   <TableCell>{r.voltage_level ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{r.latitude != null && r.longitude != null ? `${Number(r.latitude).toFixed(4)}, ${Number(r.longitude).toFixed(4)}` : "—"}</TableCell>
                   <TableCell>{r.is_prosumer ? <Badge variant="outline" className="gap-1"><Sun className="h-3 w-3" />{r.prosumer_scheme ?? "—"}</Badge> : "—"}</TableCell>
                   <TableCell>{r.has_private_meter ? "Yes" : "No"}</TableCell>
                   <TableCell><Badge variant="secondary">{r.status}</Badge></TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No connection points yet.</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No connection points yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>

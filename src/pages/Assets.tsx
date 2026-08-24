@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Plus, Battery, Sun, Zap, MapPin, Radio, Link2, AlertTriangle, Pencil, Calculator } from "lucide-react";
 
-type Site = { id: string; name: string; address: string | null; country: string | null; metering_point_id: string | null };
+type Site = { id: string; name: string; address: string | null; country: string | null; metering_point_id: string | null; latitude: number | null; longitude: number | null };
 type Asset = {
   id: string; site_id: string; asset_code: string; asset_type: "bess" | "pv" | "hybrid";
   vendor: string | null; model: string | null; nameplate_power_kw: number | null;
@@ -58,7 +58,7 @@ export default function Assets() {
   const [siteOpen, setSiteOpen] = useState(false);
   const [assetOpen, setAssetOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [siteForm, setSiteForm] = useState<any>({ name: "", address: "", country: "", metering_point_id: "" });
+  const [siteForm, setSiteForm] = useState<any>({ name: "", address: "", country: "", metering_point_id: "", latitude: "", longitude: "" });
   const [assetForm, setAssetForm] = useState<any>({ ...emptyAsset });
   const [linkAsset, setLinkAsset] = useState<Asset | null>(null);
   const [linkValue, setLinkValue] = useState("");
@@ -87,11 +87,13 @@ export default function Assets() {
       address: siteForm.address || null,
       country: siteForm.country || null,
       metering_point_id: siteForm.metering_point_id || null,
+      latitude: siteForm.latitude ? Number(siteForm.latitude) : null,
+      longitude: siteForm.longitude ? Number(siteForm.longitude) : null,
     });
     if (error) return toast.error(error.message);
     toast.success("Site added");
     setSiteOpen(false);
-    setSiteForm({ name: "", address: "", country: "", metering_point_id: "" });
+    setSiteForm({ name: "", address: "", country: "", metering_point_id: "", latitude: "", longitude: "" });
     load();
   }
 
@@ -210,6 +212,10 @@ export default function Assets() {
                     <div><Label>Country</Label><Input value={siteForm.country} onChange={e => setSiteForm({ ...siteForm, country: e.target.value })} /></div>
                     <div><Label>Address</Label><Input value={siteForm.address} onChange={e => setSiteForm({ ...siteForm, address: e.target.value })} /></div>
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><Label>Latitude</Label><Input type="number" step="0.000001" value={siteForm.latitude} onChange={e => setSiteForm({ ...siteForm, latitude: e.target.value })} placeholder="41.9981" /></div>
+                    <div><Label>Longitude</Label><Input type="number" step="0.000001" value={siteForm.longitude} onChange={e => setSiteForm({ ...siteForm, longitude: e.target.value })} placeholder="21.4254" /></div>
+                  </div>
                   <div>
                     <Label>Linked metering point (optional, BTM)</Label>
                     <Select value={siteForm.metering_point_id} onValueChange={v => setSiteForm({ ...siteForm, metering_point_id: v })}>
@@ -226,7 +232,7 @@ export default function Assets() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Country</TableHead><TableHead>Address</TableHead><TableHead>Link</TableHead><TableHead>Assets</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Country</TableHead><TableHead>Address</TableHead><TableHead>Coordinates</TableHead><TableHead>Link</TableHead><TableHead>Assets</TableHead></TableRow></TableHeader>
               <TableBody>
                 {sites.map(s => {
                   const mp = meters.find(m => m.id === s.metering_point_id);
@@ -236,12 +242,13 @@ export default function Assets() {
                       <TableCell className="font-medium">{s.name}</TableCell>
                       <TableCell>{s.country || "—"}</TableCell>
                       <TableCell>{s.address || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.latitude != null && s.longitude != null ? `${Number(s.latitude).toFixed(4)}, ${Number(s.longitude).toFixed(4)}` : "—"}</TableCell>
                       <TableCell>{mp ? <Badge variant="outline">BTM · {mp.edu_code}</Badge> : <Badge variant="secondary">Standalone</Badge>}</TableCell>
                       <TableCell>{count}</TableCell>
                     </TableRow>
                   );
                 })}
-                {!loading && sites.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No sites yet</TableCell></TableRow>}
+                {!loading && sites.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No sites yet</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>

@@ -23,7 +23,7 @@ export default function SupplyPoints() {
   const [filter, setFilter] = useState("");
 
   const load = async () => {
-    const { data: ms } = await supabase.from("metering_points").select("*").order("edu_code");
+    const { data: ms } = await supabase.from("metering_points").select("*, latitude, longitude").order("edu_code");
     const { data: cs } = await supabase.from("clients").select("id,company_name").order("company_name");
     setMps(ms ?? []); setClients((cs as any) ?? []);
   };
@@ -40,6 +40,8 @@ export default function SupplyPoints() {
       capacity_kw: form.get("capacity_kw") ? Number(form.get("capacity_kw")) : null,
       connection_type: form.get("connection_type") as string || null,
       meter_id: form.get("meter_id") as string || null,
+      latitude: form.get("latitude") ? Number(form.get("latitude")) : null,
+      longitude: form.get("longitude") ? Number(form.get("longitude")) : null,
       status: 'active',
     } as any);
     if (error) return toast.error(error.message);
@@ -72,6 +74,8 @@ export default function SupplyPoints() {
               <F name="capacity_kw" label="Capacity (kW)" type="number" step="0.01" />
               <F name="meter_id" label="Meter ID" />
               <F name="annual_consumption_mwh" label="Annual consumption (MWh)" type="number" step="0.01" />
+              <F name="latitude" label="Latitude" type="number" step="0.000001" placeholder="41.9981" />
+              <F name="longitude" label="Longitude" type="number" step="0.000001" placeholder="21.4254" />
               <DialogFooter className="col-span-2"><Button type="submit" style={{ background: "var(--gradient-primary)" }}>Save</Button></DialogFooter>
             </form>
           </DialogContent>
@@ -82,7 +86,7 @@ export default function SupplyPoints() {
         <CardContent className="p-0">
           <Table>
             <TableHeader><TableRow>
-              <TableHead>EDU / POD</TableHead><TableHead>Customer</TableHead><TableHead>DSO</TableHead><TableHead>Voltage</TableHead><TableHead className="text-right">Capacity</TableHead><TableHead className="text-right">Annual MWh</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+              <TableHead>EDU / POD</TableHead><TableHead>Customer</TableHead><TableHead>DSO</TableHead><TableHead>Voltage</TableHead><TableHead className="text-right">Capacity</TableHead><TableHead className="text-right">Annual MWh</TableHead><TableHead>Lat / Long</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {filtered.map(m => {
@@ -95,12 +99,13 @@ export default function SupplyPoints() {
                     <TableCell className="text-sm">{m.voltage_level ?? "—"}</TableCell>
                     <TableCell className="text-right text-sm">{m.capacity_kw ?? "—"}</TableCell>
                     <TableCell className="text-right text-sm">{m.annual_consumption_mwh ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{m.latitude != null && m.longitude != null ? `${Number(m.latitude).toFixed(4)}, ${Number(m.longitude).toFixed(4)}` : "—"}</TableCell>
                     <TableCell><Badge variant="secondary">{m.status}</Badge></TableCell>
                     <TableCell className="text-right"><Button size="icon" variant="ghost" onClick={() => del(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                   </TableRow>
                 );
               })}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-10 text-sm text-muted-foreground">No supply points yet.</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">No supply points yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
