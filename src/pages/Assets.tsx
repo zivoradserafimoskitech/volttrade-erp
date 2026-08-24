@@ -248,7 +248,7 @@ export default function Assets() {
                     </TableRow>
                   );
                 })}
-                {!loading && sites.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No sites yet</TableCell></TableRow>}
+                {!loading && sites.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No sites yet</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>
