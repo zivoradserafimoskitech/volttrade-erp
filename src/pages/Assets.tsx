@@ -58,7 +58,7 @@ export default function Assets() {
   const [siteOpen, setSiteOpen] = useState(false);
   const [assetOpen, setAssetOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [siteForm, setSiteForm] = useState<any>({ name: "", address: "", country: "", metering_point_id: "" });
+  const [siteForm, setSiteForm] = useState<any>({ name: "", address: "", country: "", metering_point_id: "", latitude: "", longitude: "" });
   const [assetForm, setAssetForm] = useState<any>({ ...emptyAsset });
   const [linkAsset, setLinkAsset] = useState<Asset | null>(null);
   const [linkValue, setLinkValue] = useState("");
