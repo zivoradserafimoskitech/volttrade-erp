@@ -184,6 +184,7 @@ export default function ConsumerManager() {
                   <TableCell>{r.consumer_type}</TableCell>
                   <TableCell className="tabular-nums">{r.connection_power_kw ?? "—"}</TableCell>
                   <TableCell>{r.voltage_level ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{r.latitude != null && r.longitude != null ? `${Number(r.latitude).toFixed(4)}, ${Number(r.longitude).toFixed(4)}` : "—"}</TableCell>
                   <TableCell>{r.is_prosumer ? <Badge variant="outline" className="gap-1"><Sun className="h-3 w-3" />{r.prosumer_scheme ?? "—"}</Badge> : "—"}</TableCell>
                   <TableCell>{r.has_private_meter ? "Yes" : "No"}</TableCell>
                   <TableCell><Badge variant="secondary">{r.status}</Badge></TableCell>
