@@ -26,7 +26,7 @@ export default function ConsumerManager() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterPro, setFilterPro] = useState<string>("all");
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<any>({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active" });
+  const [draft, setDraft] = useState<any>({ metering_category: "PROFILED", consumer_type: "SOHO", is_prosumer: false, has_private_meter: false, status: "active", pv_tilt_deg: 30, pv_azimuth_deg: 180, pv_calibration: 1 });
 
   async function load() {
     const [{ data: cps }, { data: bgs }] = await Promise.all([
