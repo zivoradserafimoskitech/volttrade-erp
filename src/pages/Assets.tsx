@@ -232,7 +232,7 @@ export default function Assets() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Country</TableHead><TableHead>Address</TableHead><TableHead>Link</TableHead><TableHead>Assets</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Country</TableHead><TableHead>Address</TableHead><TableHead>Coordinates</TableHead><TableHead>Link</TableHead><TableHead>Assets</TableHead></TableRow></TableHeader>
               <TableBody>
                 {sites.map(s => {
                   const mp = meters.find(m => m.id === s.metering_point_id);
