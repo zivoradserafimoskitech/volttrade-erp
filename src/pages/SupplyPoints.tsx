@@ -99,6 +99,7 @@ export default function SupplyPoints() {
                     <TableCell className="text-sm">{m.voltage_level ?? "—"}</TableCell>
                     <TableCell className="text-right text-sm">{m.capacity_kw ?? "—"}</TableCell>
                     <TableCell className="text-right text-sm">{m.annual_consumption_mwh ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{m.latitude != null && m.longitude != null ? `${Number(m.latitude).toFixed(4)}, ${Number(m.longitude).toFixed(4)}` : "—"}</TableCell>
                     <TableCell><Badge variant="secondary">{m.status}</Badge></TableCell>
                     <TableCell className="text-right"><Button size="icon" variant="ghost" onClick={() => del(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                   </TableRow>
