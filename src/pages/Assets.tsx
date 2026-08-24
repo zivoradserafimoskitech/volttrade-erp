@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Plus, Battery, Sun, Zap, MapPin, Radio, Link2, AlertTriangle, Pencil, Calculator } from "lucide-react";
 
-type Site = { id: string; name: string; address: string | null; country: string | null; metering_point_id: string | null };
+type Site = { id: string; name: string; address: string | null; country: string | null; metering_point_id: string | null; latitude: number | null; longitude: number | null };
 type Asset = {
   id: string; site_id: string; asset_code: string; asset_type: "bess" | "pv" | "hybrid";
   vendor: string | null; model: string | null; nameplate_power_kw: number | null;
