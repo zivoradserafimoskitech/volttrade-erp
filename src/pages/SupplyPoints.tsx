@@ -105,7 +105,7 @@ export default function SupplyPoints() {
                   </TableRow>
                 );
               })}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-10 text-sm text-muted-foreground">No supply points yet.</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-10 text-sm text-muted-foreground">No supply points yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
