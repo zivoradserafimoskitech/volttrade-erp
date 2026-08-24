@@ -87,11 +87,13 @@ export default function Assets() {
       address: siteForm.address || null,
       country: siteForm.country || null,
       metering_point_id: siteForm.metering_point_id || null,
+      latitude: siteForm.latitude ? Number(siteForm.latitude) : null,
+      longitude: siteForm.longitude ? Number(siteForm.longitude) : null,
     });
     if (error) return toast.error(error.message);
     toast.success("Site added");
     setSiteOpen(false);
-    setSiteForm({ name: "", address: "", country: "", metering_point_id: "" });
+    setSiteForm({ name: "", address: "", country: "", metering_point_id: "", latitude: "", longitude: "" });
     load();
   }
 
