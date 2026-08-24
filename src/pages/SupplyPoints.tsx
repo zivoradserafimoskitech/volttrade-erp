@@ -74,6 +74,8 @@ export default function SupplyPoints() {
               <F name="capacity_kw" label="Capacity (kW)" type="number" step="0.01" />
               <F name="meter_id" label="Meter ID" />
               <F name="annual_consumption_mwh" label="Annual consumption (MWh)" type="number" step="0.01" />
+              <F name="latitude" label="Latitude" type="number" step="0.000001" placeholder="41.9981" />
+              <F name="longitude" label="Longitude" type="number" step="0.000001" placeholder="21.4254" />
               <DialogFooter className="col-span-2"><Button type="submit" style={{ background: "var(--gradient-primary)" }}>Save</Button></DialogFooter>
             </form>
           </DialogContent>
