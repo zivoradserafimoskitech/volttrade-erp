@@ -190,7 +190,7 @@ export default function ConsumerManager() {
                   <TableCell><Badge variant="secondary">{r.status}</Badge></TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No connection points yet.</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No connection points yet.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
