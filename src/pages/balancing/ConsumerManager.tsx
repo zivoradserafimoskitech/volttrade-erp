@@ -74,6 +74,11 @@ export default function ConsumerManager() {
       has_pv: !!draft.is_prosumer,
       prosumer_scheme: draft.is_prosumer ? (draft.prosumer_scheme ?? null) : null,
       status: draft.status ?? "active",
+      latitude: draft.latitude ? Number(draft.latitude) : null,
+      longitude: draft.longitude ? Number(draft.longitude) : null,
+      pv_tilt_deg: draft.pv_tilt_deg ? Number(draft.pv_tilt_deg) : 30,
+      pv_azimuth_deg: draft.pv_azimuth_deg ? Number(draft.pv_azimuth_deg) : 180,
+      pv_calibration: draft.pv_calibration ? Number(draft.pv_calibration) : 1,
     };
     const { error } = await supabase.from("metering_points").insert(payload);
     if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
