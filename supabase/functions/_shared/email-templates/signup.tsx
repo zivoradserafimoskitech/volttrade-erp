@@ -32,7 +32,9 @@ export const SignupEmail = ({ siteName, siteUrl, recipient, confirmationUrl }: S
         <Button style={button} href={confirmationUrl}>
           Verify email
         </Button>
-        <Text style={footer}>If you didn't create an account, you can safely ignore this email.</Text>
+        <Text style={footer}>
+          This verification link expires in 24 hours (1440 minutes). If you didn't create an account, you can safely ignore this email.
+        </Text>
         <Signature siteName={siteName} />
       </Shell>
     </Body>
