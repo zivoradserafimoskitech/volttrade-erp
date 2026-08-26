@@ -17,7 +17,7 @@ export const MagicLinkEmail = ({ siteName, confirmationUrl }: MagicLinkEmailProp
       <Shell>
         <Heading style={h1}>Your login link</Heading>
         <Text style={text}>
-          Use the button below to sign in to {siteName}. This link expires shortly.
+          Use the button below to sign in to {siteName}. This link expires in 60 minutes.
         </Text>
         <Button style={button} href={confirmationUrl}>
           Log in

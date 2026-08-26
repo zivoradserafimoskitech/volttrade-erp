@@ -28,7 +28,7 @@ export const InviteEmail = ({ siteName, siteUrl, confirmationUrl }: InviteEmailP
           Accept invitation
         </Button>
         <Text style={footer}>
-          If you weren't expecting this invitation, you can safely ignore this email.
+          This invitation link expires in 24 hours (1440 minutes). If you weren't expecting this invitation, you can safely ignore this email.
         </Text>
         <Signature siteName={siteName} />
       </Shell>

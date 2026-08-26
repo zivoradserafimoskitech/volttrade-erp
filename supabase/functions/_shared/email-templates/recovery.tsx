@@ -23,7 +23,7 @@ export const RecoveryEmail = ({ siteName, confirmationUrl }: RecoveryEmailProps)
           Reset password
         </Button>
         <Text style={footer}>
-          If you didn't request a password reset, you can safely ignore this email — your password won't change.
+          This link expires in 24 hours (1440 minutes). If you didn't request a password reset, you can safely ignore this email — your password won't change.
         </Text>
         <Signature siteName={siteName} />
       </Shell>

@@ -34,7 +34,9 @@ export const EmailChangeEmail = ({ siteName, oldEmail, newEmail, confirmationUrl
         <Button style={button} href={confirmationUrl}>
           Confirm email change
         </Button>
-        <Text style={footer}>If you didn't request this change, please secure your account immediately.</Text>
+        <Text style={footer}>
+          This confirmation link expires in 24 hours (1440 minutes). If you didn't request this change, please secure your account immediately.
+        </Text>
         <Signature siteName={siteName} />
       </Shell>
     </Body>
