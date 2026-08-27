@@ -22,8 +22,11 @@ export default function ResetPassword() {
 
   useEffect(() => {
     let done = false;
-    const ok = () => { done = true; setPhase("ready"); };
-    const fail = (msg: string) => { done = true; setLinkError(msg); setPhase("invalid"); };
+    // Guard both handlers: the SDK may auto-exchange ?code= on load while this
+    // effect also exchanges it manually — the code is single-use, so the second
+    // exchange fails and must not overwrite an already-successful result.
+    const ok = () => { if (done) return; done = true; setPhase("ready"); };
+    const fail = (msg: string) => { if (done) return; done = true; setLinkError(msg); setPhase("invalid"); };
 
     // Supabase reports failed/expired links via hash or query params.
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -49,7 +52,13 @@ export default function ResetPassword() {
       const code = query.get("code");
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) return fail("This link has expired or was already used. Request a new one below.");
+        if (error) {
+          // The SDK may have already consumed the single-use code — treat an
+          // existing session as success rather than declaring the link invalid.
+          const { data } = await supabase.auth.getSession();
+          if (data.session) return ok();
+          return fail("This link has expired or was already used. Request a new one below.");
+        }
         return ok();
       }
       const { data } = await supabase.auth.getSession();
