@@ -2301,28 +2301,82 @@ export type Database = {
       }
       organizations: {
         Row: {
+          address_line: string | null
+          bank_name: string | null
+          city: string | null
+          contact_email: string | null
+          contact_phone: string | null
           country_code: string | null
           created_at: string
+          default_currency: string
+          eic_code: string | null
+          iban: string | null
           id: string
+          invoice_footer_note: string | null
+          invoice_sender_email: string | null
           legal_name: string | null
+          licence_number: string | null
           name: string
+          postal_code: string | null
+          registration_number: string | null
+          short_name: string | null
+          swift: string | null
           tax_id: string | null
+          updated_at: string
+          vat_number: string | null
+          website: string | null
         }
         Insert: {
+          address_line?: string | null
+          bank_name?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           country_code?: string | null
           created_at?: string
+          default_currency?: string
+          eic_code?: string | null
+          iban?: string | null
           id?: string
+          invoice_footer_note?: string | null
+          invoice_sender_email?: string | null
           legal_name?: string | null
+          licence_number?: string | null
           name: string
+          postal_code?: string | null
+          registration_number?: string | null
+          short_name?: string | null
+          swift?: string | null
           tax_id?: string | null
+          updated_at?: string
+          vat_number?: string | null
+          website?: string | null
         }
         Update: {
+          address_line?: string | null
+          bank_name?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           country_code?: string | null
           created_at?: string
+          default_currency?: string
+          eic_code?: string | null
+          iban?: string | null
           id?: string
+          invoice_footer_note?: string | null
+          invoice_sender_email?: string | null
           legal_name?: string | null
+          licence_number?: string | null
           name?: string
+          postal_code?: string | null
+          registration_number?: string | null
+          short_name?: string | null
+          swift?: string | null
           tax_id?: string | null
+          updated_at?: string
+          vat_number?: string | null
+          website?: string | null
         }
         Relationships: [
           {
