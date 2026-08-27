@@ -52,7 +52,13 @@ export default function ResetPassword() {
       const code = query.get("code");
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) return fail("This link has expired or was already used. Request a new one below.");
+        if (error) {
+          // The SDK may have already consumed the single-use code — treat an
+          // existing session as success rather than declaring the link invalid.
+          const { data } = await supabase.auth.getSession();
+          if (data.session) return ok();
+          return fail("This link has expired or was already used. Request a new one below.");
+        }
         return ok();
       }
       const { data } = await supabase.auth.getSession();
