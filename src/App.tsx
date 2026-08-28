@@ -124,10 +124,10 @@ const App = () => (
             <Route path="/asset-monitoring" element={<AssetMonitoring />} />
             <Route path="/pv-monitoring" element={<PvMonitoring />} />
             <Route path="/smart-meter" element={<SmartMeter />} />
+            <Route path="/gateways" element={<Gateways />} />
             <Route path="/gateways/alarms" element={<GatewayAlarms />} />
             <Route path="/gateways/:id" element={<GatewayDetail />} />
 
-            <Route path="/gateways/:id" element={<GatewayDetail />} />
             <Route path="/balancing/consumers" element={<ConsumerManager />} />
             <Route path="/balancing/slp" element={<SlpSynthesis />} />
             <Route path="/balancing/scheduling" element={<Scheduling />} />
