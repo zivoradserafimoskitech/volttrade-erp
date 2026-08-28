@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { ErpLayout } from "@/components/erp/Layout";
 import { RoleGate } from "@/components/erp/RoleGate";
+import { CompanyProfileCard } from "@/components/erp/CompanyProfileCard";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +106,8 @@ export default function Settings() {
       )}
 
       <RoleGate roles={['admin']}>
+        <CompanyProfileCard />
+
         <Card className="border-border/60">
           <CardHeader><CardTitle>Add country</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-5 gap-3 items-end">
