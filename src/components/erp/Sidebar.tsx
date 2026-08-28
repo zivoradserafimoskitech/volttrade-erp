@@ -75,6 +75,21 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const { user, signOut, hasRole, roles } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [criticalAlarms, setCriticalAlarms] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      const { count } = await (supabase.from as any)("gateway_alarms")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active").eq("severity", "critical");
+      if (!cancelled) setCriticalAlarms(count ?? 0);
+    };
+    check();
+    const t = setInterval(check, 60_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
   return (
     <aside className={`${mobile ? "flex" : "hidden md:flex"} w-full md:w-64 flex-col border-r border-border bg-sidebar overflow-y-auto h-full`}>
       <div className="h-16 flex items-center gap-2 px-5 border-b border-sidebar-border">
@@ -100,11 +115,18 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
                       isActive ? "bg-sidebar-accent text-sidebar-primary font-medium shadow-sm"
                               : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
                     }`}>
-                  <Icon className="h-4 w-4" />{t(label)}
+                  <Icon className="h-4 w-4" />
+                  <span className="flex-1 truncate">{t(label)}</span>
+                  {to === "/gateways/alarms" && criticalAlarms > 0 && (
+                    <span className="shrink-0 min-w-5 px-1.5 h-5 grid place-items-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold">
+                      {criticalAlarms}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>
           );
+
         })}
       </nav>
       <div className="p-3 border-t border-sidebar-border space-y-2">
