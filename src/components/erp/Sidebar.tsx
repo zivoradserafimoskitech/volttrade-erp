@@ -41,7 +41,9 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/asset-monitoring", label: "Monitoring", icon: Sun },
     { to: "/pv-monitoring", label: "PV Plants", icon: Sun },
     { to: "/smart-meter", label: "Smart Meter", icon: Radio },
-    { to: "/gateways", label: "Gateways (Kimi)", icon: Network },
+    { to: "/gateways", label: "Metering points (Kimi)", icon: Network },
+    { to: "/gateways/alarms", label: "Gateway Alarms", icon: AlertTriangle },
+
   ]},
   { title: "Balancing & Settlement", items: [
     { to: "/balancing/consumers", label: "Consumer Manager", icon: Network },
