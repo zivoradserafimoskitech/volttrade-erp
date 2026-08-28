@@ -45,6 +45,8 @@ import SmartMeter from "./pages/SmartMeter";
 import Vatra from "./pages/Vatra";
 import Gateways from "./pages/gateways/Gateways";
 import GatewayDetail from "./pages/gateways/GatewayDetail";
+import GatewayAlarms from "./pages/gateways/Alarms";
+
 import ConsumerManager from "./pages/balancing/ConsumerManager";
 import SlpSynthesis from "./pages/balancing/SlpSynthesis";
 import Scheduling from "./pages/balancing/Scheduling";
