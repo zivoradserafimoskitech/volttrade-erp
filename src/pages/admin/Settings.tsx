@@ -104,6 +104,8 @@ export default function Settings() {
       )}
 
       <RoleGate roles={['admin']}>
+        <CompanyProfileCard />
+
         <Card className="border-border/60">
           <CardHeader><CardTitle>Add country</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-5 gap-3 items-end">
