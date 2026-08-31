@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass, Handshake, Eye, UserCheck } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
