@@ -122,8 +122,12 @@ const App = () => (
             <Route path="/risk/aging/:bucket" element={<AgingDrill />} />
             <Route path="/risk/nop/:date" element={<NopDrill />} />
             <Route path="/risk/position" element={<Position />} />
+            <Route path="/risk/metrics" element={<RiskMetrics />} />
+            <Route path="/risk/hedge" element={<HedgePosition />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/forecasting" element={<Forecasting />} />
+            <Route path="/forecasting/models" element={<ForecastDashboard />} />
+            <Route path="/quote-builder" element={<QuoteBuilder />} />
             <Route path="/assets" element={<Assets />} />
             <Route path="/asset-monitoring" element={<AssetMonitoring />} />
             <Route path="/pv-monitoring" element={<PvMonitoring />} />
