@@ -121,7 +121,9 @@ export default function QuoteBuilder() {
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.from("lead_quotes").insert({
+      // The analytics quote payload is wider than the generated table types.
+      const db = supabase as unknown as { from: (t: string) => any };
+      const { data, error } = await db.from("lead_quotes").insert({
         organization_id: orgId,
         customer_name: customerName || "Unnamed",
         profile_key: quote.profile_key,
