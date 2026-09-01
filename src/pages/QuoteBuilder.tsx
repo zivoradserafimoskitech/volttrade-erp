@@ -3,7 +3,8 @@
 // Integrates with lead_quotes table.
 
 import { useEffect, useState } from "react";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,8 +48,7 @@ interface QuoteResult {
 }
 
 export default function QuoteBuilder() {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState<CaptureFactor[]>([]);
   const [orgId, setOrgId] = useState<string>("");
   const [loading, setLoading] = useState(false);

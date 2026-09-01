@@ -2,7 +2,7 @@
 // THE screen you look at every morning. Empty breaches = sleep well.
 
 import { useEffect, useState, useCallback } from "react";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from "@/components/ui/card";
@@ -38,7 +38,6 @@ interface Breach {
 }
 
 export default function HedgePosition() {
-  const supabase = useSupabaseClient();
   const [breaches, setBreaches] = useState<Breach[]>([]);
   const [position, setPosition] = useState<PositionHour[]>([]);
   const [loading, setLoading] = useState(true);

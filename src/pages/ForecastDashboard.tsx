@@ -11,7 +11,7 @@ import { Brain, TrendingUp, BarChart3, Clock, Zap, Activity } from "lucide-react
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Area, ComposedChart, ReferenceLine,
-  BarChart, Bar,
+  BarChart, Bar, Cell,
 } from "recharts";
 import { getForecast, getSupabase } from "@/lib/volttrade";
 
@@ -248,7 +248,7 @@ export default function ForecastDashboard() {
               <Tooltip />
               <Bar dataKey="capture" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Capture Ratio %">
                 {comparisonData.map((entry, index) => (
-                  <cell key={`cell-${index}`} fill={entry.color} />
+                  <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Bar>
             </BarChart>
