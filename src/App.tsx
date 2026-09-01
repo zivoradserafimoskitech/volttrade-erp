@@ -46,6 +46,10 @@ import Vatra from "./pages/Vatra";
 import Gateways from "./pages/gateways/Gateways";
 import GatewayDetail from "./pages/gateways/GatewayDetail";
 import GatewayAlarms from "./pages/gateways/Alarms";
+import ForecastDashboard from "./pages/ForecastDashboard";
+import HedgePosition from "./pages/HedgePosition";
+import QuoteBuilder from "./pages/QuoteBuilder";
+import RiskMetrics from "./pages/RiskMetrics";
 
 import ConsumerManager from "./pages/balancing/ConsumerManager";
 import SlpSynthesis from "./pages/balancing/SlpSynthesis";
@@ -118,8 +122,12 @@ const App = () => (
             <Route path="/risk/aging/:bucket" element={<AgingDrill />} />
             <Route path="/risk/nop/:date" element={<NopDrill />} />
             <Route path="/risk/position" element={<Position />} />
+            <Route path="/risk/metrics" element={<RiskMetrics />} />
+            <Route path="/risk/hedge" element={<HedgePosition />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/forecasting" element={<Forecasting />} />
+            <Route path="/forecasting/models" element={<ForecastDashboard />} />
+            <Route path="/quote-builder" element={<QuoteBuilder />} />
             <Route path="/assets" element={<Assets />} />
             <Route path="/asset-monitoring" element={<AssetMonitoring />} />
             <Route path="/pv-monitoring" element={<PvMonitoring />} />

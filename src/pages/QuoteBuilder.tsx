@@ -3,7 +3,8 @@
 // Integrates with lead_quotes table.
 
 import { useEffect, useState } from "react";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,8 +48,7 @@ interface QuoteResult {
 }
 
 export default function QuoteBuilder() {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState<CaptureFactor[]>([]);
   const [orgId, setOrgId] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -121,7 +121,9 @@ export default function QuoteBuilder() {
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.from("lead_quotes").insert({
+      // The analytics quote payload is wider than the generated table types.
+      const db = supabase as unknown as { from: (t: string) => any };
+      const { data, error } = await db.from("lead_quotes").insert({
         organization_id: orgId,
         customer_name: customerName || "Unnamed",
         profile_key: quote.profile_key,

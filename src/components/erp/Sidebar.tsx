@@ -29,13 +29,17 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/trading-contracts", label: "Trading Contracts", icon: FileSignature },
     { to: "/trading", label: "Trade Blotter", icon: Activity },
     { to: "/schedules", label: "Schedules", icon: CalendarClock },
+    { to: "/quote-builder", label: "Quote Builder", icon: FileSignature, roles: ['trader','supply_manager','management','admin'] },
   ]},
   { title: "Risk", items: [
     { to: "/risk", label: "Risk & Exposure", icon: AlertTriangle, roles: ['risk_officer','management','admin'] },
     { to: "/risk/position", label: "Hourly Position", icon: Compass, roles: ['risk_officer','management','admin','trader'] },
+    { to: "/risk/metrics", label: "Risk Metrics", icon: Activity, roles: ['risk_officer','management','admin'] },
+    { to: "/risk/hedge", label: "Hedge Position", icon: Scale, roles: ['risk_officer','management','admin','trader'] },
   ]},
   { title: "Planning", items: [
     { to: "/forecasting", label: "Forecasting", icon: TrendingUp, roles: ['management','trader','supply_manager','admin'] },
+    { to: "/forecasting/models", label: "Forecast Models", icon: TrendingUp, roles: ['management','trader','supply_manager','admin'] },
   ]},
   { title: "Assets", items: [
     { to: "/assets", label: "Sites & Assets", icon: Battery },
