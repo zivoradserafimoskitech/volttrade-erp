@@ -49,17 +49,22 @@ export default function HedgePosition() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
+    // Views are not present in the generated types; use an untyped handle.
+    const db = supabase as unknown as {
+      from: (t: string) => any;
+    };
+
     const [{ data: bData }, { data: pData }] = await Promise.all([
-      supabase.from("v_hedge_breaches").select("*").order("delivery_date", { ascending: true }).limit(30),
-      supabase.from("v_hourly_position").select("*")
+      db.from("v_hedge_breaches").select("*").order("delivery_date", { ascending: true }).limit(30),
+      db.from("v_hourly_position").select("*")
         .eq("delivery_date", selectedDate)
         .order("hour_of_day", { ascending: true }),
     ]);
 
-    setBreaches(bData || []);
-    setPosition(pData || []);
+    setBreaches((bData as Breach[]) || []);
+    setPosition((pData as PositionHour[]) || []);
     setLoading(false);
-  }, [supabase, selectedDate]);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchData();
