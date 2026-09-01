@@ -46,6 +46,10 @@ import Vatra from "./pages/Vatra";
 import Gateways from "./pages/gateways/Gateways";
 import GatewayDetail from "./pages/gateways/GatewayDetail";
 import GatewayAlarms from "./pages/gateways/Alarms";
+import ForecastDashboard from "./pages/ForecastDashboard";
+import HedgePosition from "./pages/HedgePosition";
+import QuoteBuilder from "./pages/QuoteBuilder";
+import RiskMetrics from "./pages/RiskMetrics";
 
 import ConsumerManager from "./pages/balancing/ConsumerManager";
 import SlpSynthesis from "./pages/balancing/SlpSynthesis";
