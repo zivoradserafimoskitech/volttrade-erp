@@ -1,0 +1,85 @@
+project_id = "volttrade-erp"
+
+[functions]
+  [functions.billing-run]
+    # P0-1: server-side billing engine. Staff JWT only (billing roles);
+    # invoices are written under service_role and never by the browser.
+    verify_jwt = true
+  [functions.push-ems-plan]
+    # P0-4: CLOSES THE CONTROL LOOP. Pushes dispatch to the gateway EMS.
+    # Uses GATEWAY_EMS_API_KEY (ems:write scope) — a separate credential from
+    # the billing key, which cannot command plant.
+    verify_jwt = true
+  [functions.sync-gateway-alarms]
+    # Item 18: read-only mirror of the gateway alarm engine.
+    verify_jwt = true
+  [functions.admin-invite-consumer]
+    verify_jwt = true
+  [functions.admin-invite-user]
+    verify_jwt = true
+  [functions.admin-reset-user-mfa]
+    verify_jwt = true
+  [functions.auth-email-hook]
+    # Supabase auth webhook — called by GoTrue, verifies its own hook secret.
+    verify_jwt = false
+  [functions.decide-consumer-application]
+    verify_jwt = true
+  [functions.dso-switch-message]
+    verify_jwt = true
+  [functions.forecast-volumes]
+    verify_jwt = true
+  [functions.build-meter-profiles]
+    # Builds the per-meter hourly load curve for MEASURED points. Staff JWT or
+    # service-role (weekly cron). Writes meter_load_profiles only.
+    verify_jwt = true
+  [functions.import-dso-reads]
+    # P1-12: was verify_jwt=false; it performs its own Bearer + role check, so the platform gate is now enabled as defence in depth.
+    verify_jwt = true
+  [functions.link-consumer-pod]
+    verify_jwt = true
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.reset-own-mfa]
+    verify_jwt = true
+  [functions.seed-demo-data]
+    verify_jwt = true
+  [functions.send-invoice-notices]
+    verify_jwt = true
+  [functions.send-push]
+    verify_jwt = true
+  [functions.submit-lead]
+    # Public marketing form. P1-13: needs rate limiting / captcha (Phase 2).
+    verify_jwt = false
+  [functions.submit-schedule]
+    verify_jwt = true
+  [functions.sync-asset-telemetry]
+    # Same service-role pattern — pending Phase 3 retirement.
+    verify_jwt = true
+  [functions.sync-elex-prices]
+    verify_jwt = true
+  [functions.sync-entsoe-prices]
+    verify_jwt = true
+  [functions.sync-influx-forecasts]
+    verify_jwt = true
+  [functions.sync-kimi-meters]
+    # Accepts service-role (pg_cron) or staff JWT via _shared/auth.ts.
+    verify_jwt = true
+  [functions.sync-price-providers]
+    verify_jwt = true
+  [functions.sync-pv-forecast]
+    verify_jwt = true
+  [functions.validate-readings]
+    verify_jwt = true
+  [functions.send-transactional-email]
+    verify_jwt = true
+  [functions.preview-transactional-email]
+    verify_jwt = false
+  [functions.handle-email-unsubscribe]
+    verify_jwt = false
+  [functions.handle-email-suppression]
+    verify_jwt = false
+  [functions.retrain-nightly]
+    # Weekly champion/challenger retrain (risk module). Authenticates callers
+    # itself via _shared/auth.ts — staff JWT with role, or the service-role
+    # key from pg_cron (a valid JWT, so it passes the platform gate too).
+    verify_jwt = true
