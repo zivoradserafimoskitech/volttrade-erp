@@ -138,3 +138,76 @@ select cron.schedule('prune-lead-throttle', '0 4 * * 0', $$ select public.prune_
 --   -- dispatch that actually reached the plant:
 --   select status, count(*) from public.asset_dispatch_schedules group by 1;
 --   -- rows in 'sent' must carry gateway_plan_id (enforced by CHECK).
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- RISK MODULE — price ingestion + model lifecycle
+--
+-- Same caller model as above: the service-role key is the Bearer token and
+-- _shared/auth.ts recognises it as the automated caller.
+-- One extra placeholder here: <ORG_ID> — the organisation that owns the MEMO
+-- price history. Find it with:  select id from public.organizations;
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Daily 05:00 UTC: ingest MEMO day-ahead prices into market_price_history.
+-- ingest-memo requires org_id (400 without it); date defaults to today.
+select cron.schedule(
+  'ingest-memo',
+  '0 5 * * *',
+  $$
+  select net.http_post(
+    url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/ingest-memo',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{"org_id":"<ORG_ID>"}'::jsonb
+  );
+  $$
+);
+
+-- Daily 13:45 UTC: ENTSO-E day-ahead prices for HU (HUPX) and RS (SEEPEX
+-- proxy). ENTSO-E publishes DAM results around 13:00 CET; 13:45 UTC leaves
+-- margin. sync-entsoe-prices takes ONE zone per call (body.zone must be a
+-- known bidding-zone code), so the job posts twice — once per zone.
+select cron.schedule(
+  'sync-entsoe-prices',
+  '45 13 * * *',
+  $$
+  select net.http_post(
+    url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/sync-entsoe-prices',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{"zone":"HU"}'::jsonb
+  );
+  select net.http_post(
+    url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/sync-entsoe-prices',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{"zone":"RS"}'::jsonb
+  );
+  $$
+);
+
+-- Weekly, Monday 02:00 UTC (03:00 CET): nightly retrain — champion/challenger
+-- with drift detection on the analytics service. Body is optional; omit
+-- org_id to retrain across all organisations.
+select cron.schedule(
+  'retrain-nightly',
+  '0 2 * * 1',
+  $$
+  select net.http_post(
+    url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/retrain-nightly',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
+    body    := '{}'::jsonb
+  );
+  $$
+);
+
+-- ── VERIFY RISK MODULE ─────────────────────────────────────────────────────
+--   -- MEMO prices landing daily (one row per hour):
+--   select date_trunc('day', timestamp) d, count(*)
+--     from public.market_price_history
+--    where zone = 'MK' group by 1 order by 1 desc limit 3;
+--
+--   -- ENTSO-E zones landing daily:
+--   select source, max(delivery_at) from public.market_prices
+--    where source like 'entsoe-%' group by 1;
+--
+--   -- retrain outcomes:
+--   select model_name, is_active, mae, last_trained_at
+--     from public.forecast_models order by last_trained_at desc limit 5;

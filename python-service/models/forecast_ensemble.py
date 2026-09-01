@@ -15,6 +15,14 @@ Calibration:
   - Conformalized Quantile Regression (CQR) ensures 80% coverage
   - Variance stabilizing transforms for spike handling
   - As-of-aware feature engineering (no lookahead)
+
+Phase 2 additions:
+  - Asinh target transformation (handles spikes + negative prices), default ON
+  - Rolling 90-day training window (configurable)
+  - LightGBM transfer learning: pretrain on HUPX, fine-tune on MEMO
+    (graceful MEMO-only fallback when no HUPX history is available)
+  - Cross-market features (HUPX/SEEPEX lags, spreads, rolling means) are
+    used automatically when present in the training frame
 """
 
 import os
@@ -65,8 +73,19 @@ class ForecastEnsemble:
 
     AVAILABLE_MODELS = ["lightgbm", "xgboost", "lstm", "gru", "cnn", "seasonal_naive", "naive"]
 
-    def __init__(self, model_dir: str = "./model_cache"):
+    def __init__(self, model_dir: str = "./model_cache",
+                 use_asinh: bool = True,
+                 asinh_scale: Optional[float] = None,
+                 train_window_days: int = 90,
+                 transfer_learning_rate: float = 0.02):
         self.model_dir = model_dir
+        # Phase 2 config
+        self.use_asinh = use_asinh
+        self.asinh_scale = asinh_scale
+        self.train_window_days = train_window_days
+        self.transfer_learning_rate = transfer_learning_rate
+        self._hupx_booster = None  # pretrained HUPX booster for transfer learning
+        self._hupx_scale: float = 1.0
         os.makedirs(model_dir, exist_ok=True)
         self._models: Dict[str, any] = {}
         self._scalers: Dict[str, any] = {}
@@ -88,6 +107,127 @@ class ForecastEnsemble:
                     logger.info(f"Loaded cached model: {model_name}")
                 except Exception as e:
                     logger.warning(f"Failed to load {model_name}: {e}")
+
+    # ── Phase 2 helpers ───────────────────────────────────────────────────
+
+    def _transform_target(self, y: pd.Series) -> Tuple[pd.Series, float]:
+        """Variance-stabilizing asinh transform of the target.
+
+        Fit models on asinh(y / scale); scale defaults to the median
+        absolute target (robust to spikes and negative prices).
+        Returns (transformed_series, scale).
+        """
+        if not self.use_asinh:
+            return y, 1.0
+        scale = self.asinh_scale
+        if scale is None or scale <= 0:
+            scale = float(np.nanmedian(np.abs(y))) if len(y) else 1.0
+            if not np.isfinite(scale) or scale <= 0:
+                scale = 1.0
+        return pd.Series(np.arcsinh(y / scale), index=y.index, name=y.name), scale
+
+    def _inverse_transform_target(self, y_t, scale: float) -> np.ndarray:
+        """Inverse of the asinh target transform: sinh(y_t) * scale."""
+        arr = np.asarray(y_t, dtype=float)
+        if not self.use_asinh:
+            return arr
+        return np.sinh(arr) * scale
+
+    def _apply_train_window(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Restrict training data to the most recent `train_window_days` days."""
+        if self.train_window_days and self.train_window_days > 0:
+            max_rows = self.train_window_days * 24
+            if len(df) > max_rows:
+                return df.iloc[-max_rows:]
+        return df
+
+    def pretrain_on_hupx(self, hupx_df: Optional[pd.DataFrame]) -> bool:
+        """Pretrain a LightGBM booster on HUPX history for transfer learning.
+
+        MEMO training later continues from this booster (`init_model`) with a
+        lower learning rate. If no HUPX data is available, log a warning and
+        fall back to MEMO-only (zero-shot) training. Never raises.
+
+        `hupx_df` must have a datetime index and a `price` column.
+        Returns True when a booster was pretrained.
+        """
+        self._hupx_booster = None
+        if not HAS_LIGHTGBM:
+            logger.warning("lightgbm not installed — HUPX pretraining skipped (MEMO-only)")
+            return False
+        if hupx_df is None or len(hupx_df) < 168:
+            logger.warning("No/insufficient HUPX history — MEMO-only training (zero-shot fallback)")
+            return False
+
+        try:
+            from models.cross_market import CROSS_MARKET_COLUMNS
+            p2_cols = [c for c in CROSS_MARKET_COLUMNS if c != "memo_price"]
+
+            df = hupx_df.copy()
+            if "price" not in df.columns:
+                df = df.rename(columns={df.columns[0]: "price"})
+            df = self._build_features(df)
+            # Pad the canonical cross-market schema (NaN) so the pretrained
+            # booster's feature set matches MEMO fine-tune frames that carry
+            # P2 columns (LightGBM init_model requires identical schemas).
+            for c in p2_cols:
+                if c not in df.columns:
+                    df[c] = np.nan
+            feature_cols = [c for c in df.columns if c not in ["price", "timestamp"]]
+            train = self._apply_train_window(
+                df.dropna(subset=[c for c in df.columns if c not in p2_cols])
+            )
+            if len(train) < 48:
+                logger.warning("HUPX history too short after feature build — MEMO-only training")
+                return False
+
+            y_t, scale = self._transform_target(train["price"])
+            params = {
+                "objective": "regression",
+                "metric": "mae",
+                "boosting_type": "gbdt",
+                "num_leaves": 31,
+                "learning_rate": 0.05,
+                "feature_fraction": 0.9,
+                "bagging_fraction": 0.8,
+                "bagging_freq": 5,
+                "verbose": -1,
+                "random_state": 42,
+            }
+            booster = lgb.train(params, lgb.Dataset(train[feature_cols], label=y_t),
+                                num_boost_round=200)
+            self._hupx_booster = booster
+            self._hupx_scale = scale
+            logger.info(f"Pretrained HUPX booster on {len(train)} samples for transfer learning")
+            return True
+        except Exception as e:
+            logger.warning(f"HUPX pretraining failed ({e}) — MEMO-only training")
+            self._hupx_booster = None
+            return False
+
+    def _train_lgb_with_transfer(self, X: pd.DataFrame, y_t: pd.Series,
+                                 params: Dict, num_boost_round: int) -> Tuple["lgb.Booster", List[str]]:
+        """Train LightGBM, fine-tuning from the HUPX booster when available.
+
+        Returns (booster, feature_cols_used). When fine-tuning, X is aligned
+        to the pretrained booster's feature schema (missing columns become
+        NaN, extras dropped) because LightGBM `init_model` requires identical
+        schemas. Falls back to plain MEMO-only training on any failure.
+        """
+        if self._hupx_booster is not None:
+            booster_cols = list(self._hupx_booster.feature_name())
+            X_aligned = X.reindex(columns=booster_cols)
+            ft_params = dict(params)
+            ft_params["learning_rate"] = self.transfer_learning_rate
+            try:
+                model = lgb.train(ft_params, lgb.Dataset(X_aligned, label=y_t),
+                                  num_boost_round=num_boost_round,
+                                  init_model=self._hupx_booster)
+                return model, booster_cols
+            except Exception as e:
+                logger.warning(f"Transfer fine-tune failed ({e}) — training MEMO-only")
+        model = lgb.train(params, lgb.Dataset(X, label=y_t), num_boost_round=num_boost_round)
+        return model, list(X.columns)
 
     def _build_features(self, df: pd.DataFrame, as_of: Optional[datetime] = None) -> pd.DataFrame:
         """Build as-of-aware features for price forecasting.
@@ -168,7 +308,10 @@ class ForecastEnsemble:
         daily_base = np.tile(hour_pattern, (n // 24) + 1)[:n]
 
         # Weekly pattern
-        dow_factor = np.repeat([1.0, 1.02, 1.03, 1.02, 1.01, 0.95, 0.93], 24)[:n]
+        dow_factor = np.tile(
+            np.repeat([1.0, 1.02, 1.03, 1.02, 1.01, 0.95, 0.93], 24),
+            (n // 168) + 1,
+        )[:n]
 
         # Seasonal trend
         day_of_year = np.array([d.dayofyear for d in timestamps])
@@ -191,24 +334,32 @@ class ForecastEnsemble:
         prices = (daily_base * dow_factor * seasonal * trend + noise + spikes + neg_prices).clip(-100, 500)
 
         df = pd.DataFrame({"price": prices}, index=timestamps)
+        df.index.name = "timestamp"
         df.to_csv(cache_path)
         logger.info(f"Generated synthetic data: {len(df)} hours")
         return df
 
     def _train_lightgbm(self, df: pd.DataFrame, target_col: str = "price") -> lgb.Booster:
-        """Train LightGBM with quantile regression for P10, P50, P90."""
+        """Train LightGBM with quantile regression for P10, P50, P90.
+
+        Phase 2: asinh target transform, rolling training window, and
+        fine-tuning from the pretrained HUPX booster when available.
+        """
         if not HAS_LIGHTGBM:
             raise ImportError("lightgbm not installed")
 
         df = self._build_features(df.copy())
-        feature_cols = [c for c in df.columns if c not in [target_col, "timestamp"]]
+        # All-NaN feature columns (e.g. cross-market features when HU/RS
+        # history is missing) carry no signal and would empty the training
+        # set on dropna — drop them instead of the rows.
+        feature_cols = [c for c in df.columns
+                        if c not in [target_col, "timestamp"] and not df[c].isna().all()]
 
-        train = df.dropna()
+        train = self._apply_train_window(df.dropna())
         X = train[feature_cols]
-        y = train[target_col]
+        y_t, scale = self._transform_target(train[target_col])
 
         # Train median model
-        train_data = lgb.Dataset(X, label=y)
         params = {
             "objective": "regression",
             "metric": "mae",
@@ -221,18 +372,19 @@ class ForecastEnsemble:
             "verbose": -1,
             "random_state": 42,
         }
-        model = lgb.train(params, train_data, num_boost_round=200)
+        model, used_cols = self._train_lgb_with_transfer(X, y_t, params, num_boost_round=200)
 
-        # Train quantile models
+        # Train quantile models (same aligned feature schema as the median model)
         quantile_models = {}
         for alpha in [0.1, 0.9]:
             q_params = params.copy()
             q_params["objective"] = "quantile"
             q_params["alpha"] = alpha
-            q_data = lgb.Dataset(X, label=y)
+            q_data = lgb.Dataset(X.reindex(columns=used_cols), label=y_t)
             quantile_models[alpha] = lgb.train(q_params, q_data, num_boost_round=150)
 
-        return {"median": model, "quantiles": quantile_models}
+        return {"median": model, "quantiles": quantile_models, "scale": scale,
+                "use_asinh": self.use_asinh, "feature_cols": used_cols}
 
     def _seasonal_naive(self, df: pd.DataFrame, horizon: int = 24) -> Tuple[List[float], List[float], List[float]]:
         """Seasonal naive: same hour last week, with naive quantile bands."""
@@ -346,20 +498,24 @@ class ForecastEnsemble:
         return self._format_result("ensemble", horizon, point, p10, p90, 93.2, 11.95, zone)
 
     def _lightgbm_forecast(self, df: pd.DataFrame, horizon: int, calibration_window: int) -> Tuple[List[float], List[float], List[float]]:
-        """Generate LightGBM forecast with quantile calibration."""
+        """Generate LightGBM forecast with quantile calibration.
+
+        Phase 2: asinh target transform, rolling 90-day training window, and
+        fine-tuning from the pretrained HUPX booster when available.
+        """
         df_feat = self._build_features(df.copy())
-        feature_cols = [c for c in df_feat.columns if c not in ["price", "timestamp"]]
+        feature_cols = [c for c in df_feat.columns
+                        if c not in ["price", "timestamp"] and not df_feat[c].isna().all()]
 
         # Use last calibration_window days for calibration
         cal_size = min(calibration_window * 24, len(df_feat) // 5)
-        train_df = df_feat.iloc[:-cal_size].dropna()
+        train_df = self._apply_train_window(df_feat.iloc[:-cal_size].dropna())
         cal_df = df_feat.iloc[-cal_size:].dropna()
 
-        # Train
+        # Train on the asinh-transformed target
         X_train = train_df[feature_cols]
-        y_train = train_df["price"]
+        y_t, scale = self._transform_target(train_df["price"])
 
-        train_data = lgb.Dataset(X_train, label=y_train)
         params = {
             "objective": "regression",
             "metric": "mae",
@@ -370,22 +526,22 @@ class ForecastEnsemble:
             "verbose": -1,
             "random_state": 42,
         }
-        model = lgb.train(params, train_data, num_boost_round=200)
+        model, used_cols = self._train_lgb_with_transfer(X_train, y_t, params, num_boost_round=200)
 
-        # Calibrate quantiles
-        X_cal = cal_df[feature_cols]
+        # Calibrate quantiles (in original price space)
+        X_cal = cal_df.reindex(columns=used_cols)
         y_cal = cal_df["price"].values
-        cal_pred = model.predict(X_cal)
+        cal_pred = self._inverse_transform_target(model.predict(X_cal), scale)
         cal_errors = y_cal - cal_pred
 
-        # Recursive multi-step forecast
+        # Recursive multi-step forecast (inverse-transformed to price space)
         point = []
         temp_df = df.copy()
         for _ in range(horizon):
             temp_df = self._build_features(temp_df)
-            last = temp_df[feature_cols].iloc[[-1]]
-            pred = model.predict(last)[0]
-            point.append(float(pred))
+            last = temp_df.reindex(columns=used_cols).iloc[[-1]]
+            pred = float(self._inverse_transform_target(model.predict(last), scale)[0])
+            point.append(pred)
             new_idx = temp_df.index[-1] + timedelta(hours=1)
             temp_df.loc[new_idx] = {"price": pred}
 
@@ -405,16 +561,17 @@ class ForecastEnsemble:
             raise ImportError("xgboost not installed")
 
         df_feat = self._build_features(df.copy())
-        feature_cols = [c for c in df_feat.columns if c not in ["price", "timestamp"]]
+        feature_cols = [c for c in df_feat.columns
+                        if c not in ["price", "timestamp"] and not df_feat[c].isna().all()]
 
         cal_size = min(calibration_window * 24, len(df_feat) // 5)
-        train_df = df_feat.iloc[:-cal_size].dropna()
+        train_df = self._apply_train_window(df_feat.iloc[:-cal_size].dropna())
         cal_df = df_feat.iloc[-cal_size:].dropna()
 
         X_train = train_df[feature_cols]
-        y_train = train_df["price"]
+        y_t, scale = self._transform_target(train_df["price"])
 
-        dtrain = xgb.DMatrix(X_train, label=y_train)
+        dtrain = xgb.DMatrix(X_train, label=y_t)
         params = {
             "objective": "reg:squarederror",
             "max_depth": 6,
@@ -426,20 +583,20 @@ class ForecastEnsemble:
         }
         model = xgb.train(params, dtrain, num_boost_round=150)
 
-        # Calibration
+        # Calibration (in original price space)
         X_cal = cal_df[feature_cols]
         y_cal = cal_df["price"].values
-        cal_pred = model.predict(xgb.DMatrix(X_cal))
+        cal_pred = self._inverse_transform_target(model.predict(xgb.DMatrix(X_cal)), scale)
         cal_errors = y_cal - cal_pred
 
-        # Forecast
+        # Forecast (inverse-transformed to price space)
         point = []
         temp_df = df.copy()
         for _ in range(horizon):
             temp_df = self._build_features(temp_df)
             last = temp_df[feature_cols].iloc[[-1]]
-            pred = model.predict(xgb.DMatrix(last))[0]
-            point.append(float(pred))
+            pred = float(self._inverse_transform_target(model.predict(xgb.DMatrix(last)), scale)[0])
+            point.append(pred)
             new_idx = temp_df.index[-1] + timedelta(hours=1)
             temp_df.loc[new_idx] = {"price": pred}
 

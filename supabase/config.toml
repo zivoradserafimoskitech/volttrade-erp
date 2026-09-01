@@ -78,3 +78,8 @@ project_id = "volttrade-erp"
     verify_jwt = false
   [functions.handle-email-suppression]
     verify_jwt = false
+  [functions.retrain-nightly]
+    # Weekly champion/challenger retrain (risk module). Authenticates callers
+    # itself via _shared/auth.ts — staff JWT with role, or the service-role
+    # key from pg_cron (a valid JWT, so it passes the platform gate too).
+    verify_jwt = true

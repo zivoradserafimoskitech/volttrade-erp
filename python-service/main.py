@@ -1,5 +1,5 @@
 """
-VoltTrade Analytics Service v2.0
+VoltTrade Analytics Service v2.1
 Native computation layer for VoltTrade ERP.
 
 NOT a separate product — this is VoltTrade's math engine.
@@ -12,6 +12,7 @@ Endpoints:
   GET  /risk/var         Parametric VaR/CVaR
   POST /ingest/memo      MEMO price ingestion handler
   POST /ingest/entsoe    ENTSO-E data ingestion
+  POST /retrain          Nightly champion-challenger retrain (Phase 2)
 
 Models:
   - LightGBM (gradient boosting)
@@ -44,7 +45,7 @@ logger = logging.getLogger("volttrade-analytics")
 
 app = FastAPI(
     title="VoltTrade Analytics",
-    version="2.0.0",
+    version="2.1.0",
     description="Native computation engine for VoltTrade ERP",
 )
 
@@ -200,7 +201,7 @@ async def health():
     return {
         "status": "ok",
         "service": "volttrade-analytics",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "timestamp": datetime.utcnow().isoformat(),
     }
 
@@ -344,6 +345,16 @@ async def ingest_memo(date: Optional[str] = None, org_id: Optional[str] = None):
     ingester = MemoIngest()
     result = ingester.fetch_and_store(date=date, org_id=org_id)
     return result
+
+@app.post("/retrain")
+async def retrain(org_id: Optional[str] = None):
+    """Nightly champion-challenger retrain with drift detection (Phase 2)."""
+    try:
+        from retrain.pipeline import run_retrain
+        return run_retrain(org_id=org_id)
+    except Exception as e:
+        logger.error(f"Retrain error: {e}")
+        raise HTTPException(500, f"Retrain failed: {str(e)}")
 
 # ── Run ───────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
