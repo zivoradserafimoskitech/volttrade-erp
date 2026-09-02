@@ -3,8 +3,10 @@
 // All functions are org-scoped via RLS.
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const ANALYTICS_URL = import.meta.env.VITE_VOLTTRADE_ANALYTICS_URL || "http://localhost:8000";
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+const ANALYTICS_URL =
+  import.meta.env.VITE_VOLTTRADE_ANALYTICS_URL || "https://volttrade-analytics.onrender.com";
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
