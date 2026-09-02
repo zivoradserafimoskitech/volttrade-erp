@@ -3,6 +3,11 @@
 // Thin proxy: delegates to the Python analytics service (POST /retrain),
 // same as forecast-price delegates to POST /forecast.
 //
+// Since analytics v2.2.0, POST /retrain is ASYNC: it starts the retrain in
+// a background job and answers { job_id, status: "accepted" } immediately.
+// We request model_kind=all (price + portfolio load). No polling here —
+// the pipeline persists promoted champions to forecast_models itself.
+//
 // AuthN/AuthZ via _shared/auth.ts: an interactive staff JWT must hold one of
 // the listed roles; pg_cron presents the service-role key and is recognised
 // as an automated caller (a service-role JWT has no `sub`, so auth.getUser()
@@ -32,8 +37,10 @@ Deno.serve(handler(async (req) => {
 
   // FastAPI reads org_id as a QUERY parameter (same convention as /ingest/memo),
   // not from the JSON body — append it to the URL when present.
+  // model_kind=all retrains both the price and the portfolio load models.
   const upstreamUrl = new URL(`${ANALYTICS_URL}/retrain`);
   if (body.org_id) upstreamUrl.searchParams.set("org_id", body.org_id);
+  upstreamUrl.searchParams.set("model_kind", "all");
 
   const upstream = await fetch(upstreamUrl, {
     method: "POST",
@@ -54,7 +61,15 @@ Deno.serve(handler(async (req) => {
     );
   }
 
-  // run_retrain() contract: { promoted, champion_mae, challenger_mae, drift, notes }
-  const result = await upstream.json();
-  return jsonResponse({ ok: true, result, caller: auth.kind });
+  // Async /retrain contract (analytics v2.2.0): { job_id, status: "accepted", model_kind }
+  const accepted = await upstream.json();
+  return jsonResponse(
+    {
+      ok: true,
+      job_id: accepted.job_id ?? null,
+      note: "retrain started; results land in forecast_models",
+      caller: auth.kind,
+    },
+    202,
+  );
 }));

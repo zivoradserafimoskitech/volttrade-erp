@@ -1,21 +1,23 @@
 """
-VoltTrade Analytics Service v2.1
+VoltTrade Analytics Service v2.2
 Native computation layer for VoltTrade ERP.
 
 NOT a separate product — this is VoltTrade's math engine.
 
 Endpoints:
   POST /forecast         Multi-model price forecasting
+  POST /forecast/load    Portfolio load forecast (LightGBM quantile P10/P50/P90)
   POST /optimize/hedge   Stochastic LP + CVaR portfolio hedge optimization
   POST /optimize/dispatch BESS dispatch via LP
   POST /backtest         Walk-forward backtesting
   GET  /risk/var         Parametric VaR/CVaR
   POST /ingest/memo      MEMO price ingestion handler
   POST /ingest/entsoe    ENTSO-E data ingestion
-  POST /retrain          Nightly champion-challenger retrain (Phase 2)
+  POST /retrain          ASYNC champion-challenger retrain (returns job_id)
+  GET  /retrain/status   Poll an async retrain job
 
 Models:
-  - LightGBM (gradient boosting)
+  - LightGBM (gradient boosting; quantile for load)
   - XGBoost (robust trees)
   - LSTM/GRU (deep sequence)
   - CNN (pattern detection)
@@ -27,9 +29,11 @@ Models:
 import os
 import sys
 import json
+import uuid
+import threading
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Literal, Any
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,7 +49,7 @@ logger = logging.getLogger("volttrade-analytics")
 
 app = FastAPI(
     title="VoltTrade Analytics",
-    version="2.1.0",
+    version="2.2.0",
     description="Native computation engine for VoltTrade ERP",
 )
 
@@ -201,7 +205,7 @@ async def health():
     return {
         "status": "ok",
         "service": "volttrade-analytics",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "timestamp": datetime.utcnow().isoformat(),
     }
 
@@ -346,15 +350,115 @@ async def ingest_memo(date: Optional[str] = None, org_id: Optional[str] = None):
     result = ingester.fetch_and_store(date=date, org_id=org_id)
     return result
 
-@app.post("/retrain")
-async def retrain(org_id: Optional[str] = None):
-    """Nightly champion-challenger retrain with drift detection (Phase 2)."""
+# ── Async retrain jobs ────────────────────────────────────────────────────
+# In-memory job registry (module-level). Jobs persist their run_retrain
+# result/exception when done; the pipeline itself persists champions to
+# forecast_models, so results survive a service restart even when this
+# registry does not.
+RETRAIN_JOBS: Dict[str, Dict[str, Any]] = {}
+
+
+def _run_retrain_job(job_id: str, org_id: Optional[str], model_kind: str):
+    """Blocking job body — runs in a daemon thread (run_retrain is
+    CPU/IO-blocking LightGBM work, so a plain thread is both simpler and
+    more robust than create_task + to_thread: it does not depend on the
+    app event loop being pumped between requests)."""
+    from retrain.pipeline import run_retrain
     try:
-        from retrain.pipeline import run_retrain
-        return run_retrain(org_id=org_id)
+        result = run_retrain(org_id=org_id, model_kind=model_kind)
+        RETRAIN_JOBS[job_id].update(status="done", result=result)
     except Exception as e:
-        logger.error(f"Retrain error: {e}")
-        raise HTTPException(500, f"Retrain failed: {str(e)}")
+        logger.error(f"Retrain job {job_id} failed: {e}")
+        RETRAIN_JOBS[job_id].update(status="failed", error=str(e))
+
+
+@app.post("/retrain")
+async def retrain(org_id: Optional[str] = None, model_kind: str = "price"):
+    """Start an ASYNC champion-challenger retrain with drift detection.
+
+    Returns immediately with a job_id; poll GET /retrain/status?job_id=...
+    for the outcome. The pipeline persists promoted champions to
+    forecast_models on its own.
+    """
+    if model_kind not in ("price", "load", "all"):
+        raise HTTPException(422, f"model_kind must be one of price|load|all")
+    job_id = str(uuid.uuid4())
+    RETRAIN_JOBS[job_id] = {
+        "status": "running",
+        "result": None,
+        "error": None,
+        "model_kind": model_kind,
+        "org_id": org_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    worker = threading.Thread(target=_run_retrain_job,
+                              args=(job_id, org_id, model_kind),
+                              name=f"retrain-{job_id[:8]}", daemon=True)
+    worker.start()
+    return {"job_id": job_id, "status": "accepted", "model_kind": model_kind}
+
+
+@app.get("/retrain/status")
+async def retrain_status(job_id: str):
+    """Poll an async retrain job."""
+    job = RETRAIN_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(404, f"unknown job_id {job_id}")
+    return {"status": job["status"], "result": job["result"], "error": job["error"]}
+
+
+@app.post("/forecast/load")
+async def forecast_load(org_id: Optional[str] = None, horizon_hours: int = 48):
+    """Portfolio hourly load forecast (P10/P50/P90, MW).
+
+    Uses the active load champion from the forecast_models registry when
+    available; otherwise trains an ad-hoc model on the fly (synthetic
+    fallback data when Supabase is not configured).
+    """
+    if horizon_hours < 1 or horizon_hours > 24 * 14:
+        raise HTTPException(422, "horizon_hours must be between 1 and 336")
+    try:
+        from models import load_forecast as lf
+        from retrain.pipeline import _load_champion, _load_model_object
+
+        model = None
+        model_name = None
+        source = "adhoc"
+
+        champion_row = _load_champion(org_id, model_type="lightgbm_load") if org_id else None
+        if champion_row:
+            candidate = _load_model_object(champion_row.get("model_path"))
+            if candidate is not None:
+                model = candidate
+                model_name = champion_row.get("model_name")
+                source = "champion"
+            else:
+                logger.warning("load champion row present but model not loadable — ad-hoc")
+
+        if model is None:
+            series = lf.load_portfolio_series(org_id, days=365)
+            extras = pd.DataFrame(index=series.index)
+            temp = lf.fetch_temperature(series.index[0], series.index[-1])
+            if temp is not None:
+                extras["temperature"] = temp.reindex(series.index)
+            zonal = lf.load_zonal_series(org_id, "MK", days=365)
+            if zonal is not None:
+                extras["zonal_load"] = zonal.reindex(series.index)
+            model = lf.train_load_model(series, extras)
+            model_name = f"adhoc-{model.get('kind', 'seasonal_naive')}"
+
+        start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        fc = lf.predict_load(model, horizon_hours, start)
+        return {
+            "forecast": fc.to_dict(orient="records"),
+            "model": model_name,
+            "source": source,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Load forecast error: {e}")
+        raise HTTPException(500, f"Load forecast failed: {str(e)}")
 
 # ── Run ───────────────────────────────────────────────────────────────────
 if __name__ == "__main__":

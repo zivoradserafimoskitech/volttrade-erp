@@ -174,3 +174,91 @@ it persists for several weeks.
 - **Service-role key in `cron.sql`.** That file contains a placeholder for
   the service-role key. Never commit the filled-in version; it only ever
   belongs in the SQL Editor.
+
+---
+
+## 6. Historical data backfill
+
+The nightly `sync-entsoe-prices` job only keeps a rolling window of a few
+days. Before `retrain-nightly` output can be trusted, the ML models need
+real history in `market_price_history` — run the one-time backfill:
+`python-service/ingest/backfill_history.py` (stdlib + `requests` only).
+
+**1. Get an ENTSO-E token.** Register at transparency.entsoe.eu, then
+e-mail the transparency helpdesk asking for "Restful API access" for that
+account; the token arrives in the reply (see "2.3 Set the Supabase secrets").
+
+**2. Set `ENTSOE_API_TOKEN` as a Supabase secret** (Dashboard → Edge
+Functions → Secrets). The daily `sync-entsoe-prices` job needs it too — the
+backfill only covers history, not the rolling feed.
+
+**3. Run the backfill once** (HU/HUPX 15 years, RS/SEEPEX 8 years,
+MK/MEMO 2 years, monthly chunks, upserted in batches of 500):
+
+```bash
+export SUPABASE_URL=https://<project>.supabase.co
+export SUPABASE_SERVICE_ROLE_KEY=<service-role key>
+export ENTSOE_API_TOKEN=<token from step 1>
+python3 python-service/ingest/backfill_history.py \
+  --org-id <ORG_UUID> --zones HU,RS,MK
+```
+
+Expected duration: ~10-20 minutes for all three zones (~370 monthly API
+requests with the default 2 s delay). Use `--check-token` first for a quick
+verdict (token OK / token rejected / platform unavailable). If the Supabase
+env vars are missing the script writes per-zone CSVs to `./backfill_out`
+instead and says so loudly in the logs.
+
+**Resume:** the script is idempotent and resumable. Before starting a zone
+it reads the newest stored `timestamp` for that zone (from Supabase, or
+from the CSV's last row in CSV mode) and continues from the next hour, so
+a failed run can simply be re-launched. Pass `--start YYYY-MM-DD` to force
+a full re-pull instead. Failed zones abort with a clear error after the
+retry budget and do not block the other zones.
+
+**Only trust `retrain-nightly` after this backfill has completed** — before
+that, the models train on the thin rolling window (or synthetic MEMO data)
+and the champion/challenger metrics are meaningless.
+
+---
+
+## Load forecasting (ML)
+
+Tier-1 **portfolio load forecasting** complements the price ensemble: a
+LightGBM **quantile** model (three boosters, `objective='quantile'`,
+alpha 0.1/0.5/0.9) predicts hourly portfolio load as **P10/P50/P90 MW
+bands** for nomination sizing and imbalance-risk checks. Features:
+calendar (hour/DoW/month sin-cos, weekend, MK tariff day-type WD/SA/SU,
+public holidays), optional Open-Meteo temperature (+temp², temp×hour) and
+optional zonal load (+24h lag) from `load_history`. Registry rows use
+`model_type='lightgbm_load'` in `forecast_models`.
+
+> **Scope note:** ML load forecasting **complements, not replaces** SLP
+> settlement — sub-40 kW consumers are still settled on standard load
+> profiles by the DSO regardless of the ML forecast.
+
+**1. Zonal load backfill (ENTSO-E A65 Actual Total Load).** Same script as
+the price backfill, one extra flag (MK 4y / HU 10y / RS 8y windows, rows
+land in `load_history`, or `load_<zone>.csv` in CSV mode):
+
+```bash
+python3 python-service/ingest/backfill_history.py \
+  --document A65 --load-zones MK,HU,RS --org-id <ORG_UUID>
+```
+
+**2. Retrain.** The nightly job now runs with `model_kind=all` (price +
+load). Manually, against the analytics service:
+
+```bash
+curl -X POST "$ANALYTICS_URL/retrain?org_id=<ORG_UUID>&model_kind=all" \
+  -H "X-API-Key: $VOLTTRADE_ANALYTICS_KEY"
+# -> {"job_id": "...", "status": "accepted", "model_kind": "all"}  (async)
+curl "$ANALYTICS_URL/retrain/status?job_id=<JOB_ID>" \
+  -H "X-API-Key: $VOLTTRADE_ANALYTICS_KEY"
+```
+
+**3. Forecast.** `POST /forecast/load?org_id=<ORG_UUID>&horizon_hours=48`
+returns `{"forecast": [{timestamp, p10_mw, p50_mw, p90_mw}, ...], "model",
+"source": "champion"|"adhoc"}`. Without an active load champion the service
+trains ad-hoc on the fly; without Supabase data it falls back to a loudly
+logged synthetic 10 GWh/yr portfolio.

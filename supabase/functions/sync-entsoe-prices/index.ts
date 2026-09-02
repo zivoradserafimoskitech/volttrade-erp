@@ -117,7 +117,9 @@ Deno.serve(handler(async (req) => {
     });
     const apiUrl = `https://web-api.tp.entsoe.eu/api?${params.toString()}`;
 
-    const res = await fetch(apiUrl);
+    // Accept header is REQUIRED: without it web-api.tp.entsoe.eu returns its
+    // HTML SPA page (HTTP 200/503 with an HTML body) instead of XML.
+    const res = await fetch(apiUrl, { headers: { Accept: "application/xml" } });
     const xml = await res.text();
     if (!res.ok) {
       return jsonResponse({ error: `ENTSO-E ${res.status}`, detail: xml.slice(0, 500) }, 502);
