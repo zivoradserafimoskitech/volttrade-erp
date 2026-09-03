@@ -32,6 +32,7 @@ Models:
 
 import os
 import sys
+import hmac
 import json
 import uuid
 import threading
@@ -51,18 +52,37 @@ logging.basicConfig(
 )
 logger = logging.getLogger("volttrade-analytics")
 
+# Interactive docs and the OpenAPI schema are disabled: this service is called
+# only by VoltTrade edge functions with a shared key, never by a browser, and a
+# public schema makes every endpoint (hedge optimiser, retrain, backtest)
+# enumerable by anyone who finds the hostname.
 app = FastAPI(
     title="VoltTrade Analytics",
     version="2.5.0",
     description="Native computation engine for VoltTrade ERP",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
+
+# Only the project's own origins. allow_credentials=True with allow_origins=["*"]
+# is rejected by browsers anyway and is a footgun if this ever gets a UI.
+_default_origins = (
+    "https://volttrade.app,https://www.volttrade.app,"
+    "https://volttrade-erp.lovable.app"
+)
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("VOLTTRADE_ALLOWED_ORIGINS", _default_origins).split(",")
+    if o.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["X-API-Key", "Content-Type", "Authorization"],
 )
 
 # ── Auth ──────────────────────────────────────────────────────────────────
@@ -80,10 +100,11 @@ if not API_KEY or API_KEY == "dev-key-change-in-production":
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if request.url.path in ["/health", "/docs", "/openapi.json", "/redoc"]:
+    # /health only. Docs and the OpenAPI schema are disabled outright above.
+    if request.url.path == "/health":
         return await call_next(request)
     key = request.headers.get("X-API-Key", "")
-    if key != API_KEY:
+    if not hmac.compare_digest(key, API_KEY):
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     return await call_next(request)
