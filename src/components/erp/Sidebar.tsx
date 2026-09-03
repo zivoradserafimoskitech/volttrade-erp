@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass, Handshake, Eye, UserCheck } from "lucide-react";
+import { LayoutDashboard, Users, LineChart, Receipt, Activity, LogOut, Zap, MapPin, Tags, FileText, Gauge, Calculator, Wallet, ShieldCheck, Settings as SettingsIcon, Building2, FileSignature, CalendarClock, AlertTriangle, TrendingUp, History, Scale, Battery, Sun, Radio, Network, Sigma, GitMerge, UserPlus, Repeat, KeyRound, Compass, Handshake, Eye, UserCheck, Bell, ArrowLeftRight } from "lucide-react";
 import { useAuth, AppRole } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ type Item = { to: string; label: string; icon: any; end?: boolean; roles?: AppRo
 const groups: { title: string; items: Item[] }[] = [
   { title: "Management", items: [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true },
+    { to: "/alerts", label: "Alerts", icon: Bell },
   ]},
   { title: "Supply", items: [
     { to: "/clients", label: "Customers", icon: Users },
@@ -29,6 +30,7 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/trading-contracts", label: "Trading Contracts", icon: FileSignature },
     { to: "/trading", label: "Trade Blotter", icon: Activity },
     { to: "/schedules", label: "Schedules", icon: CalendarClock },
+    { to: "/arbitrage", label: "Arbitrage", icon: ArrowLeftRight, roles: ['trader','risk_officer','management','admin'] },
     { to: "/quote-builder", label: "Quote Builder", icon: FileSignature, roles: ['trader','supply_manager','management','admin'] },
   ]},
   { title: "Risk", items: [
@@ -44,6 +46,7 @@ const groups: { title: string; items: Item[] }[] = [
   { title: "Assets", items: [
     { to: "/assets", label: "Sites & Assets", icon: Battery },
     { to: "/assets/optimizer", label: "BESS Optimizer", icon: Battery },
+    { to: "/battery", label: "Battery Plan", icon: Battery },
     { to: "/asset-monitoring", label: "Monitoring", icon: Sun },
     { to: "/pv-monitoring", label: "PV Plants", icon: Sun },
     { to: "/smart-meter", label: "Smart Meter", icon: Radio },
