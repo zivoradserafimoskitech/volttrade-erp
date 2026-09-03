@@ -8,18 +8,23 @@ const SUPABASE_ANON_KEY =
 const ANALYTICS_URL =
   import.meta.env.VITE_VOLTTRADE_ANALYTICS_URL || "https://volttrade-analytics.onrender.com";
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-
-let supabase: SupabaseClient | null = null;
+import { supabase as appSupabase } from "@/integrations/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export function getSupabase(): SupabaseClient {
-  if (!supabase) {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new Error("Missing Supabase environment variables");
-    }
-    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-  return supabase;
+  return appSupabase as unknown as SupabaseClient;
+}
+
+// Edge functions require a real user session (not the anon key).
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await appSupabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("You must be signed in to use this feature.");
+  return {
+    Authorization: `Bearer ${token}`,
+    apikey: SUPABASE_ANON_KEY,
+    "Content-Type": "application/json",
+  };
 }
 
 // ── Edge Functions ────────────────────────────────────────────────────────
@@ -36,10 +41,7 @@ export async function quoteSupply(payload: {
 }) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/quote-supply`, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: await authHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -49,10 +51,7 @@ export async function quoteSupply(payload: {
 export async function getRiskMetrics(orgId: string, scenarios?: number) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/risk-metrics`, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: await authHeaders(),
     body: JSON.stringify({ org_id: orgId, scenarios }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -62,10 +61,7 @@ export async function getRiskMetrics(orgId: string, scenarios?: number) {
 export async function getForecast(modelType: string = "ensemble", horizon: number = 24) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/forecast-price`, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: await authHeaders(),
     body: JSON.stringify({ model_type: modelType, horizon_hours: horizon, include_quantiles: true }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -75,10 +71,7 @@ export async function getForecast(modelType: string = "ensemble", horizon: numbe
 export async function optimizeHedge(orgId: string, targetRatio?: number) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/optimize-hedge`, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: await authHeaders(),
     body: JSON.stringify({ org_id: orgId, target_hedge_ratio: targetRatio }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -88,10 +81,7 @@ export async function optimizeHedge(orgId: string, targetRatio?: number) {
 export async function ingestMemo(date?: string, orgId?: string) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/ingest-memo`, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: await authHeaders(),
     body: JSON.stringify({ date, org_id: orgId }),
   });
   if (!res.ok) throw new Error(await res.text());
