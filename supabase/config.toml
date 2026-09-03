@@ -88,3 +88,9 @@ project_id = "volttrade-erp"
     # itself via _shared/auth.ts — staff JWT with role, or the service-role
     # key. Same defence-in-depth pattern as retrain-nightly.
     verify_jwt = true
+  [functions.analytics-db]
+    # Thin PostgREST proxy for the external analytics service. It authenticates
+    # internally with VOLTTRADE_ANALYTICS_KEY (timing-safe compare) and enforces
+    # a per-table method whitelist, so the platform JWT gate must be OFF — the
+    # Python client presents the analytics key, not a Supabase JWT.
+    verify_jwt = false

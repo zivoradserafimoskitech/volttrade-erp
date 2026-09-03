@@ -29,23 +29,37 @@ const corsHeaders = {
 };
 
 // Only tables the analytics pipeline legitimately reads or writes.
-const ALLOWED_TABLES = new Set([
-  "market_price_history",
-  "market_prices",
-  "load_history",
-  "forecast_models",
-  "forecast_predictions",
-  "backtest_results",
-  "retrain_log",
-  "bess_dispatch_schedules",
-  "arbitrage_opportunities",
-  "alerts",
-  "assets",
-  "sites",
-  "org_risk_settings",
-  "profile_capture_factors",
-]);
+// Per-table method whitelist. The proxy runs as service_role, so RLS does
+// NOT apply here: anything allowed below is allowed across every tenant.
+// Grant the minimum the retrain/forecast pipeline actually needs.
+//   READ  = GET/HEAD only
+//   WRITE = GET/HEAD/POST/PATCH (upserts + status updates)
+//   PURGE = WRITE + DELETE (only where the pipeline rewrites a horizon)
+const READ = ["GET", "HEAD"];
+const WRITE = [...READ, "POST", "PATCH"];
+const PURGE = [...WRITE, "DELETE"];
 
+const TABLE_METHODS: Record<string, string[]> = {
+  // Inputs — read-only for the analytics service.
+  market_price_history: READ,
+  market_prices: READ,
+  load_history: READ,
+  profile_capture_factors: READ,
+  assets: READ,
+  sites: READ,
+  org_risk_settings: READ,
+  alerts: [...READ, "POST"], // may raise an alert, never edits or deletes one
+
+  // Outputs the pipeline owns.
+  forecast_models: WRITE,
+  retrain_log: WRITE,
+  backtest_results: WRITE,
+  forecast_predictions: PURGE,       // rewrites a forecast horizon
+  bess_dispatch_schedules: PURGE,    // rewrites a dispatch day
+  arbitrage_opportunities: PURGE,    // rewrites a scan window
+};
+
+const ALLOWED_TABLES = new Set(Object.keys(TABLE_METHODS));
 const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PATCH", "DELETE"]);
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -93,6 +107,12 @@ Deno.serve(async (req) => {
   const table = decodeURIComponent(match[1]);
   if (!ALLOWED_TABLES.has(table)) {
     return json({ error: `Table '${table}' is not proxied` }, 403);
+  }
+  if (!TABLE_METHODS[table].includes(req.method)) {
+    return json(
+      { error: `Method ${req.method} is not permitted on '${table}'` },
+      403,
+    );
   }
 
   const target = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
