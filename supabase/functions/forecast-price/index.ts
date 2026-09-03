@@ -34,24 +34,25 @@ async function callAnalytics(body: ForecastRequest): Promise<Response | null> {
   if (!ANALYTICS_URL) return null;
   // Two attempts: Render free instances often 502/503 on cold start.
   for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 8_000);
     try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 45_000);
       const res = await fetch(`${ANALYTICS_URL}/forecast`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-API-Key": ANALYTICS_KEY },
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
-      clearTimeout(t);
       if (res.ok) return res;
       // 4xx from the service is a real error — surface it.
       if (res.status < 500) return res;
       console.warn(`analytics ${res.status} attempt ${attempt + 1}`);
     } catch (e) {
       console.warn(`analytics fetch failed attempt ${attempt + 1}: ${(e as Error).message}`);
+    } finally {
+      clearTimeout(timeout);
     }
-    await new Promise((r) => setTimeout(r, 2000));
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 1_000));
   }
   return null;
 }
