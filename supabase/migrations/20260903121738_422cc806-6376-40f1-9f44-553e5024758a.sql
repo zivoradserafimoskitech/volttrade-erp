@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.mirror_market_price_history() FROM PUBLIC, anon, authenticated;
