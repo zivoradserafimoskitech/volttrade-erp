@@ -44,9 +44,14 @@ async function callAnalytics(body: ForecastRequest): Promise<Response | null> {
         signal: ctrl.signal,
       });
       if (res.ok) return res;
-      // 4xx from the service is a real error — surface it.
-      if (res.status < 500) return res;
-      console.warn(`analytics ${res.status} attempt ${attempt + 1}`);
+      // Cloudflare/Render edge throttling (429/403/408/5xx) or an HTML
+      // challenge page is NOT a real validation error — retry, then fall back.
+      const ct = res.headers.get("content-type") ?? "";
+      const transient =
+        res.status >= 500 || [408, 429, 403, 520, 521, 522, 523, 524].includes(res.status) ||
+        !ct.includes("json");
+      if (!transient) return res;
+      console.warn(`analytics ${res.status} (${ct}) attempt ${attempt + 1}`);
     } catch (e) {
       console.warn(`analytics fetch failed attempt ${attempt + 1}: ${(e as Error).message}`);
     } finally {
