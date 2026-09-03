@@ -42,24 +42,52 @@ Deno.serve(handler(async (req) => {
   if (body.org_id) upstreamUrl.searchParams.set("org_id", body.org_id);
   upstreamUrl.searchParams.set("model_kind", "all");
 
-  const upstream = await fetch(upstreamUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      // The FastAPI auth middleware in python-service/main.py reads exactly
-      // this header (X-API-Key) and compares it to VOLTTRADE_ANALYTICS_KEY.
-      "X-API-Key": ANALYTICS_KEY,
-    },
-    body: "{}",
-  });
+  // Render free tier cold-starts: the first hit can return 502/503/504 with an
+  // empty body while the container boots. Retry a few times with backoff.
+  const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
+  let upstream: Response | null = null;
+  let lastDetail = "";
 
-  if (!upstream.ok) {
-    const err = await upstream.text();
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 4000 * attempt));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const res = await fetch(upstreamUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // The FastAPI auth middleware in python-service/main.py reads exactly
+          // this header (X-API-Key) and compares it to VOLTTRADE_ANALYTICS_KEY.
+          "X-API-Key": ANALYTICS_KEY,
+        },
+        body: "{}",
+        signal: controller.signal,
+      });
+      if (res.ok) { upstream = res; break; }
+      lastDetail = (await res.text()) || `upstream status ${res.status}`;
+      if (!RETRYABLE.has(res.status)) {
+        return jsonResponse({ ok: false, error: "Analytics service error", detail: lastDetail }, 502);
+      }
+    } catch (e) {
+      lastDetail = String((e as Error)?.message ?? e);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  if (!upstream) {
     return jsonResponse(
-      { ok: false, error: "Analytics service error", detail: err },
-      502,
+      {
+        ok: false,
+        error: "Analytics service unavailable",
+        detail: lastDetail ||
+          "The analytics service did not respond (cold start). Try again in a minute.",
+      },
+      503,
     );
   }
+
 
   // Async /retrain contract (analytics v2.2.0): { job_id, status: "accepted", model_kind }
   const accepted = await upstream.json();
