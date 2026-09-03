@@ -58,6 +58,23 @@ export default function ForecastDashboard() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [backtestResults, setBacktestResults] = useState<any[]>([]);
   const [horizon, setHorizon] = useState(24);
+  const [training, setTraining] = useState(false);
+
+  async function trainNow() {
+    setTraining(true);
+    try {
+      const orgId = await getMyOrgId();
+      const res = await retrainModels(orgId);
+      toast({
+        title: "Training started",
+        description: `Job ${res.job_id ?? "accepted"} — models appear here once promoted (a few minutes).`,
+      });
+      setTimeout(() => { loadModels(); loadBacktests(); }, 60_000);
+    } catch (e: any) {
+      toast({ title: "Could not start training", description: String(e?.message ?? e), variant: "destructive" });
+    }
+    setTraining(false);
+  }
 
   useEffect(() => {
     loadModels();
