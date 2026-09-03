@@ -10,6 +10,7 @@ import { StatCard } from "@/components/erp/StatCard";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, AlertTriangle, Gauge, RefreshCw, TrendingUp } from "lucide-react";
+import { fetchAllRows } from "@/lib/paginate";
 
 /**
  * Live portfolio position — the steering wheel, not the rear-view mirror.
@@ -62,10 +63,17 @@ export default function LivePosition() {
       const mpIds = ((cps ?? []) as any[]).map(c => c.id);
       const act: (number | null)[] = Array(24).fill(null);
       if (mpIds.length) {
-        const { data: iv } = await supabase.from("consumption_readings")
-          .select("metering_point_id, reading_at, actual_mwh, quality")
-          .gte("reading_at", `${date}T00:00:00Z`).lte("reading_at", `${date}T23:59:59Z`)
-          .in("metering_point_id", mpIds).limit(50000);
+        // PAGINATION REPAIR 2026-09-03: .limit(50000) returned 1000 rows. A full
+        // day at 15-minute resolution is 96 intervals, so this truncated above
+        // ~10 metering points.
+        const iv = await fetchAllRows<{ metering_point_id: string; reading_at: string; actual_mwh: number | null; quality: string | null }>(
+          () => supabase.from("consumption_readings")
+            .select("metering_point_id, reading_at, actual_mwh, quality")
+            .gte("reading_at", `${date}T00:00:00Z`).lte("reading_at", `${date}T23:59:59Z`)
+            .in("metering_point_id", mpIds)
+            .order("metering_point_id").order("reading_at"),
+          { label: "live position consumption_readings" },
+        );
         for (const r of ((iv ?? []) as any[])) {
           if ((r.quality ?? "measured") === "flagged") continue;
           const h = new Date(r.reading_at).getUTCHours();

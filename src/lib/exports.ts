@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import { writeWorkbook } from "./xlsxIo";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -10,20 +10,30 @@ const fmtCellPct = (v: any) => `${Number(v ?? 0).toFixed(1)}%`;
 const fmtCell = (v: any, f?: ExportColumn["format"]) =>
   f === "eur" ? fmtCellEur(v) : f === "num" ? fmtCellNum(v) : f === "pct" ? fmtCellPct(v) : String(v ?? "");
 
-export function exportToExcel(filename: string, sheets: { name: string; columns: ExportColumn[]; rows: any[] }[]) {
-  const wb = XLSX.utils.book_new();
-  for (const s of sheets) {
-    const data = [s.columns.map(c => c.label), ...s.rows.map(r => s.columns.map(c => {
-      const v = r[c.key];
-      if (c.format === "eur" || c.format === "num" || c.format === "pct") return Number(v ?? 0);
-      return v ?? "";
-    }))];
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    // Column widths
-    ws["!cols"] = s.columns.map(c => ({ wch: Math.max(c.label.length + 2, 14) }));
-    XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31));
-  }
-  XLSX.writeFile(wb, `${filename}.xlsx`);
+// Now async: ExcelJS is dynamically imported so it stays out of the main
+// bundle. Callers that ignored the return value keep working; callers that
+// want to await completion (or catch a write error) now can.
+export async function exportToExcel(
+  filename: string,
+  sheets: { name: string; columns: ExportColumn[]; rows: Record<string, unknown>[] }[],
+): Promise<void> {
+  await writeWorkbook(
+    filename,
+    sheets.map((s) => ({
+      name: s.name,
+      aoa: [
+        s.columns.map((c) => c.label),
+        ...s.rows.map((r) =>
+          s.columns.map((c) => {
+            const v = r[c.key];
+            if (c.format === "eur" || c.format === "num" || c.format === "pct") return Number(v ?? 0);
+            return (v ?? "") as string | number;
+          }),
+        ),
+      ],
+      widths: s.columns.map((c) => Math.max(c.label.length + 2, 14)),
+    })),
+  );
 }
 
 export function exportToPdf(opts: {

@@ -40,15 +40,26 @@ Deno.serve(async (req) => {
     const holidays = new Set<string>((hol ?? []).map((h: any) => h.holiday_date));
 
     // Profiled/measured classification + client link per metering point
-    const { data: cps } = await admin.from("metering_points")
-      .select("id, client_id, metering_category, slp_category").eq("status", "active");
+    // PAGINATION REPAIR 2026-09-01: unbounded select stops at max_rows (1000).
+    const cps = await fetchAllRows<any>(
+      () => admin.from("metering_points")
+        .select("id, client_id, metering_category, slp_category")
+        .eq("status", "active").order("id"),
+      { label: "metering_points active" },
+    );
     const mpInfo = new Map<string, any>();
     (cps ?? []).forEach((c: any) => mpInfo.set(c.id, c));
 
     // Interval energy since history start (internal Kimi data is fine here — forecasting, not settlement)
-    const { data: iv } = await admin.from("consumption_readings")
-      .select("metering_point_id, reading_at, actual_mwh")
-      .gte("reading_at", histStart.toISOString()).neq("quality", "flagged").limit(100000);
+    // PAGINATION REPAIR 2026-09-01: .limit(100000) returned 1000 rows, so the
+    // whole volume forecast was fitted on an arbitrary 1000-row prefix.
+    const iv = await fetchAllRows<any>(
+      () => admin.from("consumption_readings")
+        .select("metering_point_id, reading_at, actual_mwh")
+        .gte("reading_at", histStart.toISOString()).neq("quality", "flagged")
+        .order("metering_point_id").order("reading_at"),
+      { label: "consumption_readings forecast history" },
+    );
 
     // Aggregate per client: consumed this month + daily sums by day type
     type Agg = { toDate: number; byType: Record<string, { sum: number; days: Set<string> }>; category: string | null; segment: string };

@@ -2,12 +2,7 @@
 // CVaR, VaR, capital capacity, efficient frontier — native VoltTrade.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { authenticate, handler, json, resolveOrg } from "../_shared/auth.ts";
 
 interface RiskRequest {
   org_id?: string;
@@ -15,38 +10,23 @@ interface RiskRequest {
   days?: number;
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+// SECURITY REPAIR 2026-09-01
+// --------------------------
+// This function previously took `org_id` straight from the request body and
+// only fell back to the Bearer token when it was absent — so passing an org id
+// bypassed authentication completely. It runs on the service-role key (RLS does
+// not apply) and deploy-risk-module.yml shipped it with --no-verify-jwt, which
+// made another tenant's VaR, position and hedge ratio readable by anyone.
+//
+// Now: authenticate() first, resolveOrg() decides the tenant, and a body org_id
+// that disagrees with the caller's membership is a 403.
+serve(handler(async (req) => {
+  const auth = await authenticate(req);
+  const supabase = auth.admin;
 
-  try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+  const body: RiskRequest = await req.json().catch(() => ({} as RiskRequest));
+  const orgId = await resolveOrg(auth, body.org_id ?? null);
 
-    const body: RiskRequest = await req.json();
-
-    // Resolve org
-    let orgId = body.org_id;
-    if (!orgId) {
-      const authHeader = req.headers.get("Authorization");
-      if (authHeader?.startsWith("Bearer ")) {
-        const token = authHeader.replace("Bearer ", "");
-        const { data: { user } } = await supabase.auth.getUser(token);
-        if (user) {
-          const { data: mem } = await supabase
-            .from("organization_members")
-            .select("organization_id")
-            .eq("user_id", user.id)
-            .single();
-          if (mem) orgId = mem.organization_id;
-        }
-      }
-    }
-    if (!orgId) {
-      return new Response(JSON.stringify({ error: "org_id required" }), 
-        { status: 400, headers: corsHeaders });
-    }
 
     // 1. Org settings
     const { data: risk } = await supabase
@@ -116,7 +96,8 @@ serve(async (req) => {
     const remaining = maxCapacity - soldMwh;
 
     // 5. Profile breakdown
-    const profileBreakdown = (contracts || []).reduce((acc: any, c: any) => {
+    type ProfileAgg = Record<string, { mwh: number; revenue: number; count: number }>;
+    const profileBreakdown = (contracts || []).reduce((acc: ProfileAgg, c: Record<string, number | string | null>) => {
       const key = c.profile_key || 'unknown';
       if (!acc[key]) acc[key] = { mwh: 0, revenue: 0, count: 0 };
       acc[key].mwh += c.annual_volume_mwh || 0;
@@ -179,10 +160,5 @@ serve(async (req) => {
       recommendation,
     };
 
-    return new Response(JSON.stringify(result), 
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), 
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-});
+  return json(result);
+}));

@@ -1,3 +1,6 @@
+-- REPAIR 2026-09-01: CREATE POLICY made idempotent (DROP POLICY IF EXISTS
+-- first). These policies are also created by an earlier migration, so this
+-- file aborted on a from-scratch replay with "policy ... already exists".
 -- ═══════════════════════════════════════════════════════════════════
 -- Regulatory compliance calendar.
 -- Recurring obligations from Правила за пазар на електрична енергија
@@ -44,11 +47,16 @@ GRANT ALL ON public.compliance_tasks TO service_role;
 ALTER TABLE public.compliance_obligations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.compliance_tasks ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "staff read obligations" ON public.compliance_obligations;
+
 CREATE POLICY "staff read obligations" ON public.compliance_obligations FOR SELECT TO authenticated USING (public.is_staff());
+DROP POLICY IF EXISTS "admin write obligations" ON public.compliance_obligations;
 CREATE POLICY "admin write obligations" ON public.compliance_obligations FOR ALL TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]));
+DROP POLICY IF EXISTS "staff read tasks" ON public.compliance_tasks;
 CREATE POLICY "staff read tasks" ON public.compliance_tasks FOR SELECT TO authenticated USING (public.is_staff());
+DROP POLICY IF EXISTS "staff write tasks" ON public.compliance_tasks;
 CREATE POLICY "staff write tasks" ON public.compliance_tasks FOR ALL TO authenticated
   USING (public.is_staff()) WITH CHECK (public.is_staff());
 

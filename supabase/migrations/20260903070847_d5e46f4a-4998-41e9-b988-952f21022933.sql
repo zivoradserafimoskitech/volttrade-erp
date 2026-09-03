@@ -1,5 +1,11 @@
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
+-- REPAIR 2026-09-03: CREATE EXTENSION guarded so a plain Postgres (CI) can
+-- replay the chain. On Supabase both extensions exist and this is a no-op.
+do $ext$ begin
+  execute 'create extension if not exists pg_cron';
+  execute 'create extension if not exists pg_net';
+exception when others then
+  raise notice 'skipping pg_cron/pg_net (not available on this server)';
+end $ext$;
 
 do $do$
 declare
@@ -9,6 +15,13 @@ declare
   v_job  record;
   v_cmd  text;
 begin
+  -- REPAIR 2026-09-03: `vault` is Supabase-only. Skip the whole block on a
+  -- server without it rather than aborting the migration chain; on Supabase
+  -- the missing-secret exception below still fires as intended.
+  if to_regclass('vault.decrypted_secrets') is null then
+    raise notice 'vault not available — skipping cron scheduling';
+    return;
+  end if;
   if not exists (select 1 from vault.decrypted_secrets where name = 'email_queue_service_role_key') then
     raise exception 'vault secret email_queue_service_role_key not found';
   end if;

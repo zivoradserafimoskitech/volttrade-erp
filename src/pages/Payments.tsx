@@ -54,7 +54,7 @@ export default function Payments() {
   const allocate = async () => {
     if (!allocFor) return;
     const remaining = Number(allocFor.amount_eur) - allocated(allocFor.id);
-    let toAlloc = Object.entries(allocAmt).filter(([,v]) => v > 0);
+    const toAlloc = Object.entries(allocAmt).filter(([,v]) => v > 0);
     const total = toAlloc.reduce((s,[,v]) => s + Number(v), 0);
     if (total > remaining + 0.01) return toast.error("Allocation exceeds remaining payment amount");
     for (const [invoice_id, amount_eur] of toAlloc) {

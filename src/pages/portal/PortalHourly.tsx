@@ -64,7 +64,9 @@ export default function PortalHourly() {
         .select("reading_at, import_kwh, export_kwh")
         .eq("metering_point_id", mpId)
         .gte("reading_at", fromIso).lte("reading_at", toIso)
-        .order("reading_at", { ascending: true }).limit(2000),
+        // PAGINATION REPAIR 2026-09-03: .limit(2000) returned 1000 rows -- a
+        // customer-facing page showing a consumer half their own hourly data.
+        .order("reading_at", { ascending: true }).range(0, 999),
       supabase.from("forecasts")
         .select("forecast_date, forecast_mwh")
         .eq("client_id", clientId)

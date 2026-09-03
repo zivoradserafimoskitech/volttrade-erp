@@ -11,6 +11,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Target, Play, TrendingUp } from "lucide-react";
+import { fetchAllRows } from "@/lib/paginate";
 
 /**
  * Forecast accuracy (MAPE) — measures the volume_forecasts snapshots against
@@ -46,7 +47,16 @@ export default function ForecastAccuracy() {
       const [{ data: snaps }, { data: cps }, { data: iv }] = await Promise.all([
         (supabase.from as any)("volume_forecasts").select("client_id, slp_category, forecast_mwh, created_at").eq("scope", "client").eq("month", monthISO).order("created_at"),
         (supabase.from as any)("metering_points").select("id, client_id").eq("status", "active"),
-        supabase.from("consumption_readings").select("metering_point_id, actual_mwh, source, quality").gte("reading_at", start).lte("reading_at", end).limit(200000),
+        // PAGINATION REPAIR 2026-09-03: .limit(200000) returned 1000 rows, so the
+        // MAPE on this page was computed from ~0.5% of the month's readings.
+        // .then(data => ({ data })) keeps the { data: iv } destructuring below.
+        fetchAllRows<{ metering_point_id: string; actual_mwh: number | null; source: string | null; quality: string | null }>(
+          () => supabase.from("consumption_readings")
+            .select("metering_point_id, actual_mwh, source, quality")
+            .gte("reading_at", start).lte("reading_at", end)
+            .order("metering_point_id").order("reading_at"),
+          { label: "forecast accuracy consumption_readings" },
+        ).then((data) => ({ data })),
       ]);
       if (!snaps?.length) { toast({ title: "No snapshots for this month", description: "forecast-volumes hasn't run for it.", variant: "destructive" }); setRows([]); return; }
 

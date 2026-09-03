@@ -60,7 +60,7 @@ export default function PortalRefer() {
 
   const share = async () => {
     if (navigator.share) {
-      try { await navigator.share({ title: "Join Vatra", text: "Join me on Vatra and we both get €50 credit.", url: link }); } catch {}
+      try { await navigator.share({ title: "Join Vatra", text: "Join me on Vatra and we both get €50 credit.", url: link }); } catch { /* user dismissed the share sheet */ }
     } else { copyLink(); }
   };
 

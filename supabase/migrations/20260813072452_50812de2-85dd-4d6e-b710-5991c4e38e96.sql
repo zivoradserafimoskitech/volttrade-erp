@@ -1,3 +1,9 @@
+-- REPAIR 2026-09-01: this file is a re-upload of
+-- 20260811210000_phase1_hardening.sql, committed AFTER
+-- 20260812120000_phase4_org_tenancy.sql renamed user_id -> created_by. Its
+-- user_id references therefore cannot resolve on a from-scratch replay. They
+-- are now guarded on column existence; on a pre-Phase-4 database the
+-- behaviour is identical.
 -- ═══════════════════════════════════════════════════════════════════════════
 -- PHASE 1 HARDENING — audit items P1-11, P0-1 (partial), P0-3 (partial)
 --
@@ -93,10 +99,15 @@ BEGIN
   END LOOP;
 END $$;
 
-COMMENT ON COLUMN public.invoices.user_id IS
-  'Creator of the record. Nullable: set to NULL when the account is deleted so '
-  'the invoice survives. Scheduled/automated runs write NULL. Superseded by '
-  'created_by + organization_id in Phase 4.';
+DO $guard$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema='public' AND table_name='invoices' AND column_name='user_id') THEN
+    EXECUTE 'COMMENT ON COLUMN public.invoices.user_id IS
+  ''Creator of the record. Nullable: set to NULL when the account is deleted so ''
+  ''the invoice survives. Scheduled/automated runs write NULL. Superseded by ''
+  ''created_by + organization_id in Phase 4.'';';
+  END IF;
+END $guard$;
 
 
 -- ───────────────────────────────────────────────────────────────────────────

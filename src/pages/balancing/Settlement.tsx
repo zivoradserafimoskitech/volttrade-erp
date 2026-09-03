@@ -11,6 +11,7 @@ import { StatCard } from "@/components/erp/StatCard";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/paginate";
 import { toast } from "@/hooks/use-toast";
 import { Scale, TrendingDown, Save, Database, FileDown, FileText } from "lucide-react";
 import { exportToExcel, exportToPdf, type ExportColumn } from "@/lib/exports";
@@ -80,10 +81,17 @@ export default function Settlement() {
       const internal: Record<Seg, number | null> = { PROFILED: null, MEASURED: null, PV: null };
       const official: Record<Seg, number | null> = { PROFILED: null, MEASURED: null, PV: null };
       if (segOf.size) {
-        const { data: iv } = await supabase.from("consumption_readings")
-          .select("metering_point_id, reading_at, actual_mwh, source, quality")
-          .gte("reading_at", `${start}T00:00:00Z`).lte("reading_at", `${end}T23:59:59Z`)
-          .in("metering_point_id", [...segOf.keys()]).limit(100000);
+        // PAGINATION REPAIR 2026-09-01: .limit(100000) does not lift the 1000-row
+        // API cap — it returned the first 1000 rows and settlement was computed
+        // on that prefix. One month of hourly data for two points exceeds it.
+        const iv = await fetchAllRows<{ metering_point_id: string; reading_at: string; actual_mwh: number | null; source: string | null; quality: string | null }>(
+          () => supabase.from("consumption_readings")
+            .select("metering_point_id, reading_at, actual_mwh, source, quality")
+            .gte("reading_at", `${start}T00:00:00Z`).lte("reading_at", `${end}T23:59:59Z`)
+            .in("metering_point_id", [...segOf.keys()])
+            .order("metering_point_id").order("reading_at"),
+          { label: "settlement consumption_readings" },
+        );
         for (const r of ((iv ?? []) as any[])) {
           if ((r.quality ?? "measured") === "flagged") continue;
           const seg = segOf.get(r.metering_point_id); if (!seg) continue;
@@ -223,7 +231,8 @@ export default function Settlement() {
           return (
             <Badge key={s} variant={on ? "default" : "outline"} className="cursor-pointer select-none"
               onClick={() => setActiveSegs(prev => {
-                const next = new Set(prev); next.has(s) ? next.delete(s) : next.add(s);
+                const next = new Set(prev);
+                if (next.has(s)) next.delete(s); else next.add(s);
                 return next.size ? next : prev;
               })}>{s}</Badge>
           );

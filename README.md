@@ -22,7 +22,7 @@ backend. See [Integration](#integration).
 | Tests | Vitest |
 | CI | GitHub Actions — typecheck, strict gate, tests, build, audit, migrations |
 
-66 tables, 25 edge functions, ~65 routes.
+80 tables, 40 edge functions, ~75 routes.
 
 ---
 
@@ -121,7 +121,7 @@ device ids.
 Ownership is `organization_id`. `created_by` records who made a row and does
 **not** govern visibility — do not filter by it.
 
-Access is `is_staff()` plus `has_any_role()` across nine roles. All 66 tables
+Access is `is_staff()` plus `has_any_role()` across nine roles. All 80 tables
 have RLS enabled. Portal consumers are scoped through `clients.portal_user_id`
 and are never organization members.
 
@@ -130,10 +130,13 @@ and are never organization members.
 ## Local development
 
 ```bash
-bun install
-cp .env.example .env.local        # add your Supabase URL and anon key
+bun install                       # or: npm ci
+cp .env.example .env.local        # VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY
 bun run dev
 ```
+
+The key variable is `VITE_SUPABASE_PUBLISHABLE_KEY`, not `VITE_SUPABASE_ANON_KEY`.
+See `.env.example` for the full list.
 
 ```bash
 bun run test              # vitest
@@ -154,9 +157,15 @@ supabase functions deploy billing-run
 Scheduled jobs live in `supabase/cron.sql` — run once in the SQL editor after
 substituting your project ref and service-role key.
 
-Required secrets: `GATEWAY_API_URL`, `GATEWAY_API_KEY`, `GATEWAY_EMS_API_KEY`,
-`LEAD_THROTTLE_SALT`, `SENTRY_DSN`, plus the Influx variables for the
-third-party forecast feed.
+Required Supabase function secrets (the code reads 36 distinct variables; these
+are the ones without a working default):
+
+`GATEWAY_API_URL`, `GATEWAY_API_KEY`, `GATEWAY_EMS_API_KEY`,
+`LEAD_THROTTLE_SALT`, `SENTRY_DSN`, `RESEND_API_KEY`, `VATRA_FROM_EMAIL`,
+`ENTSOE_API_TOKEN`, `VOLTTRADE_ANALYTICS_URL`, `VOLTTRADE_ANALYTICS_KEY`,
+plus the `INFLUX_*` variables for the third-party forecast feed and the
+`ELEX_*` / `EEX_*` / `STEKKER_*` / `SOLCAST_*` / `FIREBASE_*` / `SMS_PROVIDER_*`
+groups for whichever of those integrations you enable.
 
 ---
 
@@ -180,7 +189,13 @@ preferences, they are correctness:
 4. Ownership is `organization_id`, not `user_id`.
 5. Unpaginated Supabase selects cap at **1000 rows** — always paginate over
    readings, prices and telemetry. A silently truncated billing run
-   under-bills every customer.
+   under-bills every customer. **`.limit(50000)` is not pagination** — it
+   lowers a ceiling that is already lower. Use `fetchAllRows()` from
+   `supabase/functions/_shared/paginate.ts` (edge) or `src/lib/paginate.ts`
+   (browser); both walk `.range()` and throw rather than truncate.
+6. Never take `organization_id` / `org_id` from a request body as an identity.
+   Use `resolveOrg()` in `_shared/auth.ts`: it derives the tenant from the
+   caller's membership row and 403s when the body disagrees.
 
 ---
 

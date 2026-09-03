@@ -6,6 +6,13 @@ declare
   v_job  record;
   v_cmd  text;
 begin
+  -- REPAIR 2026-09-03: `vault` is Supabase-only. Skip on a server without it
+  -- (CI) rather than aborting the migration chain; on Supabase the checks below
+  -- still run exactly as written.
+  if to_regclass('vault.decrypted_secrets') is null then
+    raise notice 'vault not available — skipping';
+    return;
+  end if;
   if not exists (select 1 from vault.decrypted_secrets where name = 'cron_service_role_key') then
     raise exception 'vault secret cron_service_role_key not found';
   end if;

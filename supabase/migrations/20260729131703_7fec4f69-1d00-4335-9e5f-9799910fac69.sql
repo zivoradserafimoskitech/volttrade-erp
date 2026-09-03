@@ -1,16 +1,23 @@
+-- REPAIR 2026-09-01: CREATE POLICY made idempotent. The file dropped the old
+-- policy name but not the new one, so on replay it aborted at line 6 with
+-- "policy already exists" -- which meant clients_block_portal_sensitive_update()
+-- further down was never created, breaking two later migrations that REVOKE on it.
 
 -- 1) balance_groups / balance_schedules / settlements: staff-only SELECT
 DROP POLICY IF EXISTS "auth read balance_groups" ON public.balance_groups;
+DROP POLICY IF EXISTS "staff read balance_groups" ON public.balance_groups;
 CREATE POLICY "staff read balance_groups" ON public.balance_groups
   FOR SELECT TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management','operations','trader','supply_manager','billing_officer','finance','risk_officer','auditor']::app_role[]));
 
 DROP POLICY IF EXISTS "auth read balance_schedules" ON public.balance_schedules;
+DROP POLICY IF EXISTS "staff read balance_schedules" ON public.balance_schedules;
 CREATE POLICY "staff read balance_schedules" ON public.balance_schedules
   FOR SELECT TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management','operations','trader','supply_manager','billing_officer','finance','risk_officer','auditor']::app_role[]));
 
 DROP POLICY IF EXISTS "auth read settlements" ON public.settlements;
+DROP POLICY IF EXISTS "staff read settlements" ON public.settlements;
 CREATE POLICY "staff read settlements" ON public.settlements
   FOR SELECT TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management','operations','trader','supply_manager','billing_officer','finance','risk_officer','auditor']::app_role[]));
@@ -55,10 +62,14 @@ CREATE TRIGGER clients_block_portal_sensitive_update
 -- 3) ev_charge_plans: split portal ALL -> portal SELECT + constrained INSERT + DELETE. No portal UPDATE.
 DROP POLICY IF EXISTS "portal owns ev plans" ON public.ev_charge_plans;
 
+DROP POLICY IF EXISTS "ev plans read" ON public.ev_charge_plans;
+
 CREATE POLICY "ev plans read" ON public.ev_charge_plans
   FOR SELECT TO authenticated
   USING (client_id = public.current_portal_client_id()
       OR public.has_any_role(auth.uid(), ARRAY['admin','operations','supply_manager','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "ev plans portal insert (no cost)" ON public.ev_charge_plans;
 
 CREATE POLICY "ev plans portal insert (no cost)" ON public.ev_charge_plans
   FOR INSERT TO authenticated
@@ -70,10 +81,14 @@ CREATE POLICY "ev plans portal insert (no cost)" ON public.ev_charge_plans
     OR public.has_any_role(auth.uid(), ARRAY['admin','operations','supply_manager','billing_officer']::app_role[])
   );
 
+DROP POLICY IF EXISTS "ev plans staff update" ON public.ev_charge_plans;
+
 CREATE POLICY "ev plans staff update" ON public.ev_charge_plans
   FOR UPDATE TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','operations','supply_manager','billing_officer']::app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','operations','supply_manager','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "ev plans portal delete own" ON public.ev_charge_plans;
 
 CREATE POLICY "ev plans portal delete own" ON public.ev_charge_plans
   FOR DELETE TO authenticated
@@ -83,10 +98,14 @@ CREATE POLICY "ev plans portal delete own" ON public.ev_charge_plans
 -- 4) referrals: portal may INSERT pending w/ zero credit; SELECT own; no UPDATE/DELETE from portal.
 DROP POLICY IF EXISTS "portal owns referrals" ON public.referrals;
 
+DROP POLICY IF EXISTS "referrals read" ON public.referrals;
+
 CREATE POLICY "referrals read" ON public.referrals
   FOR SELECT TO authenticated
   USING (referrer_client_id = public.current_portal_client_id()
       OR public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "referrals portal insert pending" ON public.referrals;
 
 CREATE POLICY "referrals portal insert pending" ON public.referrals
   FOR INSERT TO authenticated
@@ -98,10 +117,14 @@ CREATE POLICY "referrals portal insert pending" ON public.referrals
     OR public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[])
   );
 
+DROP POLICY IF EXISTS "referrals staff manage" ON public.referrals;
+
 CREATE POLICY "referrals staff manage" ON public.referrals
   FOR UPDATE TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "referrals staff delete" ON public.referrals;
 
 CREATE POLICY "referrals staff delete" ON public.referrals
   FOR DELETE TO authenticated
@@ -110,19 +133,27 @@ CREATE POLICY "referrals staff delete" ON public.referrals
 -- 5) rewards_ledger: portal SELECT only; staff manage.
 DROP POLICY IF EXISTS "portal owns rewards" ON public.rewards_ledger;
 
+DROP POLICY IF EXISTS "rewards read" ON public.rewards_ledger;
+
 CREATE POLICY "rewards read" ON public.rewards_ledger
   FOR SELECT TO authenticated
   USING (client_id = public.current_portal_client_id()
       OR public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]));
 
+DROP POLICY IF EXISTS "rewards staff insert" ON public.rewards_ledger;
+
 CREATE POLICY "rewards staff insert" ON public.rewards_ledger
   FOR INSERT TO authenticated
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "rewards staff update" ON public.rewards_ledger;
 
 CREATE POLICY "rewards staff update" ON public.rewards_ledger
   FOR UPDATE TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "rewards staff delete" ON public.rewards_ledger;
 
 CREATE POLICY "rewards staff delete" ON public.rewards_ledger
   FOR DELETE TO authenticated
@@ -131,10 +162,14 @@ CREATE POLICY "rewards staff delete" ON public.rewards_ledger
 -- 6) saving_session_signups: portal may opt in/out (status only); staff compute credits.
 DROP POLICY IF EXISTS "portal owns signups" ON public.saving_session_signups;
 
+DROP POLICY IF EXISTS "signups read" ON public.saving_session_signups;
+
 CREATE POLICY "signups read" ON public.saving_session_signups
   FOR SELECT TO authenticated
   USING (client_id = public.current_portal_client_id()
       OR public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "signups portal opt-in" ON public.saving_session_signups;
 
 CREATE POLICY "signups portal opt-in" ON public.saving_session_signups
   FOR INSERT TO authenticated
@@ -148,10 +183,14 @@ CREATE POLICY "signups portal opt-in" ON public.saving_session_signups
     OR public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[])
   );
 
+DROP POLICY IF EXISTS "signups portal opt-out" ON public.saving_session_signups;
+
 CREATE POLICY "signups portal opt-out" ON public.saving_session_signups
   FOR DELETE TO authenticated
   USING (client_id = public.current_portal_client_id()
       OR public.has_any_role(auth.uid(), ARRAY['admin','operations','billing_officer']::app_role[]));
+
+DROP POLICY IF EXISTS "signups staff update" ON public.saving_session_signups;
 
 CREATE POLICY "signups staff update" ON public.saving_session_signups
   FOR UPDATE TO authenticated

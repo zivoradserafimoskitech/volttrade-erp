@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { TrendingUp, Target, AlertTriangle, Gauge, Download, FileSpreadsheet, FileText, Sparkles, RefreshCw, Database } from "lucide-react";
 import { format, addDays, subDays, differenceInCalendarDays } from "date-fns";
 import { ResponsiveContainer, ComposedChart, Line, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { fetchAllRows } from "@/lib/paginate";
 
 type Client = { id: string; company_name: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number };
 type Forecast = { id?: string; client_id: string; forecast_date: string; forecast_mwh: number; budget_mwh: number | null; budget_eur: number | null; method: string; forecast_mwh_external?: number | null; external_source?: string | null; external_synced_at?: string | null };
@@ -68,7 +69,15 @@ export default function Forecasting() {
       supabase.from("clients").select("id, company_name, fixed_price_eur_mwh, margin_eur_mwh").order("company_name"),
       supabase.from("metering_points").select("id, client_id"),
       supabase.from("forecasts").select("id, client_id, forecast_date, forecast_mwh, budget_mwh, budget_eur, method, forecast_mwh_external, external_source, external_synced_at").gte("forecast_date", priorYearRange.from).lte("forecast_date", rangeEnd),
-      supabase.from("consumption_readings").select("metering_point_id, reading_at, actual_mwh").gte("reading_at", `${priorYearRange.from}T00:00:00`).lte("reading_at", `${rangeEnd}T23:59:59`).limit(10000),
+      // PAGINATION REPAIR 2026-09-03: .limit(10000) returned 1000 rows, so the
+      // prior-year baseline this page compares against was a 1000-row prefix.
+      fetchAllRows<{ metering_point_id: string; reading_at: string; actual_mwh: number | null }>(
+        () => supabase.from("consumption_readings")
+          .select("metering_point_id, reading_at, actual_mwh")
+          .gte("reading_at", `${priorYearRange.from}T00:00:00`).lte("reading_at", `${rangeEnd}T23:59:59`)
+          .order("metering_point_id").order("reading_at"),
+        { label: "forecasting consumption_readings" },
+      ).then((data) => ({ data })),
     ]);
     setClients((cRes.data as any) ?? []);
     setMeters((mRes.data as any) ?? []);

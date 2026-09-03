@@ -87,7 +87,7 @@ export function PortalLayout({ children, title }: { children: ReactNode; title: 
       {previewMode && (
         <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-700 dark:text-amber-300 px-4 md:px-8 py-2 text-xs flex items-center justify-between gap-3">
           <span className="flex items-center gap-2"><Eye className="h-3.5 w-3.5" /> Previewing the customer portal as staff — data shown is filtered to your own account.</span>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { try { sessionStorage.removeItem('viewAsCustomer'); } catch {} ; navigate('/'); }}>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { try { sessionStorage.removeItem('viewAsCustomer'); } catch { /* storage unavailable — navigating away clears the view anyway */ } ; navigate('/'); }}>
             <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to staff ERP
           </Button>
         </div>

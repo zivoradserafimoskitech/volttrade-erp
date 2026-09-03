@@ -13,6 +13,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Scale, Users, Play } from "lucide-react";
+import { fetchAllRows } from "@/lib/paginate";
 
 /**
  * Imbalance cost allocation per client — internal analytics, never invoiced.
@@ -53,7 +54,15 @@ export default function ImbalanceAllocation() {
         (supabase.from as any)("metering_points").select("id, client_id").eq("balance_group_id", bg).eq("status", "active"),
         supabase.from("clients").select("id, company_name"),
         supabase.from("balance_schedules").select("date, mtu, scheduled_mwh, leg, version").eq("balance_group_id", bg).gte("date", start.toISOString().slice(0, 10)).lte("date", end.toISOString().slice(0, 10)),
-        supabase.from("consumption_readings").select("metering_point_id, reading_at, actual_mwh, quality").gte("reading_at", histStart.toISOString()).lte("reading_at", end.toISOString()).limit(200000),
+        // PAGINATION REPAIR 2026-09-03: .limit(200000) returned 1000 rows, so
+        // per-client imbalance cost was allocated from a fraction of the volume.
+        fetchAllRows<{ metering_point_id: string; reading_at: string; actual_mwh: number | null; quality: string | null }>(
+          () => supabase.from("consumption_readings")
+            .select("metering_point_id, reading_at, actual_mwh, quality")
+            .gte("reading_at", histStart.toISOString()).lte("reading_at", end.toISOString())
+            .order("metering_point_id").order("reading_at"),
+          { label: "imbalance allocation consumption_readings" },
+        ).then((data) => ({ data })),
         (supabase.from as any)("public_holidays").select("holiday_date"),
         supabase.from("invoices").select("client_id, total_eur, period_start").gte("period_start", start.toISOString().slice(0, 10)).lte("period_start", end.toISOString().slice(0, 10)),
       ]);

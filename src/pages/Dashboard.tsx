@@ -16,6 +16,7 @@ import { Activity, Users, Zap, Euro, Database, Gauge, Sun, Bell, AlertTriangle }
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ComposedChart } from "recharts";
 import { toast } from "sonner";
 import { format, addDays, startOfDay, subDays } from "date-fns";
+import { fetchAllRows } from "@/lib/paginate";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ export default function Dashboard() {
     try {
       const raw = localStorage.getItem("pv.pr.alert");
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch { /* unreadable or malformed — fall through to the default below */ }
     return { enabled: true, threshold: 80 };
   });
   const lastNotifiedRef = useRef<string | null>(null);
@@ -88,15 +89,30 @@ export default function Dashboard() {
     setPv({ count: pvRows?.length ?? 0, kwp: totalKwp, daily });
 
     // Get readings for the most recent 24h
-    const { data: meterIds } = await supabase.from("metering_points").select("id");
-    const ids = (meterIds ?? []).map((m: any) => m.id);
+    // PAGINATION REPAIR 2026-09-03: two bugs here, not one.
+    //   1. The metering_points select was unbounded, so it stopped at the
+    //      1000-row cap and the .in() filter below silently excluded the rest.
+    //   2. The readings query said "most recent 24h" but had no time filter and
+    //      ordered ASCENDING with .limit(2400) -- so it returned the OLDEST rows
+    //      in the table (capped at 1000), not the newest. The chart has been
+    //      showing the wrong window, not merely a short one.
+    // Now: bound the window explicitly, then page over it.
+    const meterIds = await fetchAllRows<{ id: string }>(
+      () => supabase.from("metering_points").select("id").order("id"),
+      { label: "dashboard metering_points" },
+    );
+    const ids = meterIds.map((m) => m.id);
     if (ids.length) {
-      const { data: rd } = await supabase
-        .from("consumption_readings")
-        .select("reading_at, forecast_mwh, actual_mwh")
-        .in("metering_point_id", ids)
-        .order("reading_at", { ascending: true })
-        .limit(2400);
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const rd = await fetchAllRows<{ reading_at: string; forecast_mwh: number | null; actual_mwh: number | null }>(
+        () => supabase
+          .from("consumption_readings")
+          .select("reading_at, forecast_mwh, actual_mwh")
+          .in("metering_point_id", ids)
+          .gte("reading_at", since)
+          .order("reading_at", { ascending: true }),
+        { label: "dashboard consumption_readings" },
+      );
       const byHour = new Map<string, { f: number; a: number }>();
       (rd ?? []).forEach((r: any) => {
         const k = format(new Date(r.reading_at), "MM-dd HH:00");
@@ -115,7 +131,7 @@ export default function Dashboard() {
   useEffect(() => { load(); }, [user, period]);
 
   useEffect(() => {
-    try { localStorage.setItem("pv.pr.alert", JSON.stringify(prAlert)); } catch {}
+    try { localStorage.setItem("pv.pr.alert", JSON.stringify(prAlert)); } catch { /* storage unavailable — the setting just will not persist */ }
   }, [prAlert]);
 
   const seed = async () => {

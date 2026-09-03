@@ -1,3 +1,6 @@
+-- REPAIR 2026-09-01: CREATE POLICY made idempotent (DROP POLICY IF EXISTS
+-- first). These policies are also created by an earlier migration, so this
+-- file aborted on a from-scratch replay with "policy ... already exists".
 -- ППЕЕ (renewable obligation) purchase nomination.
 -- Правила за пазар на електрична енергија, Прилог 1, точка 4:
 --   TPS_ППЕЕПТ = p[%] × TPS_снабдувач/трговец/ПЕЕ
@@ -16,8 +19,10 @@ CREATE TABLE IF NOT EXISTS public.ppee_coefficients (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.ppee_coefficients TO authenticated;
 GRANT ALL ON public.ppee_coefficients TO service_role;
 ALTER TABLE public.ppee_coefficients ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "staff read ppee_coefficients" ON public.ppee_coefficients;
 CREATE POLICY "staff read ppee_coefficients" ON public.ppee_coefficients
   FOR SELECT TO authenticated USING (public.is_staff());
+DROP POLICY IF EXISTS "bal write ppee_coefficients" ON public.ppee_coefficients;
 CREATE POLICY "bal write ppee_coefficients" ON public.ppee_coefficients
   FOR ALL TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management','supply_manager','trader']::public.app_role[]))
