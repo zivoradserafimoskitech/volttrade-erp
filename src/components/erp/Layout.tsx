@@ -5,6 +5,7 @@ import { useTheme } from "@/lib/theme";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sidebar } from "./Sidebar";
+import { AlertsBell } from "./AlertsBell";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Sun, Moon } from "lucide-react";
