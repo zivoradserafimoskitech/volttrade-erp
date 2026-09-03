@@ -135,7 +135,21 @@ serve(async (req) => {
     const horizon = Math.min(Math.max(body.horizon_hours ?? 24, 1), 720);
     const includeQuantiles = body.include_quantiles !== false;
 
-    const res = await callAnalytics({ ...body, horizon_hours: horizon });
+    const ALLOWED = [
+      "lightgbm", "xgboost", "lstm", "gru", "cnn", "tft",
+      "ensemble", "seasonal_naive", "naive",
+    ];
+    const ALIASES: Record<string, string> = {
+      seasonal: "seasonal_naive",
+      perfect: "ensemble",
+      "perfect_foresight": "ensemble",
+    };
+    const requested = (body.model_type ?? "ensemble").toLowerCase().replace(/\s+/g, "_");
+    const modelType = ALLOWED.includes(requested)
+      ? requested
+      : (ALIASES[requested] ?? "ensemble");
+
+    const res = await callAnalytics({ ...body, model_type: modelType, horizon_hours: horizon });
 
     if (res && res.ok) {
       return json(await res.json());
