@@ -22,6 +22,7 @@ history, or absent champion never crash the service.
 import os
 import pickle
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -32,6 +33,7 @@ import requests
 from models.forecast_ensemble import ForecastEnsemble, HAS_LIGHTGBM
 from models.cross_market import build_cross_market_features
 from models import load_forecast as lf
+from retrain import self_improve
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,23 @@ HISTORY_DAYS = 120  # > 90-day train window + backtest/drift windows
 LOAD_HISTORY_DAYS = 365  # load challenger training window
 LOAD_MODEL_TYPE = "lightgbm_load"
 MODEL_KINDS = ("price", "load", "all")
+# run_retrain trigger values are free-form (recorded as a "trigger=<value>"
+# prefix in retrain_log.notes); the HTTP layer restricts its own query param
+# to scheduled|drift_check. drift_check_and_react launches "live_drift" runs.
+DEFAULT_TRIGGER = "scheduled"
+
+# Self-tuning (SPEC-selfimprove §3): when the last SELF_TUNE_AFTER_FAILURES
+# retrain_log rows for (org, kind) were all NOT promoted, the next challenger
+# trains this small 3-variant hyperparameter grid (learning_rate / num_leaves
+# / min_data_in_leaf) and keeps the best by backtest MAE:
+#   v1 — slower/smoother (lower lr), v2 — more capacity (wider leaves,
+#   smaller min_data), v3 — fast/conservative (higher lr, narrow leaves).
+SELF_TUNE_AFTER_FAILURES = 2
+SELF_TUNE_GRID = (
+    {"learning_rate": 0.03, "num_leaves": 31, "min_data_in_leaf": 20},
+    {"learning_rate": 0.05, "num_leaves": 63, "min_data_in_leaf": 10},
+    {"learning_rate": 0.10, "num_leaves": 15, "min_data_in_leaf": 40},
+)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -106,6 +125,67 @@ def _sb_update(table: str, params: Dict[str, str], body: dict) -> bool:
     except Exception as e:
         logger.warning(f"Supabase update on {table} failed: {e}")
         return False
+
+
+# ── Retrain attempt logging + self-tuning state (SPEC-selfimprove §3) ─────
+
+def _finite_or_none(value: Any) -> Optional[float]:
+    """float(value) unless it is None/NaN/inf — PostgREST rejects non-finite."""
+    try:
+        if value is None:
+            return None
+        v = float(value)
+        return v if np.isfinite(v) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _log_retrain_attempt(org_id: Optional[str], model_kind: str,
+                         trigger: str, result: Dict[str, Any]) -> bool:
+    """INSERT one retrain_log row per retrain run. Never raises.
+
+    Skipped (not failed) when org_id is missing — retrain_log.organization_id
+    is NOT NULL, and org-less runs leave no durable trace by design.
+    """
+    try:
+        if not org_id or not _sb_configured():
+            return False
+        detail = (result.get("notes") or "")[:1900]
+        # SPEC-selfimprove §3.4: the trigger is recorded as a notes prefix
+        # ("trigger=live_drift" vs "trigger=scheduled").
+        notes = f"trigger={trigger}" + (f"; {detail}" if detail else "")
+        row = {
+            "organization_id": org_id,
+            "model_kind": model_kind,
+            "champion_mae": _finite_or_none(result.get("champion_mae")),
+            "challenger_mae": _finite_or_none(result.get("challenger_mae")),
+            "promoted": bool(result.get("promoted")),
+            "drift": bool(result.get("drift")),
+            "notes": notes,
+        }
+        return _sb_insert("retrain_log", row)
+    except Exception as e:
+        logger.warning(f"retrain_log insert failed (non-fatal): {e}")
+        return False
+
+
+def _recent_unpromoted_streak(org_id: Optional[str], model_kind: str,
+                              n: int = SELF_TUNE_AFTER_FAILURES) -> bool:
+    """True when the last `n` retrain_log rows for (org, kind) all show
+    promoted=false — the trigger condition for self-tuning. False on any
+    failure or when fewer than `n` rows exist (fresh deploy)."""
+    if not org_id or not _sb_configured():
+        return False
+    rows = _sb_get("retrain_log", {
+        "select": "promoted",
+        "organization_id": f"eq.{org_id}",
+        "model_kind": f"eq.{model_kind}",
+        "order": "created_at.desc",
+        "limit": str(n),
+    })
+    if not rows or len(rows) < n:
+        return False
+    return all(not r.get("promoted") for r in rows)
 
 
 # ── Data loading ──────────────────────────────────────────────────────────
@@ -224,8 +304,13 @@ def _backtest_mae(ensemble: ForecastEnsemble, frame: pd.DataFrame, model_obj,
 
 # ── Price retrain (Phase 2 — original path, unchanged) ───────────────────
 
-def _run_price_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
+def _run_price_retrain(org_id: Optional[str] = None,
+                       trigger: str = DEFAULT_TRIGGER) -> Dict[str, Any]:
     """Run the champion-challenger price retrain. Never raises.
+
+    `trigger` is provenance only (e.g. "scheduled" weekly retrain vs
+    "live_drift" launched by drift_check_and_react) — it is recorded as a
+    prefix in retrain_log.notes and does not change the retrain itself.
 
     Returns:
         {"promoted": bool, "champion_mae": float | None,
@@ -272,21 +357,44 @@ def _run_price_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
     xm = xmarket.drop(columns=["memo_price"], errors="ignore").dropna(axis=1, how="all")
     frame = memo_df.join(xm, how="left")
 
-    # 3. Train the challenger on history excluding the backtest window
+    # 3. Train the challenger on history excluding the backtest window.
+    #    Self-tuning: after SELF_TUNE_AFTER_FAILURES consecutive unpromoted
+    #    retrain_log rows for (org, 'price'), train the SELF_TUNE_GRID
+    #    variants and keep the best by backtest MAE.
     challenger = None
+    challenger_mae: Optional[float] = None
+    tuned_variant: Optional[Dict[str, Any]] = None
     train_frame = frame.iloc[:-BACKTEST_DAYS * 24] if len(frame) > BACKTEST_DAYS * 24 else frame
     if HAS_LIGHTGBM:
-        try:
-            challenger = ensemble._train_lightgbm(train_frame)
-            notes.append("challenger trained (asinh + 90d window + cross-market)")
-        except Exception as e:
-            logger.warning(f"Challenger training failed: {e}")
-            notes.append(f"challenger training failed: {e}")
+        if _recent_unpromoted_streak(org_id, "price"):
+            for variant in SELF_TUNE_GRID:
+                try:
+                    cand = ensemble._train_lightgbm(train_frame, overrides=variant)
+                    mae = _backtest_mae(ensemble, frame, cand, BACKTEST_DAYS)
+                except Exception as e:
+                    logger.warning(f"Self-tune variant {variant} failed: {e}")
+                    notes.append(f"self-tune variant {variant} failed: {e}")
+                    continue
+                if mae is not None and (challenger_mae is None or mae < challenger_mae):
+                    challenger, challenger_mae, tuned_variant = cand, mae, variant
+            if challenger is not None:
+                notes.append(f"self-tuning: kept {tuned_variant} "
+                             f"(backtest MAE {challenger_mae:.4f}) after "
+                             f"{SELF_TUNE_AFTER_FAILURES} unpromoted runs")
+        if challenger is None:
+            try:
+                challenger = ensemble._train_lightgbm(train_frame)
+                challenger_mae = None  # tuned MAE not valid for the default challenger
+                notes.append("challenger trained (asinh + 90d window + cross-market)")
+            except Exception as e:
+                logger.warning(f"Challenger training failed: {e}")
+                notes.append(f"challenger training failed: {e}")
     else:
         notes.append("lightgbm unavailable — challenger scored with seasonal naive")
 
     # 4. Backtest on the last 14 days
-    challenger_mae = _backtest_mae(ensemble, frame, challenger, BACKTEST_DAYS)
+    if challenger_mae is None:
+        challenger_mae = _backtest_mae(ensemble, frame, challenger, BACKTEST_DAYS)
     if challenger_mae is None:
         challenger_mae = _backtest_mae(ensemble, frame, None, BACKTEST_DAYS)
     if challenger_mae is None:
@@ -359,10 +467,15 @@ def _run_price_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
             "last_trained_at": datetime.now(timezone.utc).isoformat(),
             "is_active": True,
             "model_path": model_path,
+            "promoted_at": datetime.now(timezone.utc).isoformat(),
+            "previous_champion_id": (champion_row or {}).get("id"),
+            "promotion_reason": "challenger_won",
             "features_json": {"cross_market": True, "asinh": ensemble.use_asinh},
             "hyperparams_json": {
                 "train_window_days": ensemble.train_window_days,
                 "transfer_learning": ensemble._hupx_booster is not None,
+                "self_tuned": tuned_variant is not None,
+                **({"tuned_params": tuned_variant} if tuned_variant else {}),
             },
         }
         if org_id and _sb_configured():
@@ -388,6 +501,7 @@ def _run_price_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
         "notes": "; ".join(notes),
     }
     logger.info(f"Retrain finished: {result}")
+    _log_retrain_attempt(org_id, "price", trigger, result)
     return result
 
 
@@ -420,11 +534,13 @@ def _load_backtest_mae(model: Optional[dict], frame: pd.DataFrame,
         return None
 
 
-def _run_load_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
+def _run_load_retrain(org_id: Optional[str] = None,
+                      trigger: str = DEFAULT_TRIGGER) -> Dict[str, Any]:
     """Champion-challenger retrain of the portfolio load model. Never raises.
 
     Same promotion/drift rules as the price path; registry rows use
-    model_type='lightgbm_load'. Returns the same dict shape.
+    model_type='lightgbm_load'. `trigger` is provenance only (recorded as a
+    prefix in retrain_log.notes). Returns the same dict shape.
     """
     notes: List[str] = []
     promoted = False
@@ -452,23 +568,50 @@ def _run_load_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
 
     frame = lf.build_training_frame(series, extras)
 
-    # 3. Train the challenger on history excluding the backtest window
+    # 3. Train the challenger on history excluding the backtest window.
+    #    Self-tuning: after SELF_TUNE_AFTER_FAILURES consecutive unpromoted
+    #    retrain_log rows for (org, 'load'), train the SELF_TUNE_GRID
+    #    variants (train_load_model config overrides) and keep the best by
+    #    backtest MAE.
     challenger = None
+    challenger_mae: Optional[float] = None
+    tuned_variant: Optional[Dict[str, Any]] = None
     train_series = (series.iloc[:-BACKTEST_DAYS * 24]
                     if len(series) > BACKTEST_DAYS * 24 else series)
     train_extras = extras.reindex(train_series.index)
     if lf.HAS_LIGHTGBM:
-        challenger = lf.train_load_model(train_series, train_extras)
-        if challenger.get("kind") == "lightgbm_quantile":
-            notes.append("load challenger trained (LightGBM quantile P10/P50/P90)")
-        else:
-            notes.append("load challenger degraded to seasonal naive")
-            challenger = None
+        if _recent_unpromoted_streak(org_id, "load"):
+            for variant in SELF_TUNE_GRID:
+                config = {
+                    "learning_rate": variant["learning_rate"],
+                    "num_leaves": variant["num_leaves"],
+                    "params": {"min_data_in_leaf": variant["min_data_in_leaf"]},
+                }
+                cand = lf.train_load_model(train_series, train_extras, config=config)
+                if cand.get("kind") != "lightgbm_quantile":
+                    notes.append(f"self-tune variant {variant} degraded to seasonal naive")
+                    continue
+                mae = _load_backtest_mae(cand, frame, BACKTEST_DAYS)
+                if mae is not None and (challenger_mae is None or mae < challenger_mae):
+                    challenger, challenger_mae, tuned_variant = cand, mae, variant
+            if challenger is not None:
+                notes.append(f"self-tuning: kept {tuned_variant} "
+                             f"(backtest MAE {challenger_mae:.4f}) after "
+                             f"{SELF_TUNE_AFTER_FAILURES} unpromoted runs")
+        if challenger is None:
+            challenger = lf.train_load_model(train_series, train_extras)
+            challenger_mae = None  # tuned MAE not valid for the default challenger
+            if challenger.get("kind") == "lightgbm_quantile":
+                notes.append("load challenger trained (LightGBM quantile P10/P50/P90)")
+            else:
+                notes.append("load challenger degraded to seasonal naive")
+                challenger = None
     else:
         notes.append("lightgbm unavailable — challenger scored with seasonal naive")
 
     # 4. Backtest on the last 14 days
-    challenger_mae = _load_backtest_mae(challenger, frame, BACKTEST_DAYS)
+    if challenger_mae is None:
+        challenger_mae = _load_backtest_mae(challenger, frame, BACKTEST_DAYS)
     if challenger_mae is None:
         challenger_mae = _load_backtest_mae(None, frame, BACKTEST_DAYS)
         if challenger_mae is not None:
@@ -538,11 +681,18 @@ def _run_load_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
             "last_trained_at": datetime.now(timezone.utc).isoformat(),
             "is_active": True,
             "model_path": model_path,
+            "promoted_at": datetime.now(timezone.utc).isoformat(),
+            "previous_champion_id": (champion_row or {}).get("id"),
+            "promotion_reason": "challenger_won",
             "features_json": {
                 "quantiles": list(lf.QUANTILES),
                 "extras": challenger.get("extras_used", []),
             },
-            "hyperparams_json": {"train_window_days": LOAD_HISTORY_DAYS},
+            "hyperparams_json": {
+                "train_window_days": LOAD_HISTORY_DAYS,
+                "self_tuned": tuned_variant is not None,
+                **({"tuned_params": tuned_variant} if tuned_variant else {}),
+            },
         }
         if org_id and _sb_configured():
             if _sb_insert("forecast_models", row):
@@ -567,13 +717,15 @@ def _run_load_retrain(org_id: Optional[str] = None) -> Dict[str, Any]:
         "notes": "; ".join(notes),
     }
     logger.info(f"Load retrain finished: {result}")
+    _log_retrain_attempt(org_id, "load", trigger, result)
     return result
 
 
 # ── Main entry point ──────────────────────────────────────────────────────
 
 def run_retrain(org_id: Optional[str] = None,
-                model_kind: str = "price") -> Dict[str, Any]:
+                model_kind: str = "all",
+                trigger: str = DEFAULT_TRIGGER) -> Dict[str, Any]:
     """Run the champion-challenger retrain. Never raises.
 
     model_kind:
@@ -582,14 +734,81 @@ def run_retrain(org_id: Optional[str] = None,
            "challenger_mae": float, "drift": bool, "notes": str}
       "load"  — portfolio load model path (same dict shape).
       "all"   — both, returns {"price": {...}, "load": {...}}.
+
+    trigger (SPEC-selfimprove §3.4) — free-form provenance string, recorded
+      as a "trigger=<value>" prefix in retrain_log.notes (e.g.
+      "trigger=scheduled" for the weekly retrain vs "trigger=live_drift"
+      for runs launched by drift_check_and_react). Default "scheduled".
     """
     if model_kind == "price":
-        return _run_price_retrain(org_id)
+        return _run_price_retrain(org_id, trigger=trigger)
     if model_kind == "load":
-        return _run_load_retrain(org_id)
+        return _run_load_retrain(org_id, trigger=trigger)
     if model_kind == "all":
         return {
-            "price": _run_price_retrain(org_id),
-            "load": _run_load_retrain(org_id),
+            "price": _run_price_retrain(org_id, trigger=trigger),
+            "load": _run_load_retrain(org_id, trigger=trigger),
         }
     raise ValueError(f"unknown model_kind {model_kind!r} (expected one of {MODEL_KINDS})")
+
+
+# ── Live-drift reaction (SPEC-selfimprove §3.4) ───────────────────────────
+
+def _launch_retrain(org_id: Optional[str], model_kind: str,
+                    trigger: str = "live_drift") -> bool:
+    """Launch run_retrain for one kind in a daemon thread (same process —
+    the caller threads it; drift_check_and_react never blocks on training).
+    Returns True when the thread started. Never raises."""
+    try:
+        worker = threading.Thread(
+            target=run_retrain,
+            kwargs={"org_id": org_id, "model_kind": model_kind, "trigger": trigger},
+            name=f"retrain-{model_kind}-live-drift",
+            daemon=True,
+        )
+        worker.start()
+        return True
+    except Exception as e:
+        logger.warning(f"failed to launch {model_kind} retrain (non-fatal): {e}")
+        return False
+
+
+def drift_check_and_react(org_id: Optional[str]) -> Dict[str, Any]:
+    """Check live drift and react per model_kind. NEVER raises.
+
+    For each kind with confirmed live drift: maybe_rollback(kind) FIRST
+    (restore the previous champion when possible), then ALWAYS launch a
+    retrain for that kind in a background thread (trigger="live_drift") —
+    rollback alone is not enough, the regime moved on.
+
+    Returns:
+        {"drift":   {kind: {"recent_mae", "trailing_mae", "n_recent",
+                            "drift", "reason"}},
+         "actions": [{"kind", "rolled_back", "retrain": "started"|"skipped"}]}
+    """
+    try:
+        drift = self_improve.check_live_drift(org_id)
+    except Exception as e:  # check_live_drift never raises; belt & braces
+        logger.warning(f"drift_check_and_react: drift check failed (non-fatal): {e}")
+        drift = {}
+
+    actions: List[Dict[str, Any]] = []
+    for kind in ("price", "load"):
+        info = drift.get(kind) or {}
+        if not info.get("drift"):
+            actions.append({"kind": kind, "rolled_back": False, "retrain": "skipped"})
+            continue
+        rolled_back = False
+        try:
+            rollback = self_improve.maybe_rollback(org_id, kind)
+            rolled_back = bool(rollback.get("rolled_back"))
+        except Exception as e:  # maybe_rollback never raises; belt & braces
+            logger.warning(f"drift_check_and_react: rollback[{kind}] failed (non-fatal): {e}")
+        started = _launch_retrain(org_id, kind, trigger="live_drift")
+        actions.append({"kind": kind, "rolled_back": rolled_back,
+                        "retrain": "started" if started else "skipped"})
+        logger.info(f"drift_check_and_react[{kind}]: drift confirmed "
+                    f"(recent {info.get('recent_mae')} vs trailing "
+                    f"{info.get('trailing_mae')}), rolled_back={rolled_back}, "
+                    f"retrain {'started' if started else 'skipped'}")
+    return {"drift": drift, "actions": actions}

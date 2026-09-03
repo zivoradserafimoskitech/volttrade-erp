@@ -141,6 +141,30 @@ Deno.serve(handler(async (req) => {
       return jsonResponse({ error: error.message }, 500);
     }
 
+    // SPEC-accuracy §5: fresh actuals just landed, so mature forecasts may be
+    // scoreable now. Fire-and-forget POST to the analytics service's
+    // /score-forecasts (same X-API-Key convention as retrain-nightly).
+    // Skipped silently when the analytics secrets are unset; a scoring
+    // failure must NEVER break the sync response.
+    const analyticsUrl = Deno.env.get("VOLTTRADE_ANALYTICS_URL");
+    const analyticsKey = Deno.env.get("VOLTTRADE_ANALYTICS_KEY");
+    if (analyticsUrl && analyticsKey) {
+      fetch(`${analyticsUrl}/score-forecasts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": analyticsKey,
+        },
+        body: "{}",
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            console.warn(`score-forecasts responded ${r.status}:`, (await r.text()).slice(0, 300));
+          }
+        })
+        .catch((e) => console.warn("score-forecasts trigger failed (ignored):", e));
+    }
+
     return jsonResponse({ inserted: prices.length, zone, caller: auth.kind, from: startIso, to: endIso });
   }
 }));

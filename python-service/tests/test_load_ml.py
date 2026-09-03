@@ -170,7 +170,7 @@ def _auth():
 def test_health_version(client):
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json()["version"] == "2.2.0"
+    assert resp.json()["version"] == "2.4.0"
 
 
 def test_retrain_async_roundtrip(client):

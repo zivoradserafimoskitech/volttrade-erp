@@ -262,3 +262,87 @@ returns `{"forecast": [{timestamp, p10_mw, p50_mw, p90_mw}, ...], "model",
 "source": "champion"|"adhoc"}`. Without an active load champion the service
 trains ad-hoc on the fly; without Supabase data it falls back to a loudly
 logged synthetic 10 GWh/yr portfolio.
+
+---
+
+## Forecast accuracy tracking
+
+Answers the question *"how wrong were our forecasts, actually?"* — for both
+the price ensemble and the LightGBM load model, per zone, over a rolling
+window. Analysis only: errors are plain EUR/MWh or MW numbers, no money,
+no invoicing.
+
+### The pieces
+
+| Piece | Where it lives | What it does |
+|---|---|---|
+| Table `forecast_predictions` | `supabase/migrations/20260902090000_forecast_tracking.sql` | one row per issued forecast point: when it was issued (`created_at`), the hour it targets (`target_time`), zone, model kind, the P10/P50/P90 quantiles, and — once known — the `actual` value |
+| View `v_forecast_accuracy` | same migration | rolling **last-30-day** aggregates per organisation + model kind + zone |
+| Prediction logging | `python-service/tracking/predictions.py`, called from `POST /forecast/load` | every load forecast the service issues is written to the table (best-effort; a logging failure never breaks a forecast response) |
+| Scorer | `POST /score-forecasts` on the analytics service | fills in `actual` for predictions whose target hour has passed (with a 2 h grace for data landing) |
+| Scorer trigger | `supabase/functions/sync-entsoe-prices` | after each successful price upsert it pings `/score-forecasts` fire-and-forget — so scoring rides along with the daily ENTSO-E sync, no extra cron needed |
+| Read API | `supabase/functions/forecast-accuracy` | edge function behind staff auth; feeds the Accuracy page (see `docs/LOVABLE_ACCURACY_UI.md`) |
+
+### The scorer flow
+
+1. `sync-entsoe-prices` runs on its daily schedule and upserts fresh
+   day-ahead prices.
+2. Right after a successful upsert it POSTs
+   `$VOLTTRADE_ANALYTICS_URL/score-forecasts` with the usual
+   `X-API-Key: $VOLTTRADE_ANALYTICS_KEY` header. If either secret is unset
+   the trigger is skipped silently; if the scorer is down the sync still
+   reports success (a warning lands in the function logs).
+3. The scorer picks up every prediction with `actual IS NULL` whose target
+   hour is at least 2 hours in the past, looks up the realised value
+   (`market_price_history` for price, `load_history` for load), and writes
+   `actual` + `scored_at`. Predictions with no realised data yet simply
+   wait for the next run.
+4. `v_forecast_accuracy` and the `forecast-accuracy` edge function pick the
+   new numbers up on their next read — nothing else to schedule.
+
+### The metrics, in plain language
+
+All metrics compare the **P50** (median) forecast against the actual value.
+All are computed per organisation, model kind and zone over the last 30
+days of scored rows.
+
+| Metric | What it tells you |
+|---|---|
+| **MAE** | average absolute error — "on a typical hour we were off by this much" (EUR/MWh or MW) |
+| **RMSE** | like MAE but punishes big misses harder — watch the RMSE/MAE gap for outlier hours |
+| **sMAPE** | the same error expressed as a **percentage** of the actual/forecast magnitude — comparable across zones and across price vs load |
+| **Bias** | average signed error — consistently positive means we under-forecast, negative means we over-forecast |
+| **P10–P90 coverage** | how often the actual landed **inside** the predicted band, in %. Around 80% means the uncertainty band is honest; much lower means the band is too narrow |
+
+### Verifying it works
+
+```sql
+-- predictions are being logged
+select model_kind, zone, count(*), count(actual) as scored
+  from public.forecast_predictions group by 1, 2;
+
+-- the rolling view
+select model_kind, zone, n, round(mae::numeric, 2) as mae,
+       round(smape::numeric, 1) as smape_pct,
+       round(bias::numeric, 2) as bias,
+       round(coverage_p10_p90::numeric, 1) as coverage_pct
+  from public.v_forecast_accuracy;
+```
+
+The first rows only appear after a forecast has been issued **and** its
+target hour is at least 2 hours past **and** the scorer has run — so on a
+fresh install expect meaningful numbers from the day after go-live, not
+the same afternoon.
+
+## Self-improvement loop (v2.4.0)
+
+After every daily `/score-forecasts` call (chained from sync-entsoe-prices), the service
+evaluates LIVE drift per model kind (7d vs 30d MAE from scored `forecast_predictions`,
+>10% degradation, n>=24 in both windows). On drift: (1) `maybe_rollback` restores the
+previous champion if one exists (`forecast_models.previous_champion_id`), then (2) an
+immediate retrain launches for that kind (trigger=live_drift) — no waiting for Monday.
+Every retrain run is logged in `retrain_log`; after 2 consecutive runs without promotion,
+the challenger self-tunes LightGBM hyperparameters (3 combos, best by backtest MAE).
+Promotion metadata: `promoted_at`, `previous_champion_id`, `promotion_reason`
+('challenger_won' | 'rollback'). Apply migration `20260902090100_self_improve.sql` after
+`20260902090000_forecast_tracking.sql`.

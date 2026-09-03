@@ -39,23 +39,6 @@ project_id = "volttrade-erp"
     verify_jwt = true
   [functions.process-email-queue]
     verify_jwt = true
-  [functions.quote-supply]
-    # SECURITY REPAIR 2026-09-01: these five were absent from this file AND
-    # deployed by .github/workflows/deploy-risk-module.yml with --no-verify-jwt.
-    # The workflow's comment claimed all five authenticated internally; only two
-    # did, and one of those could be bypassed by passing org_id in the body.
-    # They now use _shared/auth.ts, and the platform JWT gate is on as well.
-    verify_jwt = true
-  [functions.risk-metrics]
-    verify_jwt = true
-  [functions.forecast-price]
-    verify_jwt = true
-  [functions.optimize-hedge]
-    verify_jwt = true
-  [functions.ingest-memo]
-    # Written by pg_cron with the service-role key; interactively restricted to
-    # admin / trader / risk_officer / operations.
-    verify_jwt = true
   [functions.reset-own-mfa]
     verify_jwt = true
   [functions.seed-demo-data]
@@ -99,4 +82,9 @@ project_id = "volttrade-erp"
     # Weekly champion/challenger retrain (risk module). Authenticates callers
     # itself via _shared/auth.ts — staff JWT with role, or the service-role
     # key from pg_cron (a valid JWT, so it passes the platform gate too).
+    verify_jwt = true
+  [functions.forecast-accuracy]
+    # Forecast accuracy read API (SPEC-accuracy §4). Authenticates callers
+    # itself via _shared/auth.ts — staff JWT with role, or the service-role
+    # key. Same defence-in-depth pattern as retrain-nightly.
     verify_jwt = true

@@ -339,11 +339,16 @@ class ForecastEnsemble:
         logger.info(f"Generated synthetic data: {len(df)} hours")
         return df
 
-    def _train_lightgbm(self, df: pd.DataFrame, target_col: str = "price") -> lgb.Booster:
+    def _train_lightgbm(self, df: pd.DataFrame, target_col: str = "price",
+                        overrides: Optional[Dict] = None) -> lgb.Booster:
         """Train LightGBM with quantile regression for P10, P50, P90.
 
         Phase 2: asinh target transform, rolling training window, and
         fine-tuning from the pretrained HUPX booster when available.
+
+        `overrides` (optional) is merged into the LightGBM params dict —
+        used by the retrain pipeline's self-tuning grid (learning_rate /
+        num_leaves / min_data_in_leaf variants).
         """
         if not HAS_LIGHTGBM:
             raise ImportError("lightgbm not installed")
@@ -372,6 +377,8 @@ class ForecastEnsemble:
             "verbose": -1,
             "random_state": 42,
         }
+        if overrides:
+            params.update(overrides)
         model, used_cols = self._train_lgb_with_transfer(X, y_t, params, num_boost_round=200)
 
         # Train quantile models (same aligned feature schema as the median model)

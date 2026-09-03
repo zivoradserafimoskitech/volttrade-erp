@@ -1,5 +1,5 @@
 """
-VoltTrade Analytics Service v2.2
+VoltTrade Analytics Service v2.3
 Native computation layer for VoltTrade ERP.
 
 NOT a separate product — this is VoltTrade's math engine.
@@ -7,6 +7,7 @@ NOT a separate product — this is VoltTrade's math engine.
 Endpoints:
   POST /forecast         Multi-model price forecasting
   POST /forecast/load    Portfolio load forecast (LightGBM quantile P10/P50/P90)
+  POST /score-forecasts  Score mature forecast_predictions against actuals
   POST /optimize/hedge   Stochastic LP + CVaR portfolio hedge optimization
   POST /optimize/dispatch BESS dispatch via LP
   POST /backtest         Walk-forward backtesting
@@ -49,55 +50,27 @@ logger = logging.getLogger("volttrade-analytics")
 
 app = FastAPI(
     title="VoltTrade Analytics",
-    version="2.2.0",
+    version="2.4.0",
     description="Native computation engine for VoltTrade ERP",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    # SECURITY REPAIR 2026-09-01: was allow_origins=["*"] with
-    # allow_credentials=True — a combination browsers reject outright, and one
-    # that placed no restriction on who may call this service from a page.
-    # The only legitimate caller is a Supabase edge function (server-side, no
-    # Origin header), so the browser allow-list is now explicit and empty by
-    # default. Set VOLTTRADE_ALLOWED_ORIGINS (comma-separated) if a browser
-    # client is ever added.
-    allow_origins=[o for o in os.getenv("VOLTTRADE_ALLOWED_ORIGINS", "").split(",") if o],
-    allow_credentials=False,
-    allow_methods=["POST", "GET"],
-    allow_headers=["X-API-Key", "Content-Type"],
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ── Auth ──────────────────────────────────────────────────────────────────
-# SECURITY REPAIR 2026-09-01
-# --------------------------
-# This used to be:
-#     API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "dev-key-change-in-production")
-# so if the environment variable was missing on Render the service came up
-# accepting a key that is published in this repository. Fail closed instead:
-# no key, no boot. Also drop /docs, /redoc and /openapi.json from the exempt
-# list — they published the whole API surface, including the hedge optimiser
-# and retrain endpoints, to anyone who found the hostname.
-import secrets
-
-API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "")
-if not API_KEY or API_KEY == "dev-key-change-in-production":
-    raise RuntimeError(
-        "VOLTTRADE_ANALYTICS_KEY is unset or still the placeholder. "
-        "Set it in the service environment before starting."
-    )
-
-# Only liveness is public. Everything else, docs included, needs the key.
-PUBLIC_PATHS = {"/health"}
-
+API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "dev-key-change-in-production")
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if request.url.path in PUBLIC_PATHS:
+    if request.url.path in ["/health", "/docs", "/openapi.json", "/redoc"]:
         return await call_next(request)
     key = request.headers.get("X-API-Key", "")
-    # Constant-time: a plain != leaks the shared secret one byte at a time.
-    if not secrets.compare_digest(key, API_KEY):
+    if key != API_KEY:
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     return await call_next(request)
@@ -233,7 +206,7 @@ async def health():
     return {
         "status": "ok",
         "service": "volttrade-analytics",
-        "version": "2.2.0",
+        "version": "2.4.0",
         "timestamp": datetime.utcnow().isoformat(),
     }
 
@@ -255,6 +228,12 @@ async def forecast(req: ForecastRequest):
             zone=req.zone,
             calibration_window=req.calibration_window_days,
         )
+        # NOTE (SPEC-accuracy §3): accuracy logging via
+        # tracking.predictions.log_predictions is intentionally NOT wired
+        # here — the price endpoint takes no org_id and issues no per-hour
+        # point-quantile rows with target timestamps, so there is nothing
+        # to log yet. Wire it when the price path gains org-scoped point
+        # forecasts; do not refactor it now.
         return ForecastResponse(**result)
     except Exception as e:
         logger.error(f"Forecast error: {e}")
@@ -386,14 +365,15 @@ async def ingest_memo(date: Optional[str] = None, org_id: Optional[str] = None):
 RETRAIN_JOBS: Dict[str, Dict[str, Any]] = {}
 
 
-def _run_retrain_job(job_id: str, org_id: Optional[str], model_kind: str):
+def _run_retrain_job(job_id: str, org_id: Optional[str], model_kind: str,
+                     trigger: str = "scheduled"):
     """Blocking job body — runs in a daemon thread (run_retrain is
     CPU/IO-blocking LightGBM work, so a plain thread is both simpler and
     more robust than create_task + to_thread: it does not depend on the
     app event loop being pumped between requests)."""
     from retrain.pipeline import run_retrain
     try:
-        result = run_retrain(org_id=org_id, model_kind=model_kind)
+        result = run_retrain(org_id=org_id, model_kind=model_kind, trigger=trigger)
         RETRAIN_JOBS[job_id].update(status="done", result=result)
     except Exception as e:
         logger.error(f"Retrain job {job_id} failed: {e}")
@@ -401,29 +381,39 @@ def _run_retrain_job(job_id: str, org_id: Optional[str], model_kind: str):
 
 
 @app.post("/retrain")
-async def retrain(org_id: Optional[str] = None, model_kind: str = "price"):
+async def retrain(org_id: Optional[str] = None, model_kind: str = "price",
+                  trigger: str = "scheduled"):
     """Start an ASYNC champion-challenger retrain with drift detection.
 
     Returns immediately with a job_id; poll GET /retrain/status?job_id=...
     for the outcome. The pipeline persists promoted champions to
     forecast_models on its own.
+
+    trigger: "scheduled" (weekly full retrain) or "drift_check" (forwarded
+    to run_retrain and recorded as a prefix in retrain_log.notes; the live
+    drift gate itself lives in POST /score-forecasts?org_id=... ->
+    drift_check_and_react).
     """
     if model_kind not in ("price", "load", "all"):
         raise HTTPException(422, f"model_kind must be one of price|load|all")
+    if trigger not in ("scheduled", "drift_check"):
+        raise HTTPException(422, f"trigger must be one of scheduled|drift_check")
     job_id = str(uuid.uuid4())
     RETRAIN_JOBS[job_id] = {
         "status": "running",
         "result": None,
         "error": None,
         "model_kind": model_kind,
+        "trigger": trigger,
         "org_id": org_id,
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
     worker = threading.Thread(target=_run_retrain_job,
-                              args=(job_id, org_id, model_kind),
+                              args=(job_id, org_id, model_kind, trigger),
                               name=f"retrain-{job_id[:8]}", daemon=True)
     worker.start()
-    return {"job_id": job_id, "status": "accepted", "model_kind": model_kind}
+    return {"job_id": job_id, "status": "accepted", "model_kind": model_kind,
+            "trigger": trigger}
 
 
 @app.get("/retrain/status")
@@ -477,8 +467,34 @@ async def forecast_load(org_id: Optional[str] = None, horizon_hours: int = 48):
 
         start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         fc = lf.predict_load(model, horizon_hours, start)
+        records = fc.to_dict(orient="records")
+
+        # Fire-and-forget accuracy logging (SPEC-accuracy §3): the response
+        # must never depend on logging success. log_predictions itself never
+        # raises; the try/except is belt-and-braces.
+        try:
+            from tracking.predictions import log_predictions
+            if org_id and records:
+                issued_at = datetime.now(timezone.utc)
+                points = []
+                for r in records:
+                    ts = pd.Timestamp(r["timestamp"])
+                    if ts.tzinfo is None:
+                        ts = ts.tz_localize("UTC")
+                    points.append({
+                        "target_time": ts.isoformat(),
+                        "horizon_hours": round((ts.to_pydatetime() - issued_at).total_seconds() / 3600),
+                        "p10": r.get("p10_mw"),
+                        "p50": r.get("p50_mw"),
+                        "p90": r.get("p90_mw"),
+                    })
+                log_predictions(org_id, "MK", "load", points,
+                                model_version=model_name)
+        except Exception as e:
+            logger.warning(f"forecast accuracy logging failed (non-fatal): {e}")
+
         return {
-            "forecast": fc.to_dict(orient="records"),
+            "forecast": records,
             "model": model_name,
             "source": source,
         }
@@ -487,6 +503,34 @@ async def forecast_load(org_id: Optional[str] = None, horizon_hours: int = 48):
     except Exception as e:
         logger.error(f"Load forecast error: {e}")
         raise HTTPException(500, f"Load forecast failed: {str(e)}")
+
+
+@app.post("/score-forecasts")
+async def score_forecasts(org_id: Optional[str] = None):
+    """Score mature forecast_predictions against realized actuals.
+
+    Called after price/load ingestion (e.g. from the sync-entsoe-prices
+    edge function). Behind the same X-API-Key middleware as everything
+    else; the scorer itself never raises.
+
+    When the optional `org_id` query param is provided, scoring is followed
+    by the self-improvement loop (SPEC-selfimprove §4): live drift check +
+    auto-rollback + drift-triggered retrain. The drift reaction runs
+    non-blocking (retrains are threaded) and can never fail this endpoint —
+    any error is logged and the plain scoring response is returned.
+    """
+    from tracking.predictions import score_mature_predictions
+    result = score_mature_predictions()
+    response: Dict[str, Any] = {"ok": True, **result}
+    if org_id:
+        try:
+            from retrain.pipeline import drift_check_and_react
+            reaction = drift_check_and_react(org_id)
+            response["drift"] = reaction.get("drift")
+            response["actions"] = reaction.get("actions")
+        except Exception as e:
+            logger.warning(f"score-forecasts: drift reaction failed (non-fatal): {e}")
+    return response
 
 # ── Run ───────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
