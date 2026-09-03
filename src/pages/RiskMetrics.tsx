@@ -257,20 +257,28 @@ export default function RiskMetrics() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <ComposedChart data={frontierData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <ResponsiveContainer width="100%" height={420}>
+            <ComposedChart data={frontierData} margin={{ top: 16, right: 48, left: 24, bottom: 48 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hedgeRatio" tickFormatter={(v) => `${v}%`} label={{ value: "Hedge Ratio", position: "bottom" }} />
-              <YAxis yAxisId="left" label={{ value: "Expected Cost (EUR)", angle: -90, position: "insideLeft" }} />
-              <YAxis yAxisId="right" orientation="right" label={{ value: "CVaR95 (EUR)", angle: 90, position: "insideRight" }} />
-              <Tooltip formatter={(v: number) => v.toLocaleString()} />
-              <Legend />
-              <ReferenceLine yAxisId="left" y={riskData.risk.cvar95_eur} stroke="red" strokeDasharray="5 5" label="Current CVaR" />
-              <Area yAxisId="left" type="monotone" dataKey="expectedCost" fill="#3b82f6" stroke="#2563eb" fillOpacity={0.3} name="Expected Cost" />
-              <Line yAxisId="right" type="monotone" dataKey="cvar95" stroke="#ef4444" strokeWidth={2} name="CVaR 95%" dot />
+              <XAxis
+                dataKey="hedgeRatio"
+                type="number"
+                domain={[0, 100]}
+                ticks={[0, 20, 40, 60, 80, 100]}
+                tickFormatter={(v) => `${v}%`}
+                label={{ value: "Hedge Ratio", position: "insideBottom", offset: -28 }}
+              />
+              <YAxis yAxisId="left" width={88} tickFormatter={(v: number) => v.toLocaleString()} label={{ value: "Expected Cost (EUR)", angle: -90, position: "insideLeft", offset: -8 }} />
+              <YAxis yAxisId="right" width={88} orientation="right" tickFormatter={(v: number) => v.toLocaleString()} label={{ value: "CVaR95 (EUR)", angle: 90, position: "insideRight", offset: -8 }} />
+              <Tooltip formatter={(v: number) => v.toLocaleString()} labelFormatter={(l) => `Hedge ratio ${l}%`} />
+              <Legend verticalAlign="top" height={32} />
+              <ReferenceLine yAxisId="left" y={riskData.risk.cvar95_eur} stroke="hsl(var(--destructive))" strokeDasharray="5 5" label="Current CVaR" />
+              <Area yAxisId="left" type="monotone" dataKey="expectedCost" fill="hsl(var(--primary))" stroke="hsl(var(--primary))" fillOpacity={0.25} name="Expected Cost" />
+              <Line yAxisId="right" type="monotone" dataKey="cvar95" stroke="hsl(var(--destructive))" strokeWidth={2} name="CVaR 95%" dot />
             </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
+
       </Card>
 
       {/* Policy Settings */}
