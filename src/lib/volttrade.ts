@@ -100,6 +100,15 @@ export async function retrainModels(orgId?: string) {
   return res.json();
 }
 
+export async function getRetrainStatus(jobId: string) {
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/retrain-nightly?job_id=${encodeURIComponent(jobId)}`,
+    { method: "GET", headers: await authHeaders() },
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<{ ok: boolean; status?: string; error?: string | null; result?: any }>;
+}
+
 
 // ── Direct Supabase Queries ───────────────────────────────────────────────
 
