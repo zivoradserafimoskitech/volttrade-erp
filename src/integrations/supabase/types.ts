@@ -1469,6 +1469,9 @@ export type Database = {
           model_path: string | null
           model_type: string
           organization_id: string
+          previous_champion_id: string | null
+          promoted_at: string | null
+          promotion_reason: string | null
           rmse: number | null
         }
         Insert: {
@@ -1486,6 +1489,9 @@ export type Database = {
           model_path?: string | null
           model_type: string
           organization_id: string
+          previous_champion_id?: string | null
+          promoted_at?: string | null
+          promotion_reason?: string | null
           rmse?: number | null
         }
         Update: {
@@ -1503,11 +1509,77 @@ export type Database = {
           model_path?: string | null
           model_type?: string
           organization_id?: string
+          previous_champion_id?: string | null
+          promoted_at?: string | null
+          promotion_reason?: string | null
           rmse?: number | null
         }
         Relationships: [
           {
             foreignKeyName: "forecast_models_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forecast_models_previous_champion_id_fkey"
+            columns: ["previous_champion_id"]
+            isOneToOne: false
+            referencedRelation: "forecast_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forecast_predictions: {
+        Row: {
+          actual: number | null
+          created_at: string
+          horizon_hours: number
+          id: string
+          model_kind: string
+          model_version: string | null
+          organization_id: string
+          p10: number | null
+          p50: number | null
+          p90: number | null
+          scored_at: string | null
+          target_time: string
+          zone: string
+        }
+        Insert: {
+          actual?: number | null
+          created_at?: string
+          horizon_hours: number
+          id?: string
+          model_kind: string
+          model_version?: string | null
+          organization_id: string
+          p10?: number | null
+          p50?: number | null
+          p90?: number | null
+          scored_at?: string | null
+          target_time: string
+          zone: string
+        }
+        Update: {
+          actual?: number | null
+          created_at?: string
+          horizon_hours?: number
+          id?: string
+          model_kind?: string
+          model_version?: string | null
+          organization_id?: string
+          p10?: number | null
+          p50?: number | null
+          p90?: number | null
+          scored_at?: string | null
+          target_time?: string
+          zone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_predictions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -3210,6 +3282,50 @@ export type Database = {
         }
         Relationships: []
       }
+      retrain_log: {
+        Row: {
+          challenger_mae: number | null
+          champion_mae: number | null
+          created_at: string
+          drift: boolean
+          id: string
+          model_kind: string
+          notes: string | null
+          organization_id: string
+          promoted: boolean
+        }
+        Insert: {
+          challenger_mae?: number | null
+          champion_mae?: number | null
+          created_at?: string
+          drift?: boolean
+          id?: string
+          model_kind: string
+          notes?: string | null
+          organization_id: string
+          promoted?: boolean
+        }
+        Update: {
+          challenger_mae?: number | null
+          champion_mae?: number | null
+          created_at?: string
+          drift?: boolean
+          id?: string
+          model_kind?: string
+          notes?: string | null
+          organization_id?: string
+          promoted?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retrain_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rewards_ledger: {
         Row: {
           amount_eur: number
@@ -4290,6 +4406,29 @@ export type Database = {
       }
     }
     Views: {
+      v_forecast_accuracy: {
+        Row: {
+          bias: number | null
+          coverage_p10_p90: number | null
+          last_scored_at: string | null
+          mae: number | null
+          model_kind: string | null
+          n: number | null
+          organization_id: string | null
+          rmse: number | null
+          smape: number | null
+          zone: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_predictions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_hedge_breaches: {
         Row: {
           delivery_date: string | null
