@@ -84,8 +84,9 @@ export default function RiskMetrics() {
   }
 
   async function savePolicy() {
+    const id = orgId ?? (await getMyOrgId());
     setSaving(true);
-    await updateOrgRiskSettings(orgId, {
+    await updateOrgRiskSettings(id, {
       max_open_position_pct: maxOpenPct / 100,
     });
     setSaving(false);
