@@ -1469,6 +1469,9 @@ export type Database = {
           model_path: string | null
           model_type: string
           organization_id: string
+          previous_champion_id: string | null
+          promoted_at: string | null
+          promotion_reason: string | null
           rmse: number | null
         }
         Insert: {
@@ -1486,6 +1489,9 @@ export type Database = {
           model_path?: string | null
           model_type: string
           organization_id: string
+          previous_champion_id?: string | null
+          promoted_at?: string | null
+          promotion_reason?: string | null
           rmse?: number | null
         }
         Update: {
@@ -1503,6 +1509,9 @@ export type Database = {
           model_path?: string | null
           model_type?: string
           organization_id?: string
+          previous_champion_id?: string | null
+          promoted_at?: string | null
+          promotion_reason?: string | null
           rmse?: number | null
         }
         Relationships: [
@@ -1511,6 +1520,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forecast_models_previous_champion_id_fkey"
+            columns: ["previous_champion_id"]
+            isOneToOne: false
+            referencedRelation: "forecast_models"
             referencedColumns: ["id"]
           },
         ]
@@ -3265,6 +3281,50 @@ export type Database = {
           value?: number
         }
         Relationships: []
+      }
+      retrain_log: {
+        Row: {
+          challenger_mae: number | null
+          champion_mae: number | null
+          created_at: string
+          drift: boolean
+          id: string
+          model_kind: string
+          notes: string | null
+          organization_id: string
+          promoted: boolean
+        }
+        Insert: {
+          challenger_mae?: number | null
+          champion_mae?: number | null
+          created_at?: string
+          drift?: boolean
+          id?: string
+          model_kind: string
+          notes?: string | null
+          organization_id: string
+          promoted?: boolean
+        }
+        Update: {
+          challenger_mae?: number | null
+          champion_mae?: number | null
+          created_at?: string
+          drift?: boolean
+          id?: string
+          model_kind?: string
+          notes?: string | null
+          organization_id?: string
+          promoted?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retrain_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rewards_ledger: {
         Row: {
