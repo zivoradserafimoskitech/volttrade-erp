@@ -88,6 +88,19 @@ export async function ingestMemo(date?: string, orgId?: string) {
   return res.json();
 }
 
+// Kicks off the champion/challenger retrain (price + load models).
+// Async upstream: returns { ok, job_id } once the job is accepted.
+export async function retrainModels(orgId?: string) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/retrain-nightly`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(orgId ? { org_id: orgId } : {}),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+
 // ── Direct Supabase Queries ───────────────────────────────────────────────
 
 export async function getHourlyPosition(date: string) {
