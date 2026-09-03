@@ -13,7 +13,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ScatterChart, Scatter, ReferenceLine, Area, ComposedChart,
 } from "recharts";
-import { getRiskMetrics, getOrgRiskSettings, updateOrgRiskSettings } from "@/lib/volttrade";
+import { getRiskMetrics, getOrgRiskSettings, updateOrgRiskSettings, getMyOrgId } from "@/lib/volttrade";
 
 interface RiskData {
   organization_id: string;
@@ -53,34 +53,40 @@ interface RiskData {
 export default function RiskMetrics() {
   const [riskData, setRiskData] = useState<RiskData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [orgId, setOrgId] = useState("your-org-id"); // replace with actual org context
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [maxOpenPct, setMaxOpenPct] = useState(0);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, [orgId]);
+  }, []);
 
   async function loadData() {
     setLoading(true);
+    setError(null);
     try {
+      const id = orgId ?? (await getMyOrgId());
+      if (!orgId) setOrgId(id);
       const [metrics, settings] = await Promise.all([
-        getRiskMetrics(orgId, 2000),
-        getOrgRiskSettings(orgId),
+        getRiskMetrics(id, 2000),
+        getOrgRiskSettings(id),
       ]);
       setRiskData(metrics);
-      if (settings?.data?.max_open_position_pct !== undefined) {
-        setMaxOpenPct(settings.data.max_open_position_pct * 100);
+      if (settings?.max_open_position_pct != null) {
+        setMaxOpenPct(Number(settings.max_open_position_pct) * 100);
       }
     } catch (e) {
       console.error(e);
+      setError(e instanceof Error ? e.message : String(e));
     }
     setLoading(false);
   }
 
   async function savePolicy() {
+    const id = orgId ?? (await getMyOrgId());
     setSaving(true);
-    await updateOrgRiskSettings(orgId, {
+    await updateOrgRiskSettings(id, {
       max_open_position_pct: maxOpenPct / 100,
     });
     setSaving(false);
@@ -103,11 +109,12 @@ export default function RiskMetrics() {
 
   if (!riskData) {
     return (
-      <div className="p-6">
+      <div className="p-6 space-y-4">
         <Alert variant="destructive">
           <AlertTitle>Failed to load risk metrics</AlertTitle>
-          <AlertDescription>Check your analytics service connection.</AlertDescription>
+          <AlertDescription>{error ?? "Check your analytics service connection."}</AlertDescription>
         </Alert>
+        <Button onClick={loadData}>Retry</Button>
       </div>
     );
   }
