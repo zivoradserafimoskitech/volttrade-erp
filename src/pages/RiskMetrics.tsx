@@ -13,7 +13,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ScatterChart, Scatter, ReferenceLine, Area, ComposedChart,
 } from "recharts";
-import { getRiskMetrics, getOrgRiskSettings, updateOrgRiskSettings } from "@/lib/volttrade";
+import { getRiskMetrics, getOrgRiskSettings, updateOrgRiskSettings, getMyOrgId } from "@/lib/volttrade";
 
 interface RiskData {
   organization_id: string;
