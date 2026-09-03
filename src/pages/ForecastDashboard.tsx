@@ -61,21 +61,60 @@ export default function ForecastDashboard() {
   const [horizon, setHorizon] = useState(24);
   const [training, setTraining] = useState(false);
 
+  // Job status lives in an in-memory dict on the analytics service, and Render's
+  // free tier spins the container down after ~15 min idle — so /retrain/status
+  // can vanish mid-run. The durable signal is the database: the pipeline writes
+  // promoted models to forecast_models and an entry to retrain_log either way.
+  // We watch both and treat the job poll as a bonus, not the source of truth.
+  async function latestRetrainMarkers() {
+    const sb = getSupabase();
+    const [{ data: m }, { data: l }] = await Promise.all([
+      sb.from("forecast_models").select("created_at").order("created_at", { ascending: false }).limit(1),
+      sb.from("retrain_log").select("created_at,status,notes").order("created_at", { ascending: false }).limit(1),
+    ]);
+    return {
+      model: (m?.[0] as any)?.created_at ?? null,
+      log: (l?.[0] as any) ?? null,
+    };
+  }
+
   async function trainNow() {
     setTraining(true);
     try {
       const orgId = await getMyOrgId();
+      const before = await latestRetrainMarkers();
       const res = await retrainModels(orgId);
       const jobId = res.job_id as string | null;
       toast({
         title: "Training started",
         description: jobId ? `Job ${jobId} — tracking progress…` : "Training accepted.",
       });
-      if (!jobId) { setTraining(false); return; }
 
       // Poll every 15s for up to 10 minutes.
       for (let i = 0; i < 40; i++) {
         await new Promise((r) => setTimeout(r, 15_000));
+
+        // 1. Durable check first.
+        const now = await latestRetrainMarkers();
+        if (now.model && now.model !== before.model) {
+          toast({ title: "Training finished", description: "A new model was promoted." });
+          loadModels(); loadBacktests();
+          break;
+        }
+        const logChanged = now.log?.created_at && now.log.created_at !== before.log?.created_at;
+        if (logChanged) {
+          const failed = String(now.log.status ?? "").toLowerCase().includes("fail");
+          toast({
+            title: failed ? "Training failed" : "Training finished",
+            description: String(now.log.notes ?? (failed ? "See retrain log." : "No model beat the champion.")),
+            variant: failed ? "destructive" : undefined,
+          });
+          loadModels(); loadBacktests();
+          break;
+        }
+
+        // 2. Best-effort job poll — may 404 after a container restart.
+        if (!jobId) continue;
         let st: Awaited<ReturnType<typeof getRetrainStatus>>;
         try { st = await getRetrainStatus(jobId); } catch { continue; }
         if (st.status === "done") {
@@ -93,6 +132,7 @@ export default function ForecastDashboard() {
     }
     setTraining(false);
   }
+
 
   useEffect(() => {
     loadModels();
