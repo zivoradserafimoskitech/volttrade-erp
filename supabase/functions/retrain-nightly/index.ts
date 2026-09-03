@@ -27,6 +27,30 @@ interface RetrainRequest {
 Deno.serve(handler(async (req) => {
   const auth = await authenticate(req, { roles: ["admin", "operations", "management"] });
 
+  // GET ?job_id=... proxies the async job poll so the UI can show progress.
+  const reqUrl = new URL(req.url);
+  const pollId = reqUrl.searchParams.get("job_id");
+  if (req.method === "GET" && pollId) {
+    const statusUrl = new URL(`${ANALYTICS_URL}/retrain/status`);
+    statusUrl.searchParams.set("job_id", pollId);
+    try {
+      const r = await fetch(statusUrl, { headers: { "X-API-Key": ANALYTICS_KEY } });
+      if (!r.ok) {
+        return jsonResponse(
+          { ok: false, status: "unknown", error: `analytics status ${r.status}` },
+          r.status === 404 ? 404 : 503,
+        );
+      }
+      const body = await r.json();
+      return jsonResponse({ ok: true, ...body }, 200);
+    } catch (e) {
+      return jsonResponse(
+        { ok: false, status: "unknown", error: String((e as Error)?.message ?? e) },
+        503,
+      );
+    }
+  }
+
   const body: RetrainRequest = {};
   if (req.method === "POST") {
     try {
