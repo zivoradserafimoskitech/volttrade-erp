@@ -37,8 +37,17 @@ from optimize.bess_dispatch import BessDispatch
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+# The database is reached through the VoltTrade `analytics-db` edge proxy, not
+# PostgREST directly: the real service-role key never leaves the backend. Prefer
+# the unambiguous VOLTTRADE_DB_PROXY_* names; SUPABASE_* are legacy fallbacks
+# whose values on this host are the proxy URL and the analytics key, NOT a real
+# Supabase service-role key.
+SUPABASE_URL = (
+    os.getenv("VOLTTRADE_DB_PROXY_URL") or os.getenv("SUPABASE_URL", "")
+).rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("VOLTTRADE_DB_PROXY_KEY") or os.getenv(
+    "SUPABASE_SERVICE_ROLE_KEY", ""
+)
 
 PREDICTIONS_TABLE = "forecast_predictions"
 PRICE_TABLE = "market_price_history"
