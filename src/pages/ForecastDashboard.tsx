@@ -153,10 +153,10 @@ export default function ForecastDashboard() {
         {comparisonData.map((m) => (
           <Card
             key={m.model}
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              selectedModel === m.model.toLowerCase().replace(" ", "_") ? "ring-2 ring-primary" : ""
-            }`}
-            onClick={() => setSelectedModel(m.model.toLowerCase().replace(" ", "_"))}
+            className={`transition-all ${
+              m.id ? "cursor-pointer hover:shadow-md" : "opacity-70"
+            } ${m.id && selectedModel === m.id ? "ring-2 ring-primary" : ""}`}
+            onClick={() => m.id && setSelectedModel(m.id)}
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
