@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { shape24h, SlpCategory, SLP_CATEGORIES, seasonOf, dayTypeOf, loadSlpFromDb, loadHolidays } from "@/lib/slpSynthesis";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarClock, Lock, Send, Activity, Download, FileCode, Sun, Percent } from "lucide-react";
+import { readFirstSheetRows } from "@/lib/xlsxIo";
 
 /**
  * MEASURED leg — never a synthetic shape. Each MEASURED metering point is
@@ -109,10 +110,9 @@ export default function Scheduling() {
    */
   async function importPpeeFile(file: File) {
     try {
-      const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+      // readFirstSheetRows replaces XLSX.utils.sheet_to_json(sheet, {header:1}):
+      // same 0-based array-of-arrays shape, ExcelJS underneath.
+      const rows: unknown[][] = await readFirstSheetRows(file);
 
       const norm = (v: any) => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
       const num = (v: any) => {

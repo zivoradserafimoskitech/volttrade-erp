@@ -1,7 +1,7 @@
 /* Vatra FCM service worker — handles background push.
  * Loaded only after the user enables notifications in /portal/notifications.
  * Config is injected via URL query params so we don't ship Firebase keys statically. */
-/* eslint-disable */
+ 
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 

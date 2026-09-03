@@ -13,6 +13,7 @@ import { Activity, Zap, Euro, Leaf, Radio, Wifi, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { buildPriceMap } from "@/lib/prices";
 import { toast } from "sonner";
+import { fetchAllRows } from "@/lib/paginate";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   AreaChart, Area, PieChart, Pie, Cell, RadialBarChart, RadialBar
@@ -125,7 +126,18 @@ export default function SmartMeter() {
       const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
       const [{ data: prices }, { data: iv }] = await Promise.all([
         supabase.from("market_prices").select("delivery_at, price_eur_mwh, source").gte("delivery_at", `${today}T00:00:00Z`).lte("delivery_at", `${today}T23:59:59Z`),
-        mp ? supabase.from("consumption_readings").select("reading_at, actual_mwh, quality").eq("metering_point_id", mp).gte("reading_at", weekAgo).limit(20000) : Promise.resolve({ data: [] as any[] }),
+        // PAGINATION REPAIR 2026-09-03: .limit(20000) returned 1000 rows. A week
+        // at 15-minute resolution is 672 intervals, so this was close to the cap
+        // already and would truncate silently the moment resolution increased.
+        mp
+          ? fetchAllRows<{ reading_at: string; actual_mwh: number | null; quality: string | null }>(
+              () => supabase.from("consumption_readings")
+                .select("reading_at, actual_mwh, quality")
+                .eq("metering_point_id", mp).gte("reading_at", weekAgo)
+                .order("reading_at"),
+              { label: "smart meter consumption_readings" },
+            ).then((data) => ({ data }))
+          : Promise.resolve({ data: [] as { reading_at: string; actual_mwh: number | null; quality: string | null }[] }),
       ]);
       if (stop) return;
       const spot = prices?.length ? (() => { const pm = buildPriceMap(prices as any); const a = Array(24).fill(null as number | null); for (const [k, v] of pm) { const d = new Date(k + ":00:00Z"); if (d.toISOString().slice(0, 10) === today) a[d.getUTCHours()] = v; } return a.map((v, h) => v ?? spotPrice(h)); })() : null;

@@ -55,21 +55,49 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # SECURITY REPAIR 2026-09-01: was allow_origins=["*"] with
+    # allow_credentials=True — a combination browsers reject outright, and one
+    # that placed no restriction on who may call this service from a page.
+    # The only legitimate caller is a Supabase edge function (server-side, no
+    # Origin header), so the browser allow-list is now explicit and empty by
+    # default. Set VOLTTRADE_ALLOWED_ORIGINS (comma-separated) if a browser
+    # client is ever added.
+    allow_origins=[o for o in os.getenv("VOLTTRADE_ALLOWED_ORIGINS", "").split(",") if o],
+    allow_credentials=False,
+    allow_methods=["POST", "GET"],
+    allow_headers=["X-API-Key", "Content-Type"],
 )
 
 # ── Auth ──────────────────────────────────────────────────────────────────
-API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "dev-key-change-in-production")
+# SECURITY REPAIR 2026-09-01
+# --------------------------
+# This used to be:
+#     API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "dev-key-change-in-production")
+# so if the environment variable was missing on Render the service came up
+# accepting a key that is published in this repository. Fail closed instead:
+# no key, no boot. Also drop /docs, /redoc and /openapi.json from the exempt
+# list — they published the whole API surface, including the hedge optimiser
+# and retrain endpoints, to anyone who found the hostname.
+import secrets
+
+API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "")
+if not API_KEY or API_KEY == "dev-key-change-in-production":
+    raise RuntimeError(
+        "VOLTTRADE_ANALYTICS_KEY is unset or still the placeholder. "
+        "Set it in the service environment before starting."
+    )
+
+# Only liveness is public. Everything else, docs included, needs the key.
+PUBLIC_PATHS = {"/health"}
+
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if request.url.path in ["/health", "/docs", "/openapi.json", "/redoc"]:
+    if request.url.path in PUBLIC_PATHS:
         return await call_next(request)
     key = request.headers.get("X-API-Key", "")
-    if key != API_KEY:
+    # Constant-time: a plain != leaks the shared secret one byte at a time.
+    if not secrets.compare_digest(key, API_KEY):
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     return await call_next(request)

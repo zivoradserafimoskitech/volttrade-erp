@@ -25,9 +25,16 @@ name: Deploy VoltTrade Risk Module
 #   VOLTTRADE_ANALYTICS_URL   https://volttrade-analytics.onrender.com
 #   VOLTTRADE_ANALYTICS_KEY   the analytics service API key
 #
-# NOTE on --no-verify-jwt: the 5 risk functions authenticate callers internally
-# (Authorization header + organization membership check), so the Supabase
-# gateway JWT check is disabled to also allow service-role calls (cron).
+# FIX 5 (security, 2026-09-01): --no-verify-jwt has been REMOVED.
+#        The note that used to sit here claimed "the 5 risk functions
+#        authenticate callers internally". That was true of two of them.
+#        forecast-price, optimize-hedge and ingest-memo had no Authorization
+#        handling at all, and risk-metrics skipped its check whenever org_id was
+#        supplied in the body — so the flag exposed cross-tenant risk data and
+#        an open write path into market_price_history.
+#        All five now use supabase/functions/_shared/auth.ts. The platform gate
+#        stays ON: Supabase accepts the service-role key as a valid JWT, so
+#        pg_cron still gets through.
 # ═════════════════════════════════════════════════════════════════════════════
 
 on:
@@ -80,7 +87,7 @@ jobs:
           set -e
           for fn in quote-supply risk-metrics forecast-price optimize-hedge ingest-memo; do
             echo "Deploying $fn..."
-            supabase functions deploy "$fn" --no-verify-jwt
+            supabase functions deploy "$fn"
           done
           echo "All 5 edge functions deployed."
 

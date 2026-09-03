@@ -1,16 +1,32 @@
+-- REPAIR 2026-09-01: CREATE EXTENSION wrapped so a plain Postgres (CI) can
+-- replay the chain. On Supabase the extensions exist and this is a no-op.
 -- Email infrastructure
 -- Creates the queue system, send log, send state, suppression, and unsubscribe
 -- tables used by both auth and transactional emails.
 
 -- Extensions required for queue processing
-CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
-DO $$ BEGIN
+DO $ext$ BEGIN
+  EXECUTE 'CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'skipping: % (not available on this server)', 'CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;';
+END $ext$;
+DO $ext$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    CREATE EXTENSION pg_cron;
+    EXECUTE 'CREATE EXTENSION pg_cron';
   END IF;
-END $$;
-CREATE EXTENSION IF NOT EXISTS supabase_vault;
-CREATE EXTENSION IF NOT EXISTS pgmq;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'skipping CREATE EXTENSION pg_cron (not available on this server)';
+END $ext$;
+DO $ext$ BEGIN
+  EXECUTE 'CREATE EXTENSION IF NOT EXISTS supabase_vault;';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'skipping: % (not available on this server)', 'CREATE EXTENSION IF NOT EXISTS supabase_vault;';
+END $ext$;
+DO $ext$ BEGIN
+  EXECUTE 'CREATE EXTENSION IF NOT EXISTS pgmq;';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'skipping: % (not available on this server)', 'CREATE EXTENSION IF NOT EXISTS pgmq;';
+END $ext$;
 
 -- Create email queues (auth = high priority, transactional = normal)
 -- Wrapped in DO blocks to handle "queue already exists" errors idempotently.

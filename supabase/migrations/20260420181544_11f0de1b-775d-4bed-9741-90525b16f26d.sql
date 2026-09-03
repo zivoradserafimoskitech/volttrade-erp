@@ -67,7 +67,13 @@ CREATE POLICY "countries read" ON public.countries FOR SELECT TO authenticated U
 CREATE POLICY "countries admin" ON public.countries FOR ALL TO authenticated
   USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
 
+-- REPAIR 2026-09-01: 'MK' was missing from this seed. It is the home market,
+-- and 20260812120000_phase4_org_tenancy.sql seeds the tenant organisation with
+-- country_code = 'MK' -- so on a rebuilt database that INSERT died on
+-- organizations_country_code_fkey, aborting the entire tenancy migration and
+-- five later migrations that depend on organization_id / current_org_id().
 INSERT INTO public.countries(code,name,currency,vat_percent,tso_code) VALUES
+('MK','North Macedonia','MKD',18,'MEPSO'),
 ('HU','Hungary','EUR',27,'MAVIR'),
 ('RO','Romania','EUR',19,'TRANSELECTRICA'),
 ('BG','Bulgaria','EUR',20,'ESO'),
@@ -75,7 +81,8 @@ INSERT INTO public.countries(code,name,currency,vat_percent,tso_code) VALUES
 ('AT','Austria','EUR',20,'APG'),
 ('DE','Germany','EUR',19,'TENNET'),
 ('SK','Slovakia','EUR',20,'SEPS'),
-('HR','Croatia','EUR',25,'HOPS');
+('HR','Croatia','EUR',25,'HOPS')
+ON CONFLICT (code) DO NOTHING;
 
 -- ============ CLIENTS extension ============
 ALTER TABLE public.clients

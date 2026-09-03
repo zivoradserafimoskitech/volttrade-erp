@@ -1,3 +1,6 @@
+-- REPAIR 2026-09-01: CREATE POLICY made idempotent (DROP POLICY IF EXISTS
+-- first). These policies are also created by an earlier migration, so this
+-- file aborted on a from-scratch replay with "policy ... already exists".
 -- ═══════════════════════════════════════════════════════════════════
 -- ESS (ENTSO-E Scheduling System) support — TPS/PPS generation.
 -- Extends the EXISTING trades table (Trade Blotter) rather than creating
@@ -30,7 +33,9 @@ CREATE TABLE IF NOT EXISTS public.eic_areas (
 GRANT SELECT ON public.eic_areas TO authenticated;
 GRANT ALL ON public.eic_areas TO service_role;
 ALTER TABLE public.eic_areas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "staff read eic_areas" ON public.eic_areas;
 CREATE POLICY "staff read eic_areas" ON public.eic_areas FOR SELECT TO authenticated USING (public.is_staff());
+DROP POLICY IF EXISTS "admin write eic_areas" ON public.eic_areas;
 CREATE POLICY "admin write eic_areas" ON public.eic_areas FOR ALL TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]));
@@ -59,7 +64,9 @@ CREATE TABLE IF NOT EXISTS public.ess_settings (
 GRANT SELECT ON public.ess_settings TO authenticated;
 GRANT ALL ON public.ess_settings TO service_role;
 ALTER TABLE public.ess_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "staff read ess_settings" ON public.ess_settings;
 CREATE POLICY "staff read ess_settings" ON public.ess_settings FOR SELECT TO authenticated USING (public.is_staff());
+DROP POLICY IF EXISTS "admin write ess_settings" ON public.ess_settings;
 CREATE POLICY "admin write ess_settings" ON public.ess_settings FOR ALL TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]));

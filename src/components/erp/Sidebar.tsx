@@ -143,7 +143,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           size="sm"
           className="w-full justify-start"
           onClick={() => {
-            try { sessionStorage.setItem('viewAsCustomer', '1'); } catch {}
+            try { sessionStorage.setItem('viewAsCustomer', '1'); } catch { /* storage unavailable (private mode) — preview still opens */ }
             window.open('/portal', '_blank', 'noopener');
           }}
         >

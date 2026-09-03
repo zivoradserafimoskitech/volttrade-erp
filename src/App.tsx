@@ -1,82 +1,83 @@
+import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth";
-import Dashboard from "./pages/Dashboard";
-import Clients from "./pages/Clients";
-import Market from "./pages/Market";
-import Trading from "./pages/Trading";
-import Invoices from "./pages/Invoices";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Clients = lazy(() => import("./pages/Clients"));
+const Market = lazy(() => import("./pages/Market"));
+const Trading = lazy(() => import("./pages/Trading"));
+const Invoices = lazy(() => import("./pages/Invoices"));
 import AuthPage from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
-import TwoFactor from "./pages/TwoFactor";
-import Unsubscribe from "./pages/Unsubscribe";
-import VatraSignup from "./pages/vatra/Signup";
-import VatraJoin from "./pages/vatra/Join";
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const TwoFactor = lazy(() => import("./pages/TwoFactor"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const VatraSignup = lazy(() => import("./pages/vatra/Signup"));
+const VatraJoin = lazy(() => import("./pages/vatra/Join"));
 import NotFound from "./pages/NotFound";
-import SupplyPoints from "./pages/SupplyPoints";
-import Tariffs from "./pages/Tariffs";
-import SupplyContracts from "./pages/SupplyContracts";
-import Ppa from "./pages/Ppa";
-import MeterReadings from "./pages/MeterReadings";
-import Reconciliation from "./pages/Reconciliation";
-import BillingRuns from "./pages/BillingRuns";
-import Compliance from "./pages/Compliance";
-import Payments from "./pages/Payments";
-import UsersAdmin from "./pages/admin/UsersAdmin";
-import Settings from "./pages/admin/Settings";
-import AuditLog from "./pages/admin/AuditLog";
-import SyncHealth from "./pages/admin/SyncHealth";
-import Counterparties from "./pages/Counterparties";
-import TradingContracts from "./pages/TradingContracts";
-import Schedules from "./pages/Schedules";
-import Risk from "./pages/Risk";
-import CounterpartyDrill from "./pages/risk/CounterpartyDrill";
-import AgingDrill from "./pages/risk/AgingDrill";
-import NopDrill from "./pages/risk/NopDrill";
-import Position from "./pages/risk/Position";
-import Forecasting from "./pages/Forecasting";
-import Assets from "./pages/Assets";
-import AssetMonitoring from "./pages/AssetMonitoring";
-import PvMonitoring from "./pages/PvMonitoring";
-import SmartMeter from "./pages/SmartMeter";
-import Vatra from "./pages/Vatra";
-import Gateways from "./pages/gateways/Gateways";
-import GatewayDetail from "./pages/gateways/GatewayDetail";
-import GatewayAlarms from "./pages/gateways/Alarms";
-import ForecastDashboard from "./pages/ForecastDashboard";
-import HedgePosition from "./pages/HedgePosition";
-import QuoteBuilder from "./pages/QuoteBuilder";
-import RiskMetrics from "./pages/RiskMetrics";
+const SupplyPoints = lazy(() => import("./pages/SupplyPoints"));
+const Tariffs = lazy(() => import("./pages/Tariffs"));
+const SupplyContracts = lazy(() => import("./pages/SupplyContracts"));
+const Ppa = lazy(() => import("./pages/Ppa"));
+const MeterReadings = lazy(() => import("./pages/MeterReadings"));
+const Reconciliation = lazy(() => import("./pages/Reconciliation"));
+const BillingRuns = lazy(() => import("./pages/BillingRuns"));
+const Compliance = lazy(() => import("./pages/Compliance"));
+const Payments = lazy(() => import("./pages/Payments"));
+const UsersAdmin = lazy(() => import("./pages/admin/UsersAdmin"));
+const Settings = lazy(() => import("./pages/admin/Settings"));
+const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
+const SyncHealth = lazy(() => import("./pages/admin/SyncHealth"));
+const Counterparties = lazy(() => import("./pages/Counterparties"));
+const TradingContracts = lazy(() => import("./pages/TradingContracts"));
+const Schedules = lazy(() => import("./pages/Schedules"));
+const Risk = lazy(() => import("./pages/Risk"));
+const CounterpartyDrill = lazy(() => import("./pages/risk/CounterpartyDrill"));
+const AgingDrill = lazy(() => import("./pages/risk/AgingDrill"));
+const NopDrill = lazy(() => import("./pages/risk/NopDrill"));
+const Position = lazy(() => import("./pages/risk/Position"));
+const Forecasting = lazy(() => import("./pages/Forecasting"));
+const Assets = lazy(() => import("./pages/Assets"));
+const AssetMonitoring = lazy(() => import("./pages/AssetMonitoring"));
+const PvMonitoring = lazy(() => import("./pages/PvMonitoring"));
+const SmartMeter = lazy(() => import("./pages/SmartMeter"));
+const Vatra = lazy(() => import("./pages/Vatra"));
+const Gateways = lazy(() => import("./pages/gateways/Gateways"));
+const GatewayDetail = lazy(() => import("./pages/gateways/GatewayDetail"));
+const GatewayAlarms = lazy(() => import("./pages/gateways/Alarms"));
+const ForecastDashboard = lazy(() => import("./pages/ForecastDashboard"));
+const HedgePosition = lazy(() => import("./pages/HedgePosition"));
+const QuoteBuilder = lazy(() => import("./pages/QuoteBuilder"));
+const RiskMetrics = lazy(() => import("./pages/RiskMetrics"));
 
-import ConsumerManager from "./pages/balancing/ConsumerManager";
-import SlpSynthesis from "./pages/balancing/SlpSynthesis";
-import Scheduling from "./pages/balancing/Scheduling";
-import LivePosition from "./pages/balancing/LivePosition";
-import ImbalanceAllocation from "./pages/balancing/ImbalanceAllocation";
-import ForecastAccuracy from "./pages/balancing/ForecastAccuracy";
-import DataReadiness from "./pages/balancing/DataReadiness";
-import SmartMeterHealth from "./pages/balancing/SmartMeterHealth";
-import BessOptimizer from "./pages/assets/BessOptimizer";
-import Settlement from "./pages/balancing/Settlement";
-import Onboarding from "./pages/supply/Onboarding";
-import Switching from "./pages/supply/Switching";
-import PortalLinks from "./pages/admin/PortalLinks";
-import ConsumerApplications from "./pages/admin/ConsumerApplications";
-import PortalOverview from "./pages/portal/Overview";
-import PortalEdus from "./pages/portal/Edus";
-import PortalInvoices from "./pages/portal/PortalInvoices";
-import PortalReadings from "./pages/portal/PortalReadings";
-import PortalHourly from "./pages/portal/PortalHourly";
-import PortalTariffs from "./pages/portal/PortalTariffs";
-import PortalSavings from "./pages/portal/PortalSavings";
-import PortalRefer from "./pages/portal/PortalRefer";
-import PortalEv from "./pages/portal/PortalEv";
-import PortalPpa from "./pages/portal/PortalPpa";
-import PortalProfile from "./pages/portal/Profile";
-import PortalNotifications from "./pages/portal/PortalNotifications";
+const ConsumerManager = lazy(() => import("./pages/balancing/ConsumerManager"));
+const SlpSynthesis = lazy(() => import("./pages/balancing/SlpSynthesis"));
+const Scheduling = lazy(() => import("./pages/balancing/Scheduling"));
+const LivePosition = lazy(() => import("./pages/balancing/LivePosition"));
+const ImbalanceAllocation = lazy(() => import("./pages/balancing/ImbalanceAllocation"));
+const ForecastAccuracy = lazy(() => import("./pages/balancing/ForecastAccuracy"));
+const DataReadiness = lazy(() => import("./pages/balancing/DataReadiness"));
+const SmartMeterHealth = lazy(() => import("./pages/balancing/SmartMeterHealth"));
+const BessOptimizer = lazy(() => import("./pages/assets/BessOptimizer"));
+const Settlement = lazy(() => import("./pages/balancing/Settlement"));
+const Onboarding = lazy(() => import("./pages/supply/Onboarding"));
+const Switching = lazy(() => import("./pages/supply/Switching"));
+const PortalLinks = lazy(() => import("./pages/admin/PortalLinks"));
+const ConsumerApplications = lazy(() => import("./pages/admin/ConsumerApplications"));
+const PortalOverview = lazy(() => import("./pages/portal/Overview"));
+const PortalEdus = lazy(() => import("./pages/portal/Edus"));
+const PortalInvoices = lazy(() => import("./pages/portal/PortalInvoices"));
+const PortalReadings = lazy(() => import("./pages/portal/PortalReadings"));
+const PortalHourly = lazy(() => import("./pages/portal/PortalHourly"));
+const PortalTariffs = lazy(() => import("./pages/portal/PortalTariffs"));
+const PortalSavings = lazy(() => import("./pages/portal/PortalSavings"));
+const PortalRefer = lazy(() => import("./pages/portal/PortalRefer"));
+const PortalEv = lazy(() => import("./pages/portal/PortalEv"));
+const PortalPpa = lazy(() => import("./pages/portal/PortalPpa"));
+const PortalProfile = lazy(() => import("./pages/portal/Profile"));
+const PortalNotifications = lazy(() => import("./pages/portal/PortalNotifications"));
 
 const ExternalRedirect = ({ to }: { to: string }) => {
   if (typeof window !== "undefined") window.location.replace(to);
@@ -85,6 +86,17 @@ const ExternalRedirect = ({ to }: { to: string }) => {
 
 const queryClient = new QueryClient();
 
+/** Shown while a lazily-loaded route chunk is in flight. */
+const RouteFallback = () => (
+  <div className="flex h-screen w-full items-center justify-center">
+    <div
+      className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-primary"
+      role="status"
+      aria-label="Loading"
+    />
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -92,6 +104,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          {/* CODE SPLITTING 2026-09-03: every page below is React.lazy(), so a
+              route's JS is fetched when it is first visited instead of shipping
+              all 75 screens in the entry bundle. Auth and NotFound stay eager —
+              the login screen is the first paint and should not wait on a
+              second request. */}
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -169,6 +187,7 @@ const App = () => (
             <Route path="/vatra" element={<Vatra />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

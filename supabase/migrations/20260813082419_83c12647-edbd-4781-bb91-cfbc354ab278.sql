@@ -1,3 +1,6 @@
+-- REPAIR 2026-09-01: CREATE POLICY made idempotent (DROP POLICY IF EXISTS
+-- first). These policies are also created by an earlier migration, so this
+-- file aborted on a from-scratch replay with "policy ... already exists".
 -- (a) MK public holidays — profiled consumers behave like Sunday on these days.
 CREATE TABLE IF NOT EXISTS public.public_holidays (
   holiday_date date PRIMARY KEY,
@@ -6,7 +9,9 @@ CREATE TABLE IF NOT EXISTS public.public_holidays (
 GRANT SELECT ON public.public_holidays TO authenticated;
 GRANT ALL ON public.public_holidays TO service_role;
 ALTER TABLE public.public_holidays ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth read public_holidays" ON public.public_holidays;
 CREATE POLICY "auth read public_holidays" ON public.public_holidays FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admin write public_holidays" ON public.public_holidays;
 CREATE POLICY "admin write public_holidays" ON public.public_holidays FOR ALL TO authenticated
   USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
 
@@ -52,6 +57,8 @@ CREATE TABLE IF NOT EXISTS public.volume_forecasts (
 GRANT SELECT, INSERT ON public.volume_forecasts TO authenticated;
 GRANT ALL ON public.volume_forecasts TO service_role;
 ALTER TABLE public.volume_forecasts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth read volume_forecasts" ON public.volume_forecasts;
 CREATE POLICY "auth read volume_forecasts" ON public.volume_forecasts FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "auth insert volume_forecasts" ON public.volume_forecasts;
 CREATE POLICY "auth insert volume_forecasts" ON public.volume_forecasts FOR INSERT TO authenticated WITH CHECK (true);
 CREATE INDEX IF NOT EXISTS idx_volume_forecasts_month ON public.volume_forecasts(month, scope, created_at DESC);

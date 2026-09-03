@@ -6,6 +6,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { authenticate } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,10 +133,26 @@ async function localSeasonalNaive(horizon: number, includeQuantiles: boolean) {
   };
 }
 
+// SECURITY REPAIR 2026-09-01, re-applied 2026-09-03
+// --------------------------------------------------
+// This has never authenticated its caller, and deploy-risk-module.yml shipped
+// it with --no-verify-jwt: an open proxy onto the metered analytics service.
+// The 3 Sep rewrite added a seasonal-naive fallback (kept in full below) but
+// not a caller check, and the fallback made the gap worse — an unauthenticated
+// request now also reads market_prices via the service-role key.
+//
+// A staff JWT or the service role is required before any work happens.
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    try {
+      await authenticate(req);
+    } catch (e) {
+      const status = (e as { status?: number }).status ?? 401;
+      return json({ error: (e as Error).message }, status);
+    }
+
     const body: ForecastRequest = await req.json().catch(() => ({}));
     const horizon = Math.min(Math.max(body.horizon_hours ?? 24, 1), 720);
     const includeQuantiles = body.include_quantiles !== false;

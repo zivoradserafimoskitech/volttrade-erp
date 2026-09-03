@@ -47,7 +47,7 @@ export default function PortalSavings() {
       { title: "Free electricity hour", description: "Use as much as you like, on us, between the window times.", window_start: next.toISOString(), window_end: nextEnd.toISOString(), points_per_kwh: 0, eur_per_point: 0.001, status: "scheduled" },
     ] as any);
     load();
-  })(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clientId, sessions.length]);
+  })();   }, [clientId, sessions.length]);
 
   const totals = useMemo(() => ({
     points: signups.reduce((s, x) => s + (x.points_awarded || 0), 0),

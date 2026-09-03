@@ -27,7 +27,7 @@ interface RetrainRequest {
 Deno.serve(handler(async (req) => {
   const auth = await authenticate(req, { roles: ["admin", "operations", "management"] });
 
-  let body: RetrainRequest = {};
+  const body: RetrainRequest = {};
   if (req.method === "POST") {
     try {
       const parsed = await req.json();

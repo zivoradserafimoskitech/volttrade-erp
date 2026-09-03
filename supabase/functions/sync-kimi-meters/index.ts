@@ -36,6 +36,7 @@
 //                      viewer role so it can be revoked without collateral.
 
 import { authenticate, handler, json } from "../_shared/auth.ts";
+import { fetchAllRows } from "../_shared/paginate.ts";
 
 const MAX_RANGE_MINUTES = 31 * 24 * 60; // gateway rejects ranges over 31 days
 const CHUNK = 500;
@@ -85,13 +86,23 @@ Deno.serve(handler(async (req) => {
   // ── 1. Linked metering points ────────────────────────────────────────────
   // No user_id filter: the sync is an organisation-level job. Which points
   // exist is governed by the link (kimi_meter_id), not by who created the row.
-  const { data: mps, error: mpErr } = await admin
-    .from("metering_points")
-    .select("id, edu_code, kimi_meter_id")
-    .not("kimi_meter_id", "is", null);
-  if (mpErr) throw mpErr;
+  //
+  // PAGINATION REPAIR 2026-09-01: this select had no bound, so it stopped at
+  // the project's max_rows cap (1000). Past 1000 linked devices the sync would
+  // have quietly polled a prefix of the fleet every 30 minutes and reported
+  // success — the remaining meters would simply never produce readings, and
+  // nothing downstream would flag it. fetchAllRows() walks .range() and throws
+  // rather than truncating. The .order("id") is required: without a stable
+  // sort, paged reads can repeat or skip rows between pages.
+  const points = await fetchAllRows<MeteringPoint>(
+    () => admin
+      .from("metering_points")
+      .select("id, edu_code, kimi_meter_id")
+      .not("kimi_meter_id", "is", null)
+      .order("id"),
+    { label: "metering_points linked to a gateway device" },
+  );
 
-  const points = (mps ?? []) as MeteringPoint[];
   if (points.length === 0) {
     return json({ ok: true, synced: 0, message: "No metering points linked to a gateway device." });
   }

@@ -31,17 +31,25 @@ Deno.serve(async (req) => {
     const sinceISO = new Date(Date.now() - windowHours * 3600_000).toISOString();
 
     // Connection power per metering point (physical plausibility limit)
-    const { data: cps } = await admin.from("metering_points").select("id, connected_power_kw");
+    // PAGINATION REPAIR 2026-09-01: unbounded selects stop at max_rows (1000).
+    // Above 1000 metering points this silently validated a prefix of the fleet.
+    const cps = await fetchAllRows<any>(
+      () => admin.from("metering_points").select("id, connected_power_kw").order("id"),
+      { label: "metering_points" },
+    );
     const powerKw = new Map<string, number>();
     (cps ?? []).forEach((c: any) => { powerKw.set(c.id, Number(c.connected_power_kw || 0)); });
     const limitKw = (mp: string) => powerKw.get(mp) || 100; // fallback if unclassified
 
     // ── 1. Register validation ────────────────────────────────────
-    const { data: pend } = await admin.from("meter_readings")
-      .select("id, metering_point_id, reading_at, import_kwh")
-      .eq("validation_status", "pending")
-      .order("metering_point_id").order("reading_at")
-      .limit(5000);
+    // PAGINATION REPAIR 2026-09-01: .limit(5000) returned 1000 rows.
+    const pend = await fetchAllRows<any>(
+      () => admin.from("meter_readings")
+        .select("id, metering_point_id, reading_at, import_kwh")
+        .eq("validation_status", "pending")
+        .order("metering_point_id").order("reading_at"),
+      { label: "meter_readings pending" },
+    );
     let regValidated = 0, regFlagged = 0;
     const lastAccepted = new Map<string, { at: number; kwh: number }>();
     // seed with last validated read per mp before the pending batch
@@ -72,16 +80,26 @@ Deno.serve(async (req) => {
     }
 
     // ── 2. Interval validation ────────────────────────────────────
-    const { data: iv } = await admin.from("consumption_readings")
-      .select("id, metering_point_id, reading_at, actual_mwh, quality")
+    // PAGINATION REPAIR 2026-09-01: .limit(20000) returned 1000 rows.
+    const iv = await fetchAllRows<any>(
+      () => admin.from("consumption_readings")
+        .select("id, metering_point_id, reading_at, actual_mwh, quality")
       .gte("reading_at", sinceISO).eq("quality", "measured")
-      .order("metering_point_id").order("reading_at").limit(20000);
+      .order("metering_point_id").order("reading_at")
+      ,
+      { label: "consumption_readings interval" },
+    );
     // history for medians: prior 14 days
     const histSince = new Date(Date.now() - (windowHours + 14 * 24) * 3600_000).toISOString();
-    const { data: hist } = await admin.from("consumption_readings")
+    // PAGINATION REPAIR 2026-09-01: .limit(50000) returned 1000 rows.
+    const hist = await fetchAllRows<any>(
+      () => admin.from("consumption_readings")
       .select("metering_point_id, reading_at, actual_mwh")
       .gte("reading_at", histSince).lt("reading_at", sinceISO)
-      .neq("quality", "flagged").limit(50000);
+      .neq("quality", "flagged")
+        .order("metering_point_id").order("reading_at"),
+      { label: "consumption_readings history" },
+    );
     const histKey = (mp: string, h: number) => `${mp}|${h}`;
     const buckets = new Map<string, number[]>();
     (hist ?? []).forEach((r: any) => {

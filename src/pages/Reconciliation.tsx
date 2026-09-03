@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/paginate";
 import { useAuth } from "@/lib/auth";
 import { allocateBySlp, hourlyRange, loadCurve, CurveLookup } from "@/lib/slp";
 import { fmtNum } from "@/lib/format";
@@ -44,12 +45,17 @@ export default function Reconciliation() {
         .select("id,edu_code,consumer_category,slp_profile_code,annual_consumption_mwh");
       if (e1) throw e1;
 
-      const { data: rds, error: e2 } = await supabase.from("meter_readings")
-        .select("metering_point_id,import_kwh,reading_at,validation_status")
-        .gte("reading_at", monthRange.start.toISOString())
-        .lt("reading_at", monthRange.end.toISOString())
-        .neq("validation_status", "rejected");
-      if (e2) throw e2;
+      // PAGINATION REPAIR 2026-09-01: this select had no bound at all, so it
+      // stopped at the 1000-row API cap and reconciled a prefix of the month.
+      const rds = await fetchAllRows<{ metering_point_id: string; import_kwh: number | null; reading_at: string; validation_status: string }>(
+        () => supabase.from("meter_readings")
+          .select("metering_point_id,import_kwh,reading_at,validation_status")
+          .gte("reading_at", monthRange.start.toISOString())
+          .lt("reading_at", monthRange.end.toISOString())
+          .neq("validation_status", "rejected")
+          .order("metering_point_id").order("reading_at"),
+        { label: "reconciliation meter_readings" },
+      );
 
       // group readings
       const agg = new Map<string, { kwh: number; n: number }>();
@@ -96,7 +102,7 @@ export default function Reconciliation() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { if (user) run(); /* eslint-disable-next-line */ }, [user, ym]);
+  useEffect(() => { if (user) run();   }, [user, ym]);
 
   const filtered = category === "all" ? rows : rows.filter(r => r.category === category);
   const flagged = filtered.filter(r => {

@@ -3,6 +3,7 @@
 // implausible and duplicate rows are REJECTED and reported, never inserted.
 // Corrections require explicit allow_overwrite:true.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { fetchAllRows } from "../_shared/paginate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,7 +41,17 @@ Deno.serve(async (req) => {
   const allowOverwrite = body.allow_overwrite === true; // DSO corrections: explicit opt-in
 
   // Resolve metering points (by id or EDU code) + physical limits
-  const { data: mps } = await supabase.from("metering_points").select("id, edu_code, connected_power_kw");
+  // PAGINATION REPAIR 2026-09-01: unbounded, so it stopped at the 1000-row
+  // max_rows cap. Past 1000 metering points the lookup maps below would be
+  // missing entries and every affected row would be rejected as "unknown
+  // metering point" — i.e. legitimate DSO reads, which are the legal billing
+  // truth, silently dropped on import.
+  const mps = await fetchAllRows<{ id: string; edu_code: string | null; connected_power_kw: number | null }>(
+    () => supabase.from("metering_points")
+      .select("id, edu_code, connected_power_kw")
+      .order("id"),
+    { label: "metering_points" },
+  );
   const byId = new Map<string, any>(); const byEdu = new Map<string, any>();
   (mps ?? []).forEach((m: any) => { byId.set(m.id, m); if (m.edu_code) byEdu.set(String(m.edu_code), m); });
 
@@ -77,10 +88,21 @@ Deno.serve(async (req) => {
   if (accepted.length) {
     const mpIds = [...new Set(accepted.map(a => a.metering_point_id))];
     const times = [...new Set(accepted.map(a => a.reading_at))];
-    const { data: existing } = await supabase.from("consumption_readings")
-      .select("id, metering_point_id, reading_at, actual_mwh")
-      .in("metering_point_id", mpIds).in("reading_at", times)
-      .in("source", ["DSO_MONTHLY", "DSO_INTERVAL"]);
+    // PAGINATION REPAIR 2026-09-01: also unbounded, and this one corrupts data
+    // rather than just dropping it. The .in() cross-product of metering points
+    // and timestamps exceeds 1000 rows for any realistic monthly import. A
+    // truncated result means exKey misses existing reads, so rows that should
+    // have been caught as duplicates (or overwritten as DSO corrections) fall
+    // through to the insert branch instead — double-counting consumption on
+    // the settlement-truth table.
+    const existing = await fetchAllRows<{ id: string; metering_point_id: string; reading_at: string; actual_mwh: number }>(
+      () => supabase.from("consumption_readings")
+        .select("id, metering_point_id, reading_at, actual_mwh")
+        .in("metering_point_id", mpIds).in("reading_at", times)
+        .in("source", ["DSO_MONTHLY", "DSO_INTERVAL"])
+        .order("metering_point_id").order("reading_at"),
+      { label: "existing DSO consumption_readings" },
+    );
     const exKey = new Map<string, any>();
     (existing ?? []).forEach((e: any) => exKey.set(`${e.metering_point_id}|${new Date(e.reading_at).toISOString()}`, e));
     const fresh: any[] = [];

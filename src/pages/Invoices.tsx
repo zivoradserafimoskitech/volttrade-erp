@@ -13,8 +13,9 @@ import { toast } from "sonner";
 import { fmtEur, fmtMwh } from "@/lib/format";
 import { FileDown, FileSpreadsheet, Trash2, Send, BellRing, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import * as XLSX from "xlsx";
+import { writeJsonSheet } from "@/lib/xlsxIo";
 import { renderInvoicePdf, detectInvoiceLang, type InvoiceLang } from "@/lib/invoiceTemplates";
+import { fetchAllRows } from "@/lib/paginate";
 
 type Client = { id: string; company_name: string; contract_type: string; fixed_price_eur_mwh: number | null; margin_eur_mwh: number; country_code: string | null };
 type Invoice = {
@@ -97,15 +98,20 @@ export default function Invoices() {
   };
 
   const exportExcel = async () => {
-    const { data: readings } = await supabase.from("consumption_readings").select("reading_at, forecast_mwh, actual_mwh, metering_point:metering_points(edu_code, client:clients(company_name))").order("reading_at", { ascending: false }).limit(5000);
+    // PAGINATION REPAIR 2026-09-03: .limit(5000) returned 1000 rows, so the
+    // Excel export silently contained the 1000 most recent readings rather than
+    // the 5000 it advertised.
+    const readings = await fetchAllRows<Record<string, unknown>>(
+      () => supabase.from("consumption_readings")
+        .select("reading_at, forecast_mwh, actual_mwh, metering_point:metering_points(edu_code, client:clients(company_name))")
+        .order("reading_at", { ascending: false }).order("metering_point_id"),
+      { label: "invoice export consumption_readings" },
+    );
     const rows = (readings ?? []).map((r: any) => ({
       Timestamp: r.reading_at, Client: r.metering_point?.client?.company_name, EDU: r.metering_point?.edu_code,
       "Forecast MWh": Number(r.forecast_mwh ?? 0), "Actual MWh": Number(r.actual_mwh ?? 0),
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Energy Report");
-    XLSX.writeFile(wb, `energy-report-${format(new Date(), "yyyyMMdd")}.xlsx`);
+    await writeJsonSheet(`energy-report-${format(new Date(), "yyyyMMdd")}`, "Energy Report", rows);
   };
 
   return (

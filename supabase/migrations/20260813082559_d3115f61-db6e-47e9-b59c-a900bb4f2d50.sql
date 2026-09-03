@@ -1,3 +1,6 @@
+-- REPAIR 2026-09-01: CREATE POLICY made idempotent (DROP POLICY IF EXISTS
+-- first). These policies are also created by an earlier migration, so this
+-- file aborted on a from-scratch replay with "policy ... already exists".
 -- ═══════════════════════════════════════════════════════════════════
 -- Access model fix for core business tables.
 --
@@ -17,13 +20,18 @@ DROP POLICY IF EXISTS "own clients insert" ON public.clients;
 DROP POLICY IF EXISTS "own clients update" ON public.clients;
 DROP POLICY IF EXISTS "own clients delete" ON public.clients;
 
+DROP POLICY IF EXISTS "staff read clients" ON public.clients;
+
 CREATE POLICY "staff read clients" ON public.clients FOR SELECT TO authenticated
   USING (public.is_staff() OR portal_user_id = auth.uid());
+DROP POLICY IF EXISTS "staff insert clients" ON public.clients;
 CREATE POLICY "staff insert clients" ON public.clients FOR INSERT TO authenticated
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','management','supply_manager','trader']::public.app_role[]));
+DROP POLICY IF EXISTS "staff update clients" ON public.clients;
 CREATE POLICY "staff update clients" ON public.clients FOR UPDATE TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management','supply_manager','billing_officer']::public.app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','management','supply_manager','billing_officer']::public.app_role[]));
+DROP POLICY IF EXISTS "admin delete clients" ON public.clients;
 CREATE POLICY "admin delete clients" ON public.clients FOR DELETE TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]));
 
@@ -33,13 +41,18 @@ DROP POLICY IF EXISTS "own meters insert" ON public.metering_points;
 DROP POLICY IF EXISTS "own meters update" ON public.metering_points;
 DROP POLICY IF EXISTS "own meters delete" ON public.metering_points;
 
+DROP POLICY IF EXISTS "staff or owner read mp" ON public.metering_points;
+
 CREATE POLICY "staff or owner read mp" ON public.metering_points FOR SELECT TO authenticated
   USING (public.is_staff() OR EXISTS (SELECT 1 FROM public.clients c WHERE c.id = client_id AND c.portal_user_id = auth.uid()));
+DROP POLICY IF EXISTS "staff write mp" ON public.metering_points;
 CREATE POLICY "staff write mp" ON public.metering_points FOR INSERT TO authenticated
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','management','supply_manager','operations']::public.app_role[]));
+DROP POLICY IF EXISTS "staff update mp" ON public.metering_points;
 CREATE POLICY "staff update mp" ON public.metering_points FOR UPDATE TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management','supply_manager','operations']::public.app_role[]))
   WITH CHECK (public.has_any_role(auth.uid(), ARRAY['admin','management','supply_manager','operations']::public.app_role[]));
+DROP POLICY IF EXISTS "admin delete mp" ON public.metering_points;
 CREATE POLICY "admin delete mp" ON public.metering_points FOR DELETE TO authenticated
   USING (public.has_any_role(auth.uid(), ARRAY['admin','management']::public.app_role[]));
 
@@ -47,12 +60,16 @@ CREATE POLICY "admin delete mp" ON public.metering_points FOR DELETE TO authenti
 DROP POLICY IF EXISTS "own consumption select" ON public.consumption_readings;
 DROP POLICY IF EXISTS "own readings select" ON public.consumption_readings;
 
+DROP POLICY IF EXISTS "staff or owner read consumption" ON public.consumption_readings;
+
 CREATE POLICY "staff or owner read consumption" ON public.consumption_readings FOR SELECT TO authenticated
   USING (public.is_staff() OR EXISTS (
     SELECT 1 FROM public.metering_points m JOIN public.clients c ON c.id = m.client_id
     WHERE m.id = metering_point_id AND c.portal_user_id = auth.uid()));
+DROP POLICY IF EXISTS "staff write consumption" ON public.consumption_readings;
 CREATE POLICY "staff write consumption" ON public.consumption_readings FOR INSERT TO authenticated
   WITH CHECK (public.is_staff());
+DROP POLICY IF EXISTS "staff update consumption" ON public.consumption_readings;
 CREATE POLICY "staff update consumption" ON public.consumption_readings FOR UPDATE TO authenticated
   USING (public.is_staff()) WITH CHECK (public.is_staff());
 

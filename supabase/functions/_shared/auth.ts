@@ -170,3 +170,55 @@ export function handler(
     }
   };
 }
+
+/**
+ * Resolve the organisation the caller is allowed to act for.
+ *
+ * THE BUG THIS FIXES (audit 2026-09-01)
+ * -------------------------------------
+ * `risk-metrics` and `optimize-hedge` did this:
+ *
+ *     let orgId = body.org_id;
+ *     if (!orgId) { ...resolve from the Bearer token... }
+ *
+ * — so supplying `org_id` in the request body skipped authentication entirely.
+ * Both functions run on the service-role key, so RLS does not apply, and both
+ * were deployed with `--no-verify-jwt`. Any caller could read or optimise any
+ * organisation's book.
+ *
+ * The rule: an org id in the body is a *filter*, never an identity. A user
+ * caller's organisation always comes from their membership row, and a body
+ * value that disagrees with it is a 403 rather than a silent override.
+ * Service callers (pg_cron) have no user, so for them the body value is the
+ * only source — and possessing the service-role key already implies full
+ * database access.
+ */
+export async function resolveOrg(
+  auth: AuthResult,
+  requestedOrgId?: string | null,
+): Promise<string> {
+  if (auth.kind === "service") {
+    if (!requestedOrgId) {
+      throw new AuthError("org_id is required for service-role callers", 400);
+    }
+    return requestedOrgId;
+  }
+
+  const { data, error } = await auth.admin
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", auth.userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new AuthError("Failed to resolve organisation", 500);
+  if (!data) {
+    throw new AuthError("Forbidden — caller belongs to no organisation", 403);
+  }
+
+  const orgId = data.organization_id as string;
+  if (requestedOrgId && requestedOrgId !== orgId) {
+    throw new AuthError("Forbidden — org_id does not match your organisation", 403);
+  }
+  return orgId;
+}

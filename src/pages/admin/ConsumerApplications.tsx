@@ -40,7 +40,7 @@ function Inner() {
     if (error) return toast.error(error.message);
     setRows((data ?? []) as any);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  useEffect(() => { load();   }, [filter]);
 
   const decide = async (row: App, decision: "approve" | "reject") => {
     setBusyId(row.id);

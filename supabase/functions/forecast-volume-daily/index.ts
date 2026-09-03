@@ -159,7 +159,7 @@ Deno.serve(handler(async (req: Request) => {
       : [];
 
     let method: string | null = null;
-    let byType = new Map<string, { sum: number; n: number }>();
+    const byType = new Map<string, { sum: number; n: number }>();
     let flatDaily = 0;
 
     if (complete.length >= MIN_DAYS_THIN) {
