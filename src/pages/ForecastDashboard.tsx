@@ -98,12 +98,12 @@ export default function ForecastDashboard() {
   })) || [];
 
   const comparisonData = [
-    { model: "Naive", capture: 27.9, mae: 27.13, color: "#9ca3af" },
-    { model: "Seasonal", capture: 69.2, mae: 27.13, color: "#6b7280" },
-    { model: "LightGBM", capture: 85.0, mae: 11.95, color: "#3b82f6" },
-    { model: "XGBoost", capture: 82.0, mae: 13.5, color: "#8b5cf6" },
-    { model: "Ensemble", capture: 93.2, mae: 11.95, color: "#2563eb" },
-    { model: "Perfect", capture: 100.0, mae: 0, color: "#10b981" },
+    { model: "Naive", id: "naive", capture: 27.9, mae: 27.13, color: "#9ca3af" },
+    { model: "Seasonal", id: "seasonal_naive", capture: 69.2, mae: 27.13, color: "#6b7280" },
+    { model: "LightGBM", id: "lightgbm", capture: 85.0, mae: 11.95, color: "#3b82f6" },
+    { model: "XGBoost", id: "xgboost", capture: 82.0, mae: 13.5, color: "#8b5cf6" },
+    { model: "Ensemble", id: "ensemble", capture: 93.2, mae: 11.95, color: "#2563eb" },
+    { model: "Perfect", id: null as string | null, capture: 100.0, mae: 0, color: "#10b981" },
   ];
 
   return (
