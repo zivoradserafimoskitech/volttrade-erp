@@ -41,6 +41,7 @@ export function ErpLayout({ children, title, subtitle, actions }: { children: Re
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <AlertsBell />
             <LanguageToggle />
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={t(theme === "dark" ? "Switch to light" : "Switch to dark")}>
               {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
