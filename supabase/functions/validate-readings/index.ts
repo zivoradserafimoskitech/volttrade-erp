@@ -9,6 +9,7 @@
 //    inserted with quality='estimated'.
 // Invoke: supabase.functions.invoke("validate-readings", { body: { window_hours: 72 } })
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticate } from "../_shared/auth.ts";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
