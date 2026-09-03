@@ -258,9 +258,14 @@ export default function ForecastDashboard() {
 
       {/* Model Registry Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Model Registry</CardTitle>
-          <CardDescription>Tracked models with validation metrics</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Model Registry</CardTitle>
+            <CardDescription>Tracked models with validation metrics</CardDescription>
+          </div>
+          <Button size="sm" variant="outline" onClick={trainNow} disabled={training}>
+            {training ? "Training…" : "Train now"}
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
