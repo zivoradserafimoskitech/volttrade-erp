@@ -109,11 +109,12 @@ export default function RiskMetrics() {
 
   if (!riskData) {
     return (
-      <div className="p-6">
+      <div className="p-6 space-y-4">
         <Alert variant="destructive">
           <AlertTitle>Failed to load risk metrics</AlertTitle>
-          <AlertDescription>Check your analytics service connection.</AlertDescription>
+          <AlertDescription>{error ?? "Check your analytics service connection."}</AlertDescription>
         </Alert>
+        <Button onClick={loadData}>Retry</Button>
       </div>
     );
   }
