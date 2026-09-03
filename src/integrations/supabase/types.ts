@@ -2088,6 +2088,44 @@ export type Database = {
           },
         ]
       }
+      load_history: {
+        Row: {
+          created_at: string
+          id: string
+          load_mw: number
+          organization_id: string
+          source: string
+          timestamp: string
+          zone: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          load_mw: number
+          organization_id: string
+          source?: string
+          timestamp: string
+          zone: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          load_mw?: number
+          organization_id?: string
+          source?: string
+          timestamp?: string
+          zone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       market_price_history: {
         Row: {
           available_at: string
