@@ -51,6 +51,20 @@ _MODEL_TYPE_PARAMS = {
 }
 
 
+# ── Phase-4 alert hook (SPEC-phase4 §3) ──────────────────────────────────
+
+def _safe_alert(org_id: Optional[str], **kwargs) -> None:
+    """Emit an alerts-table event. Fully fire-and-forget: any failure is
+    logged and swallowed so alerting can never affect drift/rollback."""
+    try:
+        if not org_id:
+            return
+        from alerts import emit_alert
+        emit_alert(org_id, **kwargs)
+    except Exception as e:
+        logger.warning(f"alert hook failed (non-fatal): {e}")
+
+
 # ── Supabase access (same PostgREST/`requests` pattern as pipeline.py) ────
 
 def _sb_configured() -> bool:
@@ -191,9 +205,20 @@ def check_live_drift(org_id: Optional[str]) -> dict:
     Returns {model_kind: {"recent_mae", "trailing_mae", "n_recent",
     "drift", "reason"}} for model_kind in ('price', 'load'); kinds with
     insufficient live data get drift=False, reason='insufficient_live_data'.
+
+    Phase-4 alert hook: every kind with confirmed drift emits a
+    kind='drift' / severity='warning' alert (never affects the verdict).
     """
     try:
-        return {kind: _kind_live_drift(org_id, kind) for kind in MODEL_KINDS}
+        verdicts = {kind: _kind_live_drift(org_id, kind) for kind in MODEL_KINDS}
+        for kind, info in verdicts.items():
+            if info.get("drift"):
+                _safe_alert(org_id, kind="drift", severity="warning",
+                            title=f"Live drift detected ({kind})",
+                            body=(f"recent 7d MAE {info.get('recent_mae')} vs "
+                                  f"trailing 30d MAE {info.get('trailing_mae')}"),
+                            data={"model_kind": kind, **info})
+        return verdicts
     except Exception as e:
         logger.warning(f"check_live_drift failed (non-fatal): {e}")
         return {kind: {"recent_mae": None, "trailing_mae": None, "n_recent": 0,
@@ -267,6 +292,15 @@ def maybe_rollback(org_id: Optional[str], model_kind: str) -> dict:
             f"(recent 7d MAE {drift.get('recent_mae')} vs trailing 30d "
             f"{drift.get('trailing_mae')}) — restored previous champion "
             f"{prev_id}, retired {champion.get('id')}")
+        _safe_alert(org_id, kind="rollback", severity="critical",
+                    title=f"Auto-rollback executed ({model_kind})",
+                    body=(f"Live drift confirmed — restored previous champion "
+                          f"{prev_id}, retired {champion.get('id')}"),
+                    data={"model_kind": model_kind,
+                          "restored_model_id": prev_id,
+                          "retired_model_id": champion.get("id"),
+                          "recent_mae": drift.get("recent_mae"),
+                          "trailing_mae": drift.get("trailing_mae")})
         return {"rolled_back": True, "restored_model_id": prev_id}
     except Exception as e:
         logger.warning(f"maybe_rollback failed (non-fatal): {e}")

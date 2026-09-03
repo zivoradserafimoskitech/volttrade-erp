@@ -211,3 +211,58 @@ select cron.schedule(
 --   -- retrain outcomes:
 --   select model_name, is_active, mae, last_trained_at
 --     from public.forecast_models order by last_trained_at desc limit 5;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PHASE 4 — arbitrage scan + BESS daily optimisation
+--
+-- These two call the ANALYTICS service directly (Render), not an edge
+-- function, so the placeholders differ from the jobs above:
+--   <VOLTTRADE_ANALYTICS_URL> — e.g. https://volttrade-analytics.onrender.com
+--   <VOLTTRADE_ANALYTICS_KEY> — the service's API key (X-API-Key header)
+--   <ORG_ID>                  — the organisation to scan/optimise for
+-- Both endpoints are behind the analytics service's X-API-Key middleware.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Daily 14:15 UTC (after the 13:45 price sync has landed): scan MK/HU/RS
+-- zone pairs for cross-border arbitrage opportunities and persist them into
+-- public.arbitrage_opportunities. org_id travels as a query parameter; the
+-- request body is empty.
+select cron.schedule(
+  'arbitrage-scan',
+  '15 14 * * *',
+  $$
+  select net.http_post(
+    url     := '<VOLTTRADE_ANALYTICS_URL>/arbitrage/scan?org_id=<ORG_ID>',
+    headers := '{"Content-Type":"application/json","X-API-Key":"<VOLTTRADE_ANALYTICS_KEY>"}'::jsonb,
+    body    := '{}'::jsonb
+  );
+  $$
+);
+
+-- Daily 14:30 UTC: compute tomorrow's BESS charge/discharge schedule from
+-- the fresh price forecast and upsert it into public.bess_dispatch_schedules.
+select cron.schedule(
+  'bess-optimize',
+  '30 14 * * *',
+  $$
+  select net.http_post(
+    url     := '<VOLTTRADE_ANALYTICS_URL>/bess/optimize?org_id=<ORG_ID>',
+    headers := '{"Content-Type":"application/json","X-API-Key":"<VOLTTRADE_ANALYTICS_KEY>"}'::jsonb,
+    body    := '{}'::jsonb
+  );
+  $$
+);
+
+-- ── VERIFY PHASE 4 ─────────────────────────────────────────────────────────
+--   -- arbitrage opportunities appearing after 14:15 UTC:
+--   select target_date, buy_zone, sell_zone, hour, spread_eur_mwh
+--     from public.arbitrage_opportunities order by detected_at desc limit 10;
+--
+--   -- BESS schedule for tomorrow appearing after 14:30 UTC:
+--   select delivery_date, hour_of_day, charge_mw, discharge_mw, soc_pct
+--     from public.bess_dispatch_schedules
+--    where delivery_date = current_date + 1 order by hour_of_day;
+--
+--   -- alerts emitted by the analytics service (arbitrage / retrain hooks):
+--   select created_at, kind, severity, title
+--     from public.alerts order by created_at desc limit 10;

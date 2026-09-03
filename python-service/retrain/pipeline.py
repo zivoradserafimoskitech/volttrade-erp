@@ -721,6 +721,20 @@ def _run_load_retrain(org_id: Optional[str] = None,
     return result
 
 
+# ── Phase-4 alert hook (SPEC-phase4 §3) ──────────────────────────────────
+
+def _safe_alert(org_id: Optional[str], **kwargs) -> None:
+    """Emit an alerts-table event. Fully fire-and-forget: any failure is
+    logged and swallowed so alerting can never affect the retrain flow."""
+    try:
+        if not org_id:
+            return
+        from alerts import emit_alert
+        emit_alert(org_id, **kwargs)
+    except Exception as e:
+        logger.warning(f"alert hook failed (non-fatal): {e}")
+
+
 # ── Main entry point ──────────────────────────────────────────────────────
 
 def run_retrain(org_id: Optional[str] = None,
@@ -739,17 +753,43 @@ def run_retrain(org_id: Optional[str] = None,
       as a "trigger=<value>" prefix in retrain_log.notes (e.g.
       "trigger=scheduled" for the weekly retrain vs "trigger=live_drift"
       for runs launched by drift_check_and_react). Default "scheduled".
+
+    Phase-4 alert hooks (SPEC-phase4 §3): an exception anywhere in a run
+    emits kind='retrain_failure' (severity='critical') before the error
+    propagates; each successful promotion emits kind='promotion'
+    (severity='info'). Alert failures never affect the retrain itself.
     """
-    if model_kind == "price":
-        return _run_price_retrain(org_id, trigger=trigger)
-    if model_kind == "load":
-        return _run_load_retrain(org_id, trigger=trigger)
-    if model_kind == "all":
-        return {
-            "price": _run_price_retrain(org_id, trigger=trigger),
-            "load": _run_load_retrain(org_id, trigger=trigger),
-        }
-    raise ValueError(f"unknown model_kind {model_kind!r} (expected one of {MODEL_KINDS})")
+    try:
+        if model_kind == "price":
+            result = _run_price_retrain(org_id, trigger=trigger)
+        elif model_kind == "load":
+            result = _run_load_retrain(org_id, trigger=trigger)
+        elif model_kind == "all":
+            result = {
+                "price": _run_price_retrain(org_id, trigger=trigger),
+                "load": _run_load_retrain(org_id, trigger=trigger),
+            }
+        else:
+            raise ValueError(f"unknown model_kind {model_kind!r} "
+                             f"(expected one of {MODEL_KINDS})")
+    except Exception as e:
+        _safe_alert(org_id, kind="retrain_failure", severity="critical",
+                    title=f"Retrain failed ({model_kind})",
+                    body=str(e)[:1900],
+                    data={"model_kind": model_kind, "trigger": trigger})
+        raise
+
+    per_kind = result if model_kind == "all" else {model_kind: result}
+    for kind, res in per_kind.items():
+        if isinstance(res, dict) and res.get("promoted"):
+            _safe_alert(org_id, kind="promotion", severity="info",
+                        title=f"New {kind} champion promoted",
+                        body=(f"challenger MAE {res.get('challenger_mae')} beat "
+                              f"champion MAE {res.get('champion_mae')}"),
+                        data={"model_kind": kind, "trigger": trigger,
+                              "champion_mae": res.get("champion_mae"),
+                              "challenger_mae": res.get("challenger_mae")})
+    return result
 
 
 # ── Live-drift reaction (SPEC-selfimprove §3.4) ───────────────────────────

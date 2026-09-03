@@ -346,3 +346,63 @@ the challenger self-tunes LightGBM hyperparameters (3 combos, best by backtest M
 Promotion metadata: `promoted_at`, `previous_champion_id`, `promotion_reason`
 ('challenger_won' | 'rollback'). Apply migration `20260902090100_self_improve.sql` after
 `20260902090000_forecast_tracking.sql`.
+
+## Phase 4 — alerts, arbitrage, BESS MPC, portfolio CVaR (v2.5.0)
+
+Phase 4 adds four capabilities on top of the self-improvement loop. Apply
+migration `20260902090200_phase4_alerts_arbitrage.sql` **after**
+`20260902090100_self_improve.sql`, then re-run `supabase/cron.sql` (or just
+the two new jobs at the bottom of it).
+
+### The pieces
+
+| Piece | Where it lives | What it does |
+|---|---|---|
+| Table `alerts` | `supabase/migrations/20260902090200_phase4_alerts_arbitrage.sql` | one row per alert: `kind` (`retrain_failure`/`drift`/`rollback`/`promotion`/`arbitrage`/`system`), `severity` (`info`/`warning`/`critical`), `title`, `body`, `data` (jsonb), `read_at` (NULL = unread). RLS via `current_org_id()` |
+| Table `arbitrage_opportunities` | same migration | one row per winning (org, `target_date`, `buy_zone`, `sell_zone`, `hour`) with `buy_price`, `sell_price`, `spread_eur_mwh` (doubles — analysis only, no money storage) |
+| Alerts module | `python-service/alerts.py` (`emit_alert`) | inserts into `alerts` via PostgREST; optional fire-and-forget webhook via `ALERT_WEBHOOK_URL`; never raises |
+| Alert hooks | `python-service/retrain/pipeline.py`, `python-service/retrain/self_improve.py` | retrain failure → `retrain_failure`/critical; promotion → `promotion`/info; drift → `drift`/warning; rollback → `rollback`/critical |
+| Arbitrage scan | `python-service/analytics/arbitrage.py` (`scan_arbitrage`) | reads `market_price_history` (product `day_ahead`, zones MK/HU/RS) for the target date, keeps zone pairs with spread ≥ threshold (default 10 EUR/MWh), upserts winners into `arbitrage_opportunities`, emits an `arbitrage` alert with the best spread |
+| BESS MPC | `python-service/optimize/bess_mpc.py` (`optimize_bess_day`) | pulls tomorrow's P50 price forecast (`forecast_predictions`, model_kind `price`, zone `MK`; falls back to same-day-last-week actuals from `market_price_history`), runs the existing `BessDispatch` optimiser, upserts 24 rows into `bess_dispatch_schedules` |
+| Portfolio CVaR | `python-service/optimize/portfolio_cvar.py` (`portfolio_cvar`) | Monte-Carlo (n=2000) on the champion quantile band; returns `open_volume_mwh`, `cvar95_eur`, `var95_eur`, basis `forecast_quantiles` or `insufficient_data` |
+| Endpoints | `python-service/main.py` (behind X-API-Key) | `POST /arbitrage/scan?org_id=…&threshold=…`, `POST /bess/optimize?org_id=…&p_max_mw=…&e_max_mwh=…`, `GET /portfolio/cvar?org_id=…&days=…` |
+| Cron jobs | `supabase/cron.sql` (bottom, "PHASE 4") | `arbitrage-scan` daily 14:15 UTC (after the 13:45 price sync), `bess-optimize` daily 14:30 UTC — both POST to the analytics service with `X-API-Key`, `org_id` as query parameter |
+| UI prompt | `docs/LOVABLE_PHASE4_UI.md` | ready-to-paste Lovable prompt for the Alerts bell/page, Arbitrage page and Battery page — all read Supabase tables directly, no edge function needed |
+
+### Setup
+
+1. Apply the migration (supabase db push, or paste into the SQL Editor).
+2. Add the two cron jobs from `supabase/cron.sql`, replacing
+   `<VOLTTRADE_ANALYTICS_URL>`, `<VOLTTRADE_ANALYTICS_KEY>` and `<ORG_ID>`
+   (these call the analytics service directly, not an edge function).
+3. Optionally set `ALERT_WEBHOOK_URL` on the analytics service for
+   webhook notifications.
+
+### Verifying it works
+
+```sql
+-- alerts flowing in (retrain hooks + arbitrage):
+select created_at, kind, severity, title from public.alerts
+ order by created_at desc limit 10;
+
+-- arbitrage opportunities after the 14:15 UTC job:
+select target_date, buy_zone, sell_zone, hour,
+       round(spread_eur_mwh::numeric, 2) as spread
+  from public.arbitrage_opportunities order by target_date desc, hour;
+
+-- tomorrow's BESS schedule after the 14:30 UTC job:
+select hour_of_day, charge_mw, discharge_mw, soc_pct
+  from public.bess_dispatch_schedules
+ where delivery_date = current_date + 1 order by hour_of_day;
+```
+
+Manual triggers against the analytics service:
+
+```bash
+curl -X POST "$VOLTTRADE_ANALYTICS_URL/arbitrage/scan?org_id=<ORG_UUID>" \
+  -H "X-API-Key: $VOLTTRADE_ANALYTICS_KEY"
+curl -X POST "$VOLTTRADE_ANALYTICS_URL/bess/optimize?org_id=<ORG_UUID>" \
+  -H "X-API-Key: $VOLTTRADE_ANALYTICS_KEY"
+curl "$VOLTTRADE_ANALYTICS_URL/portfolio/cvar?org_id=<ORG_UUID>&days=30" \
+  -H "X-API-Key: $VOLTTRADE_ANALYTICS_KEY"
+```

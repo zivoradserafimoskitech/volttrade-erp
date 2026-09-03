@@ -1,5 +1,5 @@
 """
-VoltTrade Analytics Service v2.3
+VoltTrade Analytics Service v2.5
 Native computation layer for VoltTrade ERP.
 
 NOT a separate product — this is VoltTrade's math engine.
@@ -16,6 +16,9 @@ Endpoints:
   POST /ingest/entsoe    ENTSO-E data ingestion
   POST /retrain          ASYNC champion-challenger retrain (returns job_id)
   GET  /retrain/status   Poll an async retrain job
+  POST /arbitrage/scan   Cross-zone day-ahead spread scan (Phase 4)
+  POST /bess/optimize    BESS day-ahead MPC schedule (Phase 4)
+  GET  /portfolio/cvar   Portfolio CVaR95 from champion quantiles (Phase 4)
 
 Models:
   - LightGBM (gradient boosting; quantile for load)
@@ -50,7 +53,7 @@ logger = logging.getLogger("volttrade-analytics")
 
 app = FastAPI(
     title="VoltTrade Analytics",
-    version="2.4.0",
+    version="2.5.0",
     description="Native computation engine for VoltTrade ERP",
 )
 
@@ -206,7 +209,7 @@ async def health():
     return {
         "status": "ok",
         "service": "volttrade-analytics",
-        "version": "2.4.0",
+        "version": "2.5.0",
         "timestamp": datetime.utcnow().isoformat(),
     }
 
@@ -531,6 +534,60 @@ async def score_forecasts(org_id: Optional[str] = None):
         except Exception as e:
             logger.warning(f"score-forecasts: drift reaction failed (non-fatal): {e}")
     return response
+
+# ── Phase 4: arbitrage scan / BESS MPC / portfolio CVaR ─────────────────
+# All three sit behind the X-API-Key middleware like everything else; the
+# underlying service functions NEVER raise, so the handlers just forward.
+
+@app.post("/arbitrage/scan")
+async def arbitrage_scan(org_id: str, threshold: float = 10.0,
+                         target_date: Optional[str] = None):
+    """Scan MK/HU/RS day-ahead prices for cross-zone spreads >= threshold
+    (EUR/MWh); winners are persisted to arbitrage_opportunities and an
+    'arbitrage' alert is emitted. target_date: ISO date (default: tomorrow
+    after 13:00 UTC, else today)."""
+    from datetime import date as _date
+    from analytics.arbitrage import scan_arbitrage
+    parsed = None
+    if target_date:
+        try:
+            parsed = _date.fromisoformat(target_date)
+        except ValueError:
+            raise HTTPException(422, "target_date must be an ISO date (YYYY-MM-DD)")
+    return scan_arbitrage(org_id=org_id, target_date=parsed,
+                          threshold_eur_mwh=threshold)
+
+
+@app.post("/bess/optimize")
+async def bess_optimize(org_id: str, p_max_mw: float = 1.0,
+                        e_max_mwh: float = 2.0,
+                        target_date: Optional[str] = None):
+    """BESS day-ahead MPC: latest P50 forecast (fallback: same-day-last-week
+    actuals) through the BessDispatch LP; schedule persisted to
+    bess_dispatch_schedules."""
+    from datetime import date as _date
+    from optimize.bess_mpc import optimize_bess_day
+    if p_max_mw <= 0 or e_max_mwh <= 0:
+        raise HTTPException(422, "p_max_mw and e_max_mwh must be positive")
+    parsed = None
+    if target_date:
+        try:
+            parsed = _date.fromisoformat(target_date)
+        except ValueError:
+            raise HTTPException(422, "target_date must be an ISO date (YYYY-MM-DD)")
+    return optimize_bess_day(org_id=org_id, target_date=parsed,
+                             p_max_mw=p_max_mw, e_max_mwh=e_max_mwh)
+
+
+@app.get("/portfolio/cvar")
+async def portfolio_cvar_endpoint(org_id: str, days: int = 30):
+    """VaR95/CVaR95 of the signed open trade position over 2000 Monte-Carlo
+    paths sampled from the champion price forecast's P10/P50/P90 band."""
+    if days < 1 or days > 365:
+        raise HTTPException(422, "days must be between 1 and 365")
+    from optimize.portfolio_cvar import portfolio_cvar
+    return portfolio_cvar(org_id=org_id, days=days)
+
 
 # ── Run ───────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
