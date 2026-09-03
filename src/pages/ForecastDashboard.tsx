@@ -66,11 +66,28 @@ export default function ForecastDashboard() {
     try {
       const orgId = await getMyOrgId();
       const res = await retrainModels(orgId);
+      const jobId = res.job_id as string | null;
       toast({
         title: "Training started",
-        description: `Job ${res.job_id ?? "accepted"} — models appear here once promoted (a few minutes).`,
+        description: jobId ? `Job ${jobId} — tracking progress…` : "Training accepted.",
       });
-      setTimeout(() => { loadModels(); loadBacktests(); }, 60_000);
+      if (!jobId) { setTraining(false); return; }
+
+      // Poll every 15s for up to 10 minutes.
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 15_000));
+        let st: Awaited<ReturnType<typeof getRetrainStatus>>;
+        try { st = await getRetrainStatus(jobId); } catch { continue; }
+        if (st.status === "done") {
+          toast({ title: "Training finished", description: "Model registry updated." });
+          loadModels(); loadBacktests();
+          break;
+        }
+        if (st.status === "failed") {
+          toast({ title: "Training failed", description: String(st.error ?? "unknown error"), variant: "destructive" });
+          break;
+        }
+      }
     } catch (e: any) {
       toast({ title: "Could not start training", description: String(e?.message ?? e), variant: "destructive" });
     }
