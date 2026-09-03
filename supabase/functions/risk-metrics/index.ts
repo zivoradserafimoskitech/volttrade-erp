@@ -106,12 +106,12 @@ serve(handler(async (req) => {
       return acc;
     }, {});
 
-    // 6. Efficient frontier
+    // 6. Efficient frontier — always emit the full curve so the chart is
+    // readable; `allowed` marks which points the risk policy permits.
     const frontier = [];
-    for (let h = 0; h <= 1; h += 0.25) {
-      const hedgePct = h;
+    for (let step = 0; step <= 10; step++) {
+      const hedgePct = step / 10;
       const openPct = 1 - hedgePct;
-      if (openPct > maxOpen + 0.001) continue;
       const eCost = boughtCost * hedgePct + soldMwh * avgBoughtPrice * openPct;
       const tailPrice = avgBoughtPrice * 1.4;
       const tailCost = soldMwh * (hedgePct * avgBoughtPrice + openPct * tailPrice);
@@ -119,9 +119,12 @@ serve(handler(async (req) => {
         hedge_ratio: Math.round(hedgePct * 100),
         open_pct: Math.round(openPct * 100),
         expected_cost: Math.round(eCost),
+        cvar95: Math.round(tailCost),
         cvar95_cost: Math.round(tailCost),
+        allowed: openPct <= maxOpen + 0.001,
       });
     }
+
 
     const recommendation = remaining < 0 ? "STOP — at capacity limit"
       : remaining / maxCapacity < 0.2 ? "CAUTION — less than 20% headroom"
