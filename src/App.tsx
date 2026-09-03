@@ -60,6 +60,9 @@ const ImbalanceAllocation = lazy(() => import("./pages/balancing/ImbalanceAlloca
 const ForecastAccuracy = lazy(() => import("./pages/balancing/ForecastAccuracy"));
 const DataReadiness = lazy(() => import("./pages/balancing/DataReadiness"));
 const SmartMeterHealth = lazy(() => import("./pages/balancing/SmartMeterHealth"));
+const Alerts = lazy(() => import("./pages/Alerts"));
+const Arbitrage = lazy(() => import("./pages/Arbitrage"));
+const BatteryPlan = lazy(() => import("./pages/BatteryPlan"));
 const BessOptimizer = lazy(() => import("./pages/assets/BessOptimizer"));
 const Settlement = lazy(() => import("./pages/balancing/Settlement"));
 const Onboarding = lazy(() => import("./pages/supply/Onboarding"));
@@ -163,6 +166,9 @@ const App = () => (
             <Route path="/balancing/readiness" element={<DataReadiness />} />
             <Route path="/balancing/smart-meter-health" element={<SmartMeterHealth />} />
             <Route path="/assets/optimizer" element={<BessOptimizer />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/arbitrage" element={<Arbitrage />} />
+            <Route path="/battery" element={<BatteryPlan />} />
             <Route path="/balancing/settlement" element={<Settlement />} />
             <Route path="/supply/onboarding" element={<Onboarding />} />
             <Route path="/supply/switching" element={<Switching />} />

@@ -5,6 +5,7 @@ import { useTheme } from "@/lib/theme";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sidebar } from "./Sidebar";
+import { AlertsBell } from "./AlertsBell";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Sun, Moon } from "lucide-react";
@@ -40,6 +41,7 @@ export function ErpLayout({ children, title, subtitle, actions }: { children: Re
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <AlertsBell />
             <LanguageToggle />
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={t(theme === "dark" ? "Switch to light" : "Switch to dark")}>
               {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

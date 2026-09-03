@@ -14,6 +14,97 @@ export type Database = {
   }
   public: {
     Tables: {
+      alerts: {
+        Row: {
+          body: string | null
+          created_at: string
+          data: Json | null
+          id: string
+          kind: string
+          organization_id: string
+          read_at: string | null
+          severity: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          data?: Json | null
+          id?: string
+          kind: string
+          organization_id: string
+          read_at?: string | null
+          severity?: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          data?: Json | null
+          id?: string
+          kind?: string
+          organization_id?: string
+          read_at?: string | null
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arbitrage_opportunities: {
+        Row: {
+          buy_price: number
+          buy_zone: string
+          detected_at: string
+          hour: number
+          id: string
+          organization_id: string
+          sell_price: number
+          sell_zone: string
+          spread_eur_mwh: number
+          target_date: string
+        }
+        Insert: {
+          buy_price: number
+          buy_zone: string
+          detected_at?: string
+          hour: number
+          id?: string
+          organization_id: string
+          sell_price: number
+          sell_zone: string
+          spread_eur_mwh: number
+          target_date: string
+        }
+        Update: {
+          buy_price?: number
+          buy_zone?: string
+          detected_at?: string
+          hour?: number
+          id?: string
+          organization_id?: string
+          sell_price?: number
+          sell_zone?: string
+          spread_eur_mwh?: number
+          target_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arbitrage_opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_dispatch_schedules: {
         Row: {
           asset_id: string
