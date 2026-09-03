@@ -374,6 +374,75 @@ export type Database = {
           },
         ]
       }
+      backtest_results: {
+        Row: {
+          avg_daily_profit_eur: number
+          capture_ratio_pct: number | null
+          created_at: string
+          id: string
+          max_drawdown_eur: number
+          model_id: string | null
+          organization_id: string
+          period_from: string
+          period_to: string
+          scenarios_json: Json
+          sharpe_ratio: number | null
+          strategy_name: string
+          total_days: number
+          total_profit_eur: number
+          win_rate_pct: number | null
+        }
+        Insert: {
+          avg_daily_profit_eur: number
+          capture_ratio_pct?: number | null
+          created_at?: string
+          id?: string
+          max_drawdown_eur: number
+          model_id?: string | null
+          organization_id: string
+          period_from: string
+          period_to: string
+          scenarios_json?: Json
+          sharpe_ratio?: number | null
+          strategy_name: string
+          total_days: number
+          total_profit_eur: number
+          win_rate_pct?: number | null
+        }
+        Update: {
+          avg_daily_profit_eur?: number
+          capture_ratio_pct?: number | null
+          created_at?: string
+          id?: string
+          max_drawdown_eur?: number
+          model_id?: string | null
+          organization_id?: string
+          period_from?: string
+          period_to?: string
+          scenarios_json?: Json
+          sharpe_ratio?: number | null
+          strategy_name?: string
+          total_days?: number
+          total_profit_eur?: number
+          win_rate_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backtest_results_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "forecast_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "backtest_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       balance_groups: {
         Row: {
           brp_party: string | null
@@ -450,6 +519,66 @@ export type Database = {
             columns: ["balance_group_id"]
             isOneToOne: false
             referencedRelation: "balance_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bess_dispatch_schedules: {
+        Row: {
+          asset_id: string | null
+          charge_mw: number
+          created_at: string
+          delivery_date: string
+          discharge_mw: number
+          hour_of_day: number
+          id: string
+          organization_id: string
+          price_actual_eur_mwh: number | null
+          price_forecast_eur_mwh: number | null
+          revenue_eur: number | null
+          soc_pct: number
+        }
+        Insert: {
+          asset_id?: string | null
+          charge_mw?: number
+          created_at?: string
+          delivery_date: string
+          discharge_mw?: number
+          hour_of_day: number
+          id?: string
+          organization_id: string
+          price_actual_eur_mwh?: number | null
+          price_forecast_eur_mwh?: number | null
+          revenue_eur?: number | null
+          soc_pct: number
+        }
+        Update: {
+          asset_id?: string | null
+          charge_mw?: number
+          created_at?: string
+          delivery_date?: string
+          discharge_mw?: number
+          hour_of_day?: number
+          id?: string
+          organization_id?: string
+          price_actual_eur_mwh?: number | null
+          price_forecast_eur_mwh?: number | null
+          revenue_eur?: number | null
+          soc_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bess_dispatch_schedules_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bess_dispatch_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1324,6 +1453,68 @@ export type Database = {
         }
         Relationships: []
       }
+      forecast_models: {
+        Row: {
+          capture_ratio_pct: number | null
+          coverage_pct: number | null
+          created_at: string
+          features_json: Json
+          horizon_hours: number
+          hyperparams_json: Json
+          id: string
+          is_active: boolean
+          last_trained_at: string | null
+          mae: number | null
+          model_name: string
+          model_path: string | null
+          model_type: string
+          organization_id: string
+          rmse: number | null
+        }
+        Insert: {
+          capture_ratio_pct?: number | null
+          coverage_pct?: number | null
+          created_at?: string
+          features_json?: Json
+          horizon_hours?: number
+          hyperparams_json?: Json
+          id?: string
+          is_active?: boolean
+          last_trained_at?: string | null
+          mae?: number | null
+          model_name: string
+          model_path?: string | null
+          model_type: string
+          organization_id: string
+          rmse?: number | null
+        }
+        Update: {
+          capture_ratio_pct?: number | null
+          coverage_pct?: number | null
+          created_at?: string
+          features_json?: Json
+          horizon_hours?: number
+          hyperparams_json?: Json
+          id?: string
+          is_active?: boolean
+          last_trained_at?: string | null
+          mae?: number | null
+          model_name?: string
+          model_path?: string | null
+          model_type?: string
+          organization_id?: string
+          rmse?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_models_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forecasts: {
         Row: {
           budget_eur: number | null
@@ -1709,43 +1900,61 @@ export type Database = {
           annual_cost_eur: number | null
           annual_volume_mwh: number | null
           base_price_eur_mwh: number | null
+          capture_factor: number | null
+          captured_price_eur_mwh: number | null
           created_at: string
           id: string
           lead_id: string
           margin_eur_mwh: number | null
           pdf_url: string | null
+          profile_key: string | null
+          required_price_eur_mwh: number | null
+          risk_capacity_ok: boolean | null
           status: string
           tariff_id: string | null
           term_months: number | null
           updated_at: string
+          volume_risk_premium_eur_mwh: number | null
         }
         Insert: {
           annual_cost_eur?: number | null
           annual_volume_mwh?: number | null
           base_price_eur_mwh?: number | null
+          capture_factor?: number | null
+          captured_price_eur_mwh?: number | null
           created_at?: string
           id?: string
           lead_id: string
           margin_eur_mwh?: number | null
           pdf_url?: string | null
+          profile_key?: string | null
+          required_price_eur_mwh?: number | null
+          risk_capacity_ok?: boolean | null
           status?: string
           tariff_id?: string | null
           term_months?: number | null
           updated_at?: string
+          volume_risk_premium_eur_mwh?: number | null
         }
         Update: {
           annual_cost_eur?: number | null
           annual_volume_mwh?: number | null
           base_price_eur_mwh?: number | null
+          capture_factor?: number | null
+          captured_price_eur_mwh?: number | null
           created_at?: string
           id?: string
           lead_id?: string
           margin_eur_mwh?: number | null
           pdf_url?: string | null
+          profile_key?: string | null
+          required_price_eur_mwh?: number | null
+          risk_capacity_ok?: boolean | null
           status?: string
           tariff_id?: string | null
           term_months?: number | null
           updated_at?: string
+          volume_risk_premium_eur_mwh?: number | null
         }
         Relationships: [
           {
@@ -1754,6 +1963,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "leads"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_quotes_profile_key_fkey"
+            columns: ["profile_key"]
+            isOneToOne: false
+            referencedRelation: "profile_capture_factors"
+            referencedColumns: ["profile_key"]
           },
           {
             foreignKeyName: "lead_quotes_tariff_id_fkey"
@@ -1865,6 +2081,50 @@ export type Database = {
           },
           {
             foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_price_history: {
+        Row: {
+          available_at: string
+          id: string
+          organization_id: string
+          price_eur_mwh: number
+          product: string
+          source: string
+          timestamp: string
+          volume_mwh: number | null
+          zone: string
+        }
+        Insert: {
+          available_at?: string
+          id?: string
+          organization_id: string
+          price_eur_mwh: number
+          product: string
+          source?: string
+          timestamp: string
+          volume_mwh?: number | null
+          zone?: string
+        }
+        Update: {
+          available_at?: string
+          id?: string
+          organization_id?: string
+          price_eur_mwh?: number
+          product?: string
+          source?: string
+          timestamp?: string
+          volume_mwh?: number | null
+          zone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_price_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -2269,6 +2529,68 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      org_risk_settings: {
+        Row: {
+          bess_capex_eur_kwh: number
+          bess_max_cycles_per_day: number
+          capital_at_risk_eur: number
+          cvar_beta: number
+          forecast_horizon_hours: number
+          forecast_retrain_days: number
+          id: string
+          margin_target_eur_mwh: number
+          max_open_position_pct: number
+          min_hedge_ratio: number
+          organization_id: string
+          risk_aversion_lambda: number
+          updated_at: string
+          updated_by: string | null
+          volume_sigma_default: number
+        }
+        Insert: {
+          bess_capex_eur_kwh?: number
+          bess_max_cycles_per_day?: number
+          capital_at_risk_eur?: number
+          cvar_beta?: number
+          forecast_horizon_hours?: number
+          forecast_retrain_days?: number
+          id?: string
+          margin_target_eur_mwh?: number
+          max_open_position_pct?: number
+          min_hedge_ratio?: number
+          organization_id: string
+          risk_aversion_lambda?: number
+          updated_at?: string
+          updated_by?: string | null
+          volume_sigma_default?: number
+        }
+        Update: {
+          bess_capex_eur_kwh?: number
+          bess_max_cycles_per_day?: number
+          capital_at_risk_eur?: number
+          cvar_beta?: number
+          forecast_horizon_hours?: number
+          forecast_retrain_days?: number
+          id?: string
+          margin_target_eur_mwh?: number
+          max_open_position_pct?: number
+          min_hedge_ratio?: number
+          organization_id?: string
+          risk_aversion_lambda?: number
+          updated_at?: string
+          updated_by?: string | null
+          volume_sigma_default?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_risk_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_members: {
         Row: {
@@ -2678,6 +3000,36 @@ export type Database = {
           hour?: number
           is_final?: boolean
           source?: string
+        }
+        Relationships: []
+      }
+      profile_capture_factors: {
+        Row: {
+          capture_factor: number
+          measured_from: string
+          measured_to: string
+          n_hours: number
+          note: string | null
+          profile_key: string
+          updated_at: string
+        }
+        Insert: {
+          capture_factor: number
+          measured_from: string
+          measured_to: string
+          n_hours: number
+          note?: string | null
+          profile_key: string
+          updated_at?: string
+        }
+        Update: {
+          capture_factor?: number
+          measured_from?: string
+          measured_to?: string
+          n_hours?: number
+          note?: string | null
+          profile_key?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3618,8 +3970,11 @@ export type Database = {
           out_area_eic: string | null
           price_eur_mwh: number
           schedulable: boolean
+          shape_hours: number[] | null
+          shape_key: string
           side: string
           status: string
+          supply_contract_id: string | null
           total_value_eur: number | null
           trade_number: string
           trader: string | null
@@ -3646,8 +4001,11 @@ export type Database = {
           out_area_eic?: string | null
           price_eur_mwh: number
           schedulable?: boolean
+          shape_hours?: number[] | null
+          shape_key?: string
           side: string
           status?: string
+          supply_contract_id?: string | null
           total_value_eur?: number | null
           trade_number: string
           trader?: string | null
@@ -3674,8 +4032,11 @@ export type Database = {
           out_area_eic?: string | null
           price_eur_mwh?: number
           schedulable?: boolean
+          shape_hours?: number[] | null
+          shape_key?: string
           side?: string
           status?: string
+          supply_contract_id?: string | null
           total_value_eur?: number | null
           trade_number?: string
           trader?: string | null
@@ -3696,6 +4057,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_supply_contract_id_fkey"
+            columns: ["supply_contract_id"]
+            isOneToOne: false
+            referencedRelation: "supply_contracts"
             referencedColumns: ["id"]
           },
           {
@@ -3884,7 +4252,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_hedge_breaches: {
+        Row: {
+          delivery_date: string | null
+          hedge_ratio: number | null
+          net_open_mwh: number | null
+          total_long_mwh: number | null
+          total_short_mwh: number | null
+          worst_hour: number | null
+          worst_open_mwh: number | null
+        }
+        Relationships: []
+      }
+      v_hourly_position: {
+        Row: {
+          bought_mwh: number | null
+          delivery_date: string | null
+          hour_of_day: number | null
+          open_mwh: number | null
+          sold_mwh: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       allocate_invoice_number: {
@@ -3959,6 +4348,10 @@ export type Database = {
       regulatory_value_for: {
         Args: { p_code: string; p_period_start: string }
         Returns: number
+      }
+      shape_mask: {
+        Args: { p_hours: number[]; p_key: string }
+        Returns: number[]
       }
     }
     Enums: {
