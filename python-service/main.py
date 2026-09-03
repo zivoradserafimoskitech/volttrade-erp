@@ -66,7 +66,17 @@ app.add_middleware(
 )
 
 # ── Auth ──────────────────────────────────────────────────────────────────
-API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "dev-key-change-in-production")
+# Fail closed. The previous default ("dev-key-change-in-production") is public
+# in this repository, so an unset env var silently accepted anyone. Refusing to
+# boot is loud and unambiguous; a 503 on /health means "set the env var".
+API_KEY = os.getenv("VOLTTRADE_ANALYTICS_KEY", "")
+if not API_KEY or API_KEY == "dev-key-change-in-production":
+    raise RuntimeError(
+        "VOLTTRADE_ANALYTICS_KEY is unset or still the published default. "
+        "Set it in the service environment to the same value the edge "
+        "functions send as X-API-Key."
+    )
+
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
