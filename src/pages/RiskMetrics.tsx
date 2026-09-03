@@ -53,27 +53,32 @@ interface RiskData {
 export default function RiskMetrics() {
   const [riskData, setRiskData] = useState<RiskData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [orgId, setOrgId] = useState("your-org-id"); // replace with actual org context
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [maxOpenPct, setMaxOpenPct] = useState(0);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, [orgId]);
+  }, []);
 
   async function loadData() {
     setLoading(true);
+    setError(null);
     try {
+      const id = orgId ?? (await getMyOrgId());
+      if (!orgId) setOrgId(id);
       const [metrics, settings] = await Promise.all([
-        getRiskMetrics(orgId, 2000),
-        getOrgRiskSettings(orgId),
+        getRiskMetrics(id, 2000),
+        getOrgRiskSettings(id),
       ]);
       setRiskData(metrics);
-      if (settings?.data?.max_open_position_pct !== undefined) {
-        setMaxOpenPct(settings.data.max_open_position_pct * 100);
+      if (settings?.max_open_position_pct != null) {
+        setMaxOpenPct(Number(settings.max_open_position_pct) * 100);
       }
     } catch (e) {
       console.error(e);
+      setError(e instanceof Error ? e.message : String(e));
     }
     setLoading(false);
   }
