@@ -119,12 +119,28 @@ export async function getCaptureFactors() {
   return data;
 }
 
+/** Resolve the signed-in user's organisation id from their membership row. */
+export async function getMyOrgId(): Promise<string> {
+  const { data: sess } = await appSupabase.auth.getSession();
+  const uid = sess.session?.user?.id;
+  if (!uid) throw new Error("You must be signed in to use this feature.");
+  const { data, error } = await getSupabase()
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", uid)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Your account is not linked to an organisation.");
+  return (data as { organization_id: string }).organization_id;
+}
+
 export async function getOrgRiskSettings(orgId: string) {
   const { data, error } = await getSupabase()
     .from("org_risk_settings")
     .select("*")
     .eq("organization_id", orgId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }
