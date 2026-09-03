@@ -5,6 +5,7 @@
 // Every run APPENDS a snapshot to volume_forecasts (audit trail: what we knew
 // when we nominated). Invoke: functions.invoke("forecast-volumes", { body: {} })
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticate } from "../_shared/auth.ts";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
@@ -19,15 +20,15 @@ const dayKey = (d: Date, holidays: Set<string>) => {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) return json({ ok: false, error: "Unauthorized" }, 401);
-    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-    const { data: u } = await userClient.auth.getUser();
-    if (!u?.user) return json({ ok: false, error: "Unauthorized" }, 401);
-    const supabaseAdmin_ROLECHECK = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: allowed } = await supabaseAdmin_ROLECHECK.rpc("has_any_role", { _user_id: u.user.id, _roles: ["admin", "operations", "supply_manager"] });
-    if (!allowed) return json({ ok: false, error: "Forbidden" }, 403);
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    // Cron (service-role key) and interactive staff both allowed — see _shared/auth.ts
+    let auth;
+    try {
+      auth = await authenticate(req, { roles: ["admin", "operations", "supply_manager"] });
+    } catch (e) {
+      const status = (e as { status?: number }).status ?? 401;
+      return json({ ok: false, error: (e as Error).message }, status);
+    }
+    const admin = auth.admin;
     const body = await req.json().catch(() => ({}));
     const now = body.as_of ? new Date(body.as_of) : new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
