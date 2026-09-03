@@ -99,14 +99,14 @@ export default function Arbitrage() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard title="Opportunities" value={String(dayRows.length)} icon={ArrowLeftRight} />
+            <StatCard label="Opportunities" value={String(dayRows.length)} icon={ArrowLeftRight} />
             <StatCard
-              title="Best spread"
+              label="Best spread"
               value={`${n2(best)} EUR/MWh`}
               icon={TrendingUp}
-              subtitle={bestRow ? `${bestRow.buy_zone} → ${bestRow.sell_zone} ${hh(bestRow.hour)}` : undefined}
+              hint={bestRow ? `${bestRow.buy_zone} → ${bestRow.sell_zone} ${hh(bestRow.hour)}` : undefined}
             />
-            <StatCard title="Average spread" value={`${n2(avg)} EUR/MWh`} icon={Sigma} />
+            <StatCard label="Average spread" value={`${n2(avg)} EUR/MWh`} icon={Sigma} />
           </div>
 
           {pairs.map(([pair, list]) => (
