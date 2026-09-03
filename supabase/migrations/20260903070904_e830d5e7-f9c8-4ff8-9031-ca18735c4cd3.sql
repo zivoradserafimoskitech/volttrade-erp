@@ -1,0 +1,1 @@
+select cron.unschedule('sync-entsoe-prices-daily');
