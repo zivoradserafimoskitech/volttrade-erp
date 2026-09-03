@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticate } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,10 +18,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // Cron (service-role key) or staff JWT — never anonymous.
+    let auth;
+    try {
+      auth = await authenticate(req, { roles: ["admin", "management", "trader", "operations"] });
+    } catch (e) {
+      const status = (e as { status?: number }).status ?? 401;
+      return new Response(JSON.stringify({ error: (e as Error).message }),
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const supabase = auth.admin;
 
     const body = await req.json().catch(() => ({}));
     const date = body.date || new Date().toISOString().split("T")[0];
