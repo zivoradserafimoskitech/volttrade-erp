@@ -209,7 +209,8 @@ from(bucket: "${INFLUX_BUCKET}")
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("sync-influx-forecasts error:", err);
+    const status = err instanceof AuthError ? err.status : 500;
     return new Response(JSON.stringify({ ok: false, error: err?.message ?? "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
