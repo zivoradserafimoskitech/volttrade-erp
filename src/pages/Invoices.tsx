@@ -140,7 +140,7 @@ export default function Invoices() {
               <SelectItem value="sq">Shqip</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="secondary" onClick={exportExcel}><FileSpreadsheet className="h-4 w-4 mr-2" />Export Excel report</Button>
+          <Button variant="secondary" onClick={exportExcel} disabled={busy === "export"}><FileSpreadsheet className="h-4 w-4 mr-2" />{busy === "export" ? "Exporting…" : "Export Excel report"}</Button>
         </div>
       }>
       <Card className="border-border/60">
