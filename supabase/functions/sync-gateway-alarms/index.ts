@@ -29,7 +29,14 @@ Deno.serve(handler(async (req) => {
   try {
     gw = GatewayClient.reader();
   } catch (err) {
-    return json({ ok: false, error: err instanceof GatewayError ? err.message : String(err) }, 500);
+    // Gateway credentials are not configured. This is a deployment gap, not a
+    // server fault: returning 500 on every 15-minute cron tick buried the real
+    // errors under a permanent alert storm. Report it as a skipped run.
+    return json({
+      ok: false,
+      skipped: "gateway_not_configured",
+      error: err instanceof GatewayError ? err.message : String(err),
+    }, 200);
   }
 
   // "all" so that resolutions propagate — fetching only active alarms would
