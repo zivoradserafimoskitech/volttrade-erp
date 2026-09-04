@@ -1,4 +1,5 @@
 import { authenticate, handler, json } from "../_shared/auth.ts";
+import { sendTemplateEmail } from "../_shared/transactional-email-templates/send-email.ts";
 
 const PAGE = 500;
 
@@ -60,6 +61,23 @@ function langFor(country?: string | null, override?: string): Lang {
   return "en";
 }
 
+// Append-only delivery history for the invoice notice emails. Never gates a
+// send — Lovable's managed delivery is the source of truth for suppression.
+async function logEmail(
+  admin: { from: (t: string) => { insert: (v: Record<string, unknown>) => Promise<{ error: unknown }> } },
+  recipient: string,
+  status: "sent" | "suppressed" | "failed",
+  errorMessage?: string,
+) {
+  const { error } = await admin.from("email_send_log").insert({
+    template_name: "invoice-notice",
+    recipient_email: recipient,
+    status,
+    ...(errorMessage ? { error_message: errorMessage } : {}),
+  });
+  if (error) console.error("email_send_log insert failed", error);
+}
+
 // Automated runs (pg_cron / server-side schedulers) present the service-role
 // key; interactive runs present a staff JWT that must carry a billing role.
 // _shared/auth.ts distinguishes the two — the previous auth.getUser() path
@@ -79,7 +97,7 @@ Deno.serve(handler(async (req) => {
       ? payload.invoice_ids.filter((v: unknown) => typeof v === "string")
       : null;
     // Operator-chosen sender (must be on the verified domain — validated again
-    // inside send-transactional-email) and optional recipient override for
+    // by the shared send helper) and optional recipient override for
     // one-off sends to a different address than the client contact.
     const fromEmail: string | null = typeof payload?.from_email === "string" && payload.from_email.includes("@")
       ? payload.from_email.trim() : null;
@@ -197,10 +215,8 @@ Deno.serve(handler(async (req) => {
       // address, so customers without a portal login still get the document.
       const mailTo = recipientOverride ?? client.contact_email;
       if (mailTo) {
-        const { data: mailRes, error: mailErr } = await admin.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "invoice-notice",
-            recipientEmail: mailTo,
+        try {
+          const res = await sendTemplateEmail("invoice-notice", mailTo, {
             ...(fromEmail ? { fromEmail, replyTo: fromEmail } : {}),
             idempotencyKey: `inv-${kind}-${inv.id}-${mailTo}-${kind === "invoice" ? "1" : new Date().toISOString().slice(0, 10)}`,
             templateData: {
@@ -214,18 +230,24 @@ Deno.serve(handler(async (req) => {
               dunningLevel: level || 1,
               portalUrl: "https://volttrade.app/portal/invoices",
             },
-          },
-        });
-        if (mailErr) {
-          console.error("invoice email failed", inv.invoice_number, mailErr);
-        } else if ((mailRes as { success?: boolean } | null)?.success) {
-          emailed = true;
+          });
+          if (res.sent) {
+            emailed = true;
+            await logEmail(admin, mailTo, "sent");
+          } else {
+            await logEmail(admin, mailTo, "suppressed");
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Unknown email error";
+          console.error("invoice email failed", inv.invoice_number, msg);
+          await logEmail(admin, mailTo, "failed", msg);
         }
         if (emailed) {
           channel = channel === "portal" ? "portal+email" : "email";
           status = "sent";
           error = null;
         }
+
       }
 
       await admin.from("invoice_dispatches").insert({

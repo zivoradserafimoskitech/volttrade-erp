@@ -13,7 +13,6 @@ const Invoices = lazy(() => import("./pages/Invoices"));
 import AuthPage from "./pages/Auth";
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const TwoFactor = lazy(() => import("./pages/TwoFactor"));
-const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const VatraSignup = lazy(() => import("./pages/vatra/Signup"));
 const VatraJoin = lazy(() => import("./pages/vatra/Join"));
 import NotFound from "./pages/NotFound";
@@ -117,7 +116,6 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/2fa" element={<TwoFactor />} />
-            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/vatra/join" element={<VatraJoin />} />
             <Route path="/join" element={<VatraJoin />} />
             <Route path="/vatra/signup" element={<VatraSignup />} />
