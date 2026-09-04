@@ -124,6 +124,7 @@ export default function MeterReadings() {
         <Button variant="outline" onClick={syncKimi} disabled={syncing}>
           <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />{syncing ? "Syncing…" : "Sync from Kimi"}
         </Button>
+        <DsoImportDialog onImported={() => { load(); setTab("dso"); }} />
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button style={{ background: "var(--gradient-primary)" }}><Plus className="h-4 w-4 mr-2" />Add reading</Button></DialogTrigger>
           <DialogContent>
