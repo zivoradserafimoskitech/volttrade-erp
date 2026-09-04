@@ -34,23 +34,23 @@ const groups: { title: string; items: Item[] }[] = [
     { to: "/quote-builder", label: "Quote Builder", icon: FileSignature, roles: ['trader','supply_manager','management','admin'] },
   ]},
   { title: "Risk", items: [
-    { to: "/risk", label: "Risk & Exposure", icon: AlertTriangle, roles: ['risk_officer','management','admin'] },
+    { to: "/risk", label: "Risk & Exposure", icon: AlertTriangle, end: true, roles: ['risk_officer','management','admin'] },
     { to: "/risk/position", label: "Hourly Position", icon: Compass, roles: ['risk_officer','management','admin','trader'] },
     { to: "/risk/metrics", label: "Risk Metrics", icon: Activity, roles: ['risk_officer','management','admin'] },
     { to: "/risk/hedge", label: "Hedge Position", icon: Scale, roles: ['risk_officer','management','admin','trader'] },
   ]},
   { title: "Planning", items: [
-    { to: "/forecasting", label: "Forecasting", icon: TrendingUp, roles: ['management','trader','supply_manager','admin'] },
+    { to: "/forecasting", label: "Forecasting", icon: TrendingUp, end: true, roles: ['management','trader','supply_manager','admin'] },
     { to: "/forecasting/models", label: "Forecast Models", icon: TrendingUp, roles: ['management','trader','supply_manager','admin'] },
   ]},
   { title: "Assets", items: [
-    { to: "/assets", label: "Sites & Assets", icon: Battery },
+    { to: "/assets", label: "Sites & Assets", icon: Battery, end: true },
     { to: "/assets/optimizer", label: "BESS Optimizer", icon: Battery },
     { to: "/battery", label: "Battery Plan", icon: Battery },
     { to: "/asset-monitoring", label: "Monitoring", icon: Sun },
     { to: "/pv-monitoring", label: "PV Plants", icon: Sun },
     { to: "/smart-meter", label: "Smart Meter", icon: Radio },
-    { to: "/gateways", label: "Metering points (Kimi)", icon: Network },
+    { to: "/gateways", label: "Metering points (Kimi)", icon: Network, end: true },
     { to: "/gateways/alarms", label: "Gateway Alarms", icon: AlertTriangle },
 
   ]},
