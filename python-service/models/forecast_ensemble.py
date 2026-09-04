@@ -67,11 +67,14 @@ except ImportError:
     HAS_TORCH = False
     logger.warning("torch not installed — LSTM/GRU/CNN/TFT unavailable")
 
+from .deep_seq import DeepSequenceForecaster, KINDS as DEEP_KINDS, MIN_POINTS as DEEP_MIN_POINTS
+
 
 class ForecastEnsemble:
     """Multi-model ensemble with conformal calibration."""
 
-    AVAILABLE_MODELS = ["lightgbm", "xgboost", "lstm", "gru", "cnn", "seasonal_naive", "naive"]
+    AVAILABLE_MODELS = ["lightgbm", "xgboost", "lstm", "gru", "cnn", "tft", "seasonal_naive", "naive"]
+
 
     def __init__(self, model_dir: str = "./model_cache",
                  use_asinh: bool = True,
