@@ -87,7 +87,7 @@ export async function sendTemplateEmail(
     await sendLovableEmail(
       {
         to: recipient,
-        from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+        from: resolveFrom(options.fromEmail),
         sender_domain: SENDER_DOMAIN,
         subject,
         html,
