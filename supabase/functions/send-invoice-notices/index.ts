@@ -97,7 +97,7 @@ Deno.serve(handler(async (req) => {
       ? payload.invoice_ids.filter((v: unknown) => typeof v === "string")
       : null;
     // Operator-chosen sender (must be on the verified domain — validated again
-    // inside send-transactional-email) and optional recipient override for
+    // by the shared send helper) and optional recipient override for
     // one-off sends to a different address than the client contact.
     const fromEmail: string | null = typeof payload?.from_email === "string" && payload.from_email.includes("@")
       ? payload.from_email.trim() : null;
