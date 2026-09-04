@@ -49,6 +49,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Accepts EITHER a staff JWT or the service-role key (pg_cron).
+    const auth = await authenticate(req, {
+      roles: ["admin", "management", "operations", "trading"],
+    });
+    const admin = auth.admin;
+
     const INFLUX_URL = Deno.env.get("INFLUX_URL");
     const INFLUX_ORG = Deno.env.get("INFLUX_ORG");
     const INFLUX_BUCKET = Deno.env.get("INFLUX_BUCKET");
@@ -62,11 +68,6 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Accepts EITHER a staff JWT or the service-role key (pg_cron).
-    const auth = await authenticate(req, {
-      roles: ["admin", "management", "operations", "trading"],
-    });
-    const admin = auth.admin;
 
     // Ownership is the organization, not the caller. A service-role run has no
     // user, so resolve the org directly rather than through current_org_id().
