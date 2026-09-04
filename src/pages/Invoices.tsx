@@ -100,18 +100,31 @@ export default function Invoices() {
   const exportExcel = async () => {
     // PAGINATION REPAIR 2026-09-03: .limit(5000) returned 1000 rows, so the
     // Excel export silently contained the 1000 most recent readings rather than
-    // the 5000 it advertised.
-    const readings = await fetchAllRows<Record<string, unknown>>(
-      () => supabase.from("consumption_readings")
-        .select("reading_at, forecast_mwh, actual_mwh, metering_point:metering_points(edu_code, client:clients(company_name))")
-        .order("reading_at", { ascending: false }).order("metering_point_id"),
-      { label: "invoice export consumption_readings" },
-    );
-    const rows = (readings ?? []).map((r: any) => ({
-      Timestamp: r.reading_at, Client: r.metering_point?.client?.company_name, EDU: r.metering_point?.edu_code,
-      "Forecast MWh": Number(r.forecast_mwh ?? 0), "Actual MWh": Number(r.actual_mwh ?? 0),
-    }));
-    await writeJsonSheet(`energy-report-${format(new Date(), "yyyyMMdd")}`, "Energy Report", rows);
+    // the 5000 it advertised. Bounded to the last 12 months so the paged read
+    // terminates in a predictable number of requests, with a visible busy state
+    // and an error toast instead of an unhandled rejection.
+    setBusy("export");
+    try {
+      const sinceISO = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
+      const readings = await fetchAllRows<Record<string, unknown>>(
+        () => supabase.from("consumption_readings")
+          .select("reading_at, forecast_mwh, actual_mwh, metering_point:metering_points(edu_code, client:clients(company_name))")
+          .gte("reading_at", sinceISO)
+          .order("reading_at", { ascending: false }).order("metering_point_id"),
+        { label: "invoice export consumption_readings", maxRows: 100_000 },
+      );
+      const rows = (readings ?? []).map((r: any) => ({
+        Timestamp: r.reading_at, Client: r.metering_point?.client?.company_name, EDU: r.metering_point?.edu_code,
+        "Forecast MWh": Number(r.forecast_mwh ?? 0), "Actual MWh": Number(r.actual_mwh ?? 0),
+      }));
+      if (rows.length === 0) { toast.warning("No readings in the last 12 months — nothing to export."); return; }
+      await writeJsonSheet(`energy-report-${format(new Date(), "yyyyMMdd")}`, "Energy Report", rows);
+      toast.success(`Exported ${rows.length.toLocaleString()} readings (last 12 months)`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Excel export failed");
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
