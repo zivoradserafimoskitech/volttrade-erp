@@ -197,10 +197,8 @@ Deno.serve(handler(async (req) => {
       // address, so customers without a portal login still get the document.
       const mailTo = recipientOverride ?? client.contact_email;
       if (mailTo) {
-        const { data: mailRes, error: mailErr } = await admin.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "invoice-notice",
-            recipientEmail: mailTo,
+        try {
+          const res = await sendTemplateEmail("invoice-notice", mailTo, {
             ...(fromEmail ? { fromEmail, replyTo: fromEmail } : {}),
             idempotencyKey: `inv-${kind}-${inv.id}-${mailTo}-${kind === "invoice" ? "1" : new Date().toISOString().slice(0, 10)}`,
             templateData: {
@@ -214,18 +212,24 @@ Deno.serve(handler(async (req) => {
               dunningLevel: level || 1,
               portalUrl: "https://volttrade.app/portal/invoices",
             },
-          },
-        });
-        if (mailErr) {
-          console.error("invoice email failed", inv.invoice_number, mailErr);
-        } else if ((mailRes as { success?: boolean } | null)?.success) {
-          emailed = true;
+          });
+          if (res.sent) {
+            emailed = true;
+            await logEmail(admin, mailTo, "sent");
+          } else {
+            await logEmail(admin, mailTo, "suppressed");
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Unknown email error";
+          console.error("invoice email failed", inv.invoice_number, msg);
+          await logEmail(admin, mailTo, "failed", msg);
         }
         if (emailed) {
           channel = channel === "portal" ? "portal+email" : "email";
           status = "sent";
           error = null;
         }
+
       }
 
       await admin.from("invoice_dispatches").insert({
