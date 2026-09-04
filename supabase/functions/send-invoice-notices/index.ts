@@ -1,4 +1,5 @@
 import { authenticate, handler, json } from "../_shared/auth.ts";
+import { sendTemplateEmail } from "../_shared/transactional-email-templates/send-email.ts";
 
 const PAGE = 500;
 
@@ -58,6 +59,23 @@ function langFor(country?: string | null, override?: string): Lang {
   if (country === "MK") return "mk";
   if (country === "AL" || country === "XK") return "sq";
   return "en";
+}
+
+// Append-only delivery history for the invoice notice emails. Never gates a
+// send — Lovable's managed delivery is the source of truth for suppression.
+async function logEmail(
+  admin: { from: (t: string) => { insert: (v: Record<string, unknown>) => Promise<{ error: unknown }> } },
+  recipient: string,
+  status: "sent" | "suppressed" | "failed",
+  errorMessage?: string,
+) {
+  const { error } = await admin.from("email_send_log").insert({
+    template_name: "invoice-notice",
+    recipient_email: recipient,
+    status,
+    ...(errorMessage ? { error_message: errorMessage } : {}),
+  });
+  if (error) console.error("email_send_log insert failed", error);
 }
 
 // Automated runs (pg_cron / server-side schedulers) present the service-role
