@@ -94,3 +94,22 @@ project_id = "volttrade-erp"
     # a per-table method whitelist, so the platform JWT gate must be OFF — the
     # Python client presents the analytics key, not a Supabase JWT.
     verify_jwt = false
+  [functions.risk-metrics]
+    # Risk module (VaR/CVaR, hedge frontier). Authenticates internally via
+    # _shared/auth.ts + resolveOrg(); org_id is never taken from the body.
+    # Pinned explicitly so a platform-default change cannot silently open it.
+    verify_jwt = true
+  [functions.optimize-hedge]
+    # Stochastic hedge optimiser. Same internal auth + resolveOrg pattern.
+    verify_jwt = true
+  [functions.forecast-price]
+    # Price forecast proxy to the analytics service. Requires a staff JWT;
+    # the analytics credential never leaves the server.
+    verify_jwt = true
+  [functions.ingest-memo]
+    # Trade-memo ingestion. Writes org-scoped rows — staff JWT only.
+    verify_jwt = true
+  [functions.quote-supply]
+    # Supply quote builder. Staff JWT only; pricing logic must not be
+    # callable anonymously.
+    verify_jwt = true

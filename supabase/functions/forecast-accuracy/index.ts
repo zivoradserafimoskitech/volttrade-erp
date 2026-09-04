@@ -43,7 +43,7 @@ Deno.serve(handler(async (req) => {
   const auth = await authenticate(req, { roles: ["admin", "operations", "management"] });
   const supabase = auth.admin;
 
-  let body: AccuracyRequest = {};
+  const body: AccuracyRequest = {};
   try {
     const parsed = await req.json();
     if (parsed && typeof parsed === "object") {
