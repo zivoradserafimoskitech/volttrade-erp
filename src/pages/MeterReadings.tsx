@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { Plus, Check, X, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { fmtNum } from "@/lib/format";
+import { DsoImportDialog } from "@/components/erp/DsoImportDialog";
 
 const STATUS_VARIANT: Record<string,string> = { pending: 'secondary', validated: 'default', rejected: 'destructive', corrected: 'outline' };
 
