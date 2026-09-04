@@ -27,6 +27,7 @@ Phase 2 additions:
 
 import os
 import json
+import math
 import pickle
 import numpy as np
 import pandas as pd
@@ -67,11 +68,14 @@ except ImportError:
     HAS_TORCH = False
     logger.warning("torch not installed — LSTM/GRU/CNN/TFT unavailable")
 
+from .deep_seq import DeepSequenceForecaster, KINDS as DEEP_KINDS, MIN_POINTS as DEEP_MIN_POINTS
+
 
 class ForecastEnsemble:
     """Multi-model ensemble with conformal calibration."""
 
-    AVAILABLE_MODELS = ["lightgbm", "xgboost", "lstm", "gru", "cnn", "seasonal_naive", "naive"]
+    AVAILABLE_MODELS = ["lightgbm", "xgboost", "lstm", "gru", "cnn", "tft", "seasonal_naive", "naive"]
+
 
     def __init__(self, model_dir: str = "./model_cache",
                  use_asinh: bool = True,
@@ -466,6 +470,14 @@ class ForecastEnsemble:
             except Exception as e:
                 logger.warning(f"XGBoost failed: {e}, falling back")
 
+        if model_type in DEEP_KINDS:
+            if not HAS_TORCH:
+                raise RuntimeError(
+                    f"'{model_type}' requires torch, which is not installed in this build")
+            result, mae = self._deep_forecast(df, horizon, model_type, zone)
+            return self._format_result(model_type, horizon, *result, self._capture_ratio(df, result[0]), mae, zone)
+
+
         # Ensemble: weighted average of available models
         forecasts = []
         weights = []
@@ -613,7 +625,56 @@ class ForecastEnsemble:
 
         return point, p10, p90
 
+    # ── deep sequence models (LSTM / GRU / CNN / TFT) ─────────────────────
+
+    def _deep_forecast(self, df: pd.DataFrame, horizon: int, kind: str,
+                       zone: str) -> Tuple[Tuple[List[float], List[float], List[float]], float]:
+        """Forecast with a torch sequence model, training on demand.
+
+        A cached checkpoint per (kind, zone) is reused when present; otherwise
+        the model is trained on the full loaded history and saved. Training a
+        3-year hourly series takes ~1-3 min on one CPU, so the cache matters.
+        """
+        series = df["price"].astype(float).to_numpy()
+        if len(series) < DEEP_MIN_POINTS:
+            raise RuntimeError(
+                f"'{kind}' needs at least {DEEP_MIN_POINTS} hourly prices for zone {zone}; "
+                f"only {len(series)} available — LightGBM remains the better choice here")
+
+        fc = DeepSequenceForecaster(kind, model_dir=self.model_dir)
+        if not fc.load(zone):
+            stats = fc.train(series)
+            fc.save(zone)
+            logger.info(f"trained {kind} for {zone}: {stats}")
+
+        point = fc.predict(series, horizon)
+        sigma = fc.residual_sigma(series) or float(np.std(np.diff(series[-720:])) or 1.0)
+        # Widen with the horizon: recursive forecasts accumulate error.
+        p10 = [p - 1.28 * sigma * math.sqrt(i + 1) for i, p in enumerate(point)]
+        p90 = [p + 1.28 * sigma * math.sqrt(i + 1) for i, p in enumerate(point)]
+        mae = round(fc.val_mae if fc.val_mae is not None else sigma, 2)
+        return (point, p10, p90), mae
+
+    def _capture_ratio(self, df: pd.DataFrame, point: List[float]) -> float:
+        """Share of perfect-foresight daily arbitrage spread the forecast captures."""
+        try:
+            if len(point) < 4:
+                return 0.0
+            fp = np.asarray(point, dtype=float)
+            actual = df["price"].astype(float).to_numpy()[-len(point):]
+            if len(actual) < len(point):
+                return 0.0
+            buy, sell = int(np.argmin(fp)), int(np.argmax(fp))
+            realised = actual[sell] - actual[buy]
+            perfect = actual.max() - actual.min()
+            if perfect <= 0:
+                return 0.0
+            return round(max(0.0, min(100.0, realised / perfect * 100)), 1)
+        except Exception:
+            return 0.0
+
     def _format_result(self, model_type: str, horizon: int, point: List[float],
+
                        p10: List[float], p90: List[float], capture_ratio: float,
                        mae: float, zone: str) -> Dict:
         """Format forecast result."""

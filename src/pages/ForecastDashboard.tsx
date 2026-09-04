@@ -213,7 +213,11 @@ export default function ForecastDashboard() {
               <SelectItem value="lightgbm">LightGBM</SelectItem>
               <SelectItem value="xgboost">XGBoost</SelectItem>
               <SelectItem value="lstm">LSTM</SelectItem>
+              <SelectItem value="gru">GRU</SelectItem>
+              <SelectItem value="cnn">CNN</SelectItem>
+              <SelectItem value="tft">TFT</SelectItem>
               <SelectItem value="seasonal_naive">Seasonal Naive</SelectItem>
+
             </SelectContent>
           </Select>
           <Button onClick={runForecast} disabled={loading}>
