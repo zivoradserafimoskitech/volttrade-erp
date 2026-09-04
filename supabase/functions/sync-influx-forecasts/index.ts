@@ -23,7 +23,7 @@
 //    person. Scheduled runs work.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.0";
-import { authenticate } from "../_shared/auth.ts";
+import { authenticate, AuthError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,6 +49,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Accepts EITHER a staff JWT or the service-role key (pg_cron).
+    const auth = await authenticate(req, {
+      roles: ["admin", "management", "operations", "trading"],
+    });
+    const admin = auth.admin;
+
     const INFLUX_URL = Deno.env.get("INFLUX_URL");
     const INFLUX_ORG = Deno.env.get("INFLUX_ORG");
     const INFLUX_BUCKET = Deno.env.get("INFLUX_BUCKET");
@@ -62,11 +68,6 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Accepts EITHER a staff JWT or the service-role key (pg_cron).
-    const auth = await authenticate(req, {
-      roles: ["admin", "management", "operations", "trading"],
-    });
-    const admin = auth.admin;
 
     // Ownership is the organization, not the caller. A service-role run has no
     // user, so resolve the org directly rather than through current_org_id().
@@ -208,7 +209,8 @@ from(bucket: "${INFLUX_BUCKET}")
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("sync-influx-forecasts error:", err);
+    const status = err instanceof AuthError ? err.status : 500;
     return new Response(JSON.stringify({ ok: false, error: err?.message ?? "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
