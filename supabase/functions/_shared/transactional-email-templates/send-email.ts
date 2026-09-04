@@ -24,7 +24,24 @@ export interface SendTemplateEmailOptions {
   /** Dedupes retries of the same logical send; defaults to a random UUID (no dedupe). */
   idempotencyKey?: string
   replyTo?: string
+  /**
+   * Operator-chosen From address. Only accepted when it is on the verified
+   * sending domain — anything else falls back to the default noreply address.
+   */
+  fromEmail?: string
 }
+
+function resolveFrom(fromEmail?: string): string {
+  const raw = (fromEmail ?? '').trim().toLowerCase()
+  if (raw && /^[a-z0-9._%+-]+@[a-z0-9.-]+$/.test(raw)) {
+    const domain = raw.split('@')[1]
+    if (domain === FROM_DOMAIN || domain === SENDER_DOMAIN) {
+      return `${SITE_NAME} <${raw}>`
+    }
+  }
+  return `${SITE_NAME} <noreply@${FROM_DOMAIN}>`
+}
+
 
 /**
  * Renders a registered template and sends it through Lovable's managed email
