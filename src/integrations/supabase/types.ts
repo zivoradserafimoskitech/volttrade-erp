@@ -4585,6 +4585,7 @@ export type Database = {
           invoice_number: string
         }[]
       }
+      market_zone_for_source: { Args: { p_source: string }; Returns: string }
       next_invoice_number: { Args: never; Returns: string }
       prune_lead_throttle: { Args: never; Returns: number }
       regulatory_value_for: {
