@@ -23,7 +23,7 @@
 //    person. Scheduled runs work.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.0";
-import { authenticate } from "../_shared/auth.ts";
+import { authenticate, AuthError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
