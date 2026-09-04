@@ -23,7 +23,7 @@ pulp>=2.7.0
 # The default PyPI torch wheel bundles CUDA (~2.5 GB) and will not fit the
 # instance; the CPU index below keeps the image around 300 MB.
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.4.1
+torch==2.8.0
 # NOTE: pytorch-forecasting is intentionally NOT used — the compact TFT in
 # models/deep_seq.py reproduces its gating/attention at CPU-affordable size.
 
