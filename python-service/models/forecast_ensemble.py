@@ -466,6 +466,14 @@ class ForecastEnsemble:
             except Exception as e:
                 logger.warning(f"XGBoost failed: {e}, falling back")
 
+        if model_type in DEEP_KINDS:
+            if not HAS_TORCH:
+                raise RuntimeError(
+                    f"'{model_type}' requires torch, which is not installed in this build")
+            result, mae = self._deep_forecast(df, horizon, model_type, zone)
+            return self._format_result(model_type, horizon, *result, self._capture_ratio(df, result[0]), mae, zone)
+
+
         # Ensemble: weighted average of available models
         forecasts = []
         weights = []
